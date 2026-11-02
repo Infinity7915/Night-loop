@@ -28,8 +28,7 @@ public static class Program
             VelopackApp.Build().Run();
             var app = new App();
             app.InitializeComponent();
-            app.StartupUri = null;
-            return Views.SmokeTest.Run(app, folder);
+            return Views.SmokeTest.Run(app, folder); // app.Run() is never called, so no window opens
         }
         catch (Exception ex)
         {
