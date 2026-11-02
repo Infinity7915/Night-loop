@@ -8,27 +8,28 @@
   <views:BoolToVisibleConverter x:Key="BoolToVisible" />
   <views:TextToVisibleConverter x:Key="TextToVisible" />
   <views:IsStageConverter x:Key="IsStage" />
-  <!-- Colors from the Night-loop design mockups. -->
-  <SolidColorBrush x:Key="Bg" Color="#0E1117" />
-  <SolidColorBrush x:Key="Sidebar" Color="#11141B" />
-  <SolidColorBrush x:Key="Panel" Color="#151922" />
-  <SolidColorBrush x:Key="PanelRaised" Color="#1B2030" />
-  <SolidColorBrush x:Key="Border" Color="#262C3A" />
+  <!-- Night-loop design colors, shifted to the deep purple of the icon's night sky. -->
+  <SolidColorBrush x:Key="Bg" Color="#110D1A" />
+  <SolidColorBrush x:Key="Sidebar" Color="#150F21" />
+  <SolidColorBrush x:Key="Panel" Color="#1A1428" />
+  <SolidColorBrush x:Key="PanelRaised" Color="#241C37" />
+  <SolidColorBrush x:Key="Border" Color="#30264A" />
   <SolidColorBrush x:Key="Text" Color="#E6E8EE" />
-  <SolidColorBrush x:Key="TextMuted" Color="#8B93A7" />
+  <SolidColorBrush x:Key="TextMuted" Color="#9C93B5" />
   <SolidColorBrush x:Key="Accent" Color="#4CC9F0" />
   <SolidColorBrush x:Key="AccentText" Color="#0B1220" />
   <SolidColorBrush x:Key="Purple" Color="#8B7CF6" />
   <SolidColorBrush x:Key="Record" Color="#F05454" />
   <SolidColorBrush x:Key="Warning" Color="#F5A524" />
-  <SolidColorBrush x:Key="Current" Color="#1F2A3D" />
+  <SolidColorBrush x:Key="Current" Color="#2B2145" />
   <SolidColorBrush x:Key="Success" Color="#3DD68C" />
 
   <FontFamily x:Key="Icons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
   <FontFamily x:Key="Mono">Cascadia Mono, Consolas</FontFamily>
 
-  <Style TargetType="Window">
+  <!-- Implicit styles skip subclasses like MainWindow, so windows use this key: Style="{StaticResource NightWindow}". -->
+  <Style x:Key="NightWindow" TargetType="Window">
     <Setter Property="Background" Value="{StaticResource Bg}" />
     <Setter Property="Foreground" Value="{StaticResource Text}" />
     <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI" />
@@ -174,7 +175,7 @@
       <Setter.Value>
         <ControlTemplate TargetType="RadioButton">
           <Grid>
-            <Border x:Name="Bg" CornerRadius="8" Background="#1B2030" Opacity="0" />
+            <Border x:Name="Bg" CornerRadius="8" Background="{StaticResource PanelRaised}" Opacity="0" />
             <Border x:Name="Bar" Width="3" Height="18" CornerRadius="2" Background="{StaticResource Accent}"
                     HorizontalAlignment="Left" Margin="0,0,0,0" RenderTransformOrigin="0.5,0.5">
               <Border.RenderTransform>

@@ -94,7 +94,7 @@
                     <Setter TargetName="Dot" Property="Visibility" Value="Visible" />
                   </DataTrigger>
                   <DataTrigger Binding="{Binding Kind}" Value="{x:Static updates:AnnouncementBlockKind.Paragraph}">
-                    <Setter TargetName="Body" Property="Foreground" Value="#C9CEDA" />
+                    <Setter TargetName="Body" Property="Foreground" Value="#D2CCE3" />
                   </DataTrigger>
                 </DataTemplate.Triggers>
               </DataTemplate>
