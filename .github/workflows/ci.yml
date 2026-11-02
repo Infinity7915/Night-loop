@@ -36,7 +36,8 @@ jobs:
         run: |
           $exe = Get-ChildItem src/NightLoop.App/bin/Release -Recurse -Filter NightLoop.exe | Select-Object -First 1
           $p = Start-Process $exe.FullName -ArgumentList '--smoke', "$pwd\smoke" -Wait -PassThru
-          Get-ChildItem smoke | Format-Table Name, Length
+          "Exit code: $($p.ExitCode)"
+          Get-ChildItem smoke -ErrorAction SilentlyContinue | Format-Table Name, Length
           Get-Content smoke\*.error.txt -ErrorAction SilentlyContinue
           if ($p.ExitCode -ne 0) { throw "UI smoke test failed (exit $($p.ExitCode))" }
 
