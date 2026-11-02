@@ -67,3 +67,42 @@ public sealed class IsStageConverter : IValueConverter
         value?.ToString() == parameter as string;
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
+
+/// <summary>
+/// For radio buttons bound to one string: checked when the value equals the parameter, and checking it writes the
+/// parameter back. Example: IsChecked="{Binding Mode, Converter={StaticResource EqualsParam}, ConverterParameter=dark}".
+/// </summary>
+public sealed class EqualsConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        string.Equals(value?.ToString(), parameter as string, StringComparison.OrdinalIgnoreCase);
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is true ? parameter : Binding.DoNothing;
+}
+
+/// <summary>"#RRGGBB" to a brush (group colors, accent swatches).</summary>
+public sealed class HexToBrushConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        try
+        {
+            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(value as string ?? "#808080"));
+            brush.Freeze();
+            return brush;
+        }
+        catch (FormatException)
+        {
+            return Brushes.Gray;
+        }
+    }
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
+}
+
+/// <summary>Visible when the value is not null; ConverterParameter=invert flips it.</summary>
+public sealed class NullToVisibleConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        (value is not null) ^ (parameter as string == "invert") ? Visibility.Visible : Visibility.Collapsed;
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
+}

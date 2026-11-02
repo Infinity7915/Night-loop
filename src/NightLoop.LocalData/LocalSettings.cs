@@ -22,7 +22,7 @@ public sealed class LocalSettings(string path)
         get
         {
             var raw = Environment.GetEnvironmentVariable("NIGHTLOOP_SERVER");
-            if (string.IsNullOrWhiteSpace(raw)) raw = Read()?["serverUrl"]?.GetValue<string>();
+            if (string.IsNullOrWhiteSpace(raw)) raw = ReadString("serverUrl");
             return Normalize(raw) ?? new Uri(DefaultServerUrl);
         }
     }
@@ -30,9 +30,33 @@ public sealed class LocalSettings(string path)
     /// <summary>Last email typed on the sign-in screen, so it's filled in next time.</summary>
     public string? LastEmail
     {
-        get => Read()?["lastEmail"]?.GetValue<string>();
+        get => ReadString("lastEmail");
         set => Write("lastEmail", value);
     }
+
+    /// <summary>Theme mode: "dark" (default), "light" or "system".</summary>
+    public string Theme
+    {
+        get => ReadString("theme") switch { "light" => "light", "system" => "system", _ => "dark" };
+        set => Write("theme", value);
+    }
+
+    /// <summary>Accent color as #RRGGBB, or null for the default.</summary>
+    public string? Accent
+    {
+        get => ReadString("accent") is { } a && IsHexColor(a) ? a.ToUpperInvariant() : null;
+        set => Write("accent", value is not null && IsHexColor(value) ? value.ToUpperInvariant() : null);
+    }
+
+    /// <summary>Name of the target game picked in Settings ("N/A" or missing = no target).</summary>
+    public string? ActiveGame
+    {
+        get => ReadString("activeGame");
+        set => Write("activeGame", value);
+    }
+
+    public static bool IsHexColor(string s) =>
+        s.Length == 7 && s[0] == '#' && s.Skip(1).All(Uri.IsHexDigit);
 
     internal static Uri? Normalize(string? raw)
     {
@@ -43,6 +67,9 @@ public sealed class LocalSettings(string path)
         // Passwords and tokens only travel over HTTPS. Plain HTTP is allowed for a server on this PC (development).
         return uri.Scheme == Uri.UriSchemeHttps || (uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback) ? uri : null;
     }
+
+    private string? ReadString(string key) =>
+        Read()?[key] is JsonValue v && v.TryGetValue(out string? s) ? s : null;
 
     private JsonObject? Read()
     {

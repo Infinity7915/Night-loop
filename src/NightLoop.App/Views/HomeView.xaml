@@ -25,7 +25,7 @@
           <StackPanel>
             <TextBlock Text="Stopwatch" Style="{StaticResource Muted}" />
             <TextBlock Margin="0,6,0,10" FontFamily="{StaticResource Mono}">
-              <Run Text="{Binding Stopwatch.Main, Mode=OneWay}" FontSize="26" /><Run Text="{Binding Stopwatch.Fraction, Mode=OneWay}" FontSize="15" Foreground="{StaticResource TextMuted}" />
+              <Run Text="{Binding Stopwatch.Main, Mode=OneWay}" FontSize="26" /><Run Text="{Binding Stopwatch.Fraction, Mode=OneWay}" FontSize="15" Foreground="{DynamicResource TextMuted}" />
             </TextBlock>
             <UniformGrid Columns="3">
               <Button Style="{StaticResource PrimaryButton}" Margin="0,0,4,0" Command="{Binding Stopwatch.StartCommand}" Content="Start" />
@@ -81,7 +81,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                   </Grid.ColumnDefinitions>
-                  <TextBlock x:Name="Dot" Text="•" Foreground="{StaticResource Accent}" Margin="2,0,10,0" Visibility="Collapsed" />
+                  <TextBlock x:Name="Dot" Text="•" Foreground="{DynamicResource Accent}" Margin="2,0,10,0" Visibility="Collapsed" />
                   <TextBlock x:Name="Body" Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap" LineHeight="21" />
                 </Grid>
                 <DataTemplate.Triggers>
@@ -94,7 +94,7 @@
                     <Setter TargetName="Dot" Property="Visibility" Value="Visible" />
                   </DataTrigger>
                   <DataTrigger Binding="{Binding Kind}" Value="{x:Static updates:AnnouncementBlockKind.Paragraph}">
-                    <Setter TargetName="Body" Property="Foreground" Value="#D2CCE3" />
+                    <Setter TargetName="Body" Property="Foreground" Value="{DynamicResource TextSoft}" />
                   </DataTrigger>
                 </DataTemplate.Triggers>
               </DataTemplate>
@@ -103,11 +103,12 @@
         </StackPanel>
       </Border>
 
-      <Border Margin="0,24,0,0" Padding="16,12" CornerRadius="10" BorderBrush="{StaticResource Border}" BorderThickness="1">
-        <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap">
-          <Run Text="&#xE72E;" FontFamily="{StaticResource Icons}" /><Run Text="  Signed in. Night-loop re-checks your session every minute and stops macros if the server ends it." />
+      <Grid Margin="0,24,0,0">
+        <Rectangle RadiusX="10" RadiusY="10" Stroke="{DynamicResource BorderStrong}" StrokeThickness="1" StrokeDashArray="4 3" />
+        <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="16,12">
+          <Run Text="&#xE72E;" FontFamily="{StaticResource Icons}" /><Run Text="  Session valid · re-checked every minute · macros stop if the server ends it" />
         </TextBlock>
-      </Border>
+      </Grid>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

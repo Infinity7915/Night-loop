@@ -1,13 +1,77 @@
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using NightLoop.App.Themes;
 
 namespace NightLoop.App.ViewModels;
 
-/// <summary>
-/// Settings: Updates and the account for now. Appearance, target games and account changes (schema section 8)
-/// come with milestone M8.
-/// </summary>
-public sealed class SettingsViewModel(ShellViewModel shell) : ObservableObject
+/// <summary>Settings (schema section 8): appearance, target game, account and updates.</summary>
+public sealed partial class SettingsViewModel : ObservableObject, IDisposable
 {
-    public ShellViewModel Shell => shell;
-    public UpdatesViewModel Updates => shell.Updates;
+    private readonly ShellViewModel _shell;
+    private readonly DispatcherTimer _gameTimer;
+
+    public SettingsViewModel(ShellViewModel shell)
+    {
+        _shell = shell;
+        Account = new AccountViewModel(shell.Session, shell.SignOutAsync);
+        Accents = ThemeManager.Accents.Select(hex => new AccentOption(hex)).ToList();
+        ThemeManager.Changed += OnThemeChanged;
+        // Detected / Not running labels stay current while Settings is open.
+        _gameTimer = new DispatcherTimer(TimeSpan.FromSeconds(4), DispatcherPriority.Background,
+            (_, _) => Games.RefreshStatus(), Dispatcher.CurrentDispatcher);
+        _gameTimer.Stop();
+    }
+
+    public ShellViewModel Shell => _shell;
+    public UpdatesViewModel Updates => _shell.Updates;
+    public TargetGamesViewModel Games => _shell.Games;
+    public AccountViewModel Account { get; }
+    public IReadOnlyList<AccentOption> Accents { get; }
+
+    public string ThemeMode
+    {
+        get => ThemeManager.Mode;
+        set => ThemeManager.SetMode(value);
+    }
+
+    public string Accent
+    {
+        get => ThemeManager.Accent;
+        set => ThemeManager.SetAccent(value);
+    }
+
+    public void OnShown()
+    {
+        Games.RefreshStatus();
+        _gameTimer.Start();
+    }
+
+    public void OnHidden() => _gameTimer.Stop();
+
+    private void OnThemeChanged()
+    {
+        OnPropertyChanged(nameof(ThemeMode));
+        OnPropertyChanged(nameof(Accent));
+        foreach (var a in Accents) a.Refresh();
+    }
+
+    public void Dispose()
+    {
+        _gameTimer.Stop();
+        ThemeManager.Changed -= OnThemeChanged;
+    }
+}
+
+/// <summary>One accent swatch.</summary>
+public sealed class AccentOption(string hex) : ObservableObject
+{
+    public string Hex { get; } = hex;
+
+    public bool IsSelected
+    {
+        get => string.Equals(ThemeManager.Accent, Hex, StringComparison.OrdinalIgnoreCase);
+        set { if (value) ThemeManager.SetAccent(Hex); }
+    }
+
+    internal void Refresh() => OnPropertyChanged(nameof(IsSelected));
 }

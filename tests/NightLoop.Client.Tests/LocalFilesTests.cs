@@ -37,6 +37,26 @@ public sealed class LocalFilesTests : IDisposable
         Assert.Equal("a@b.co", new LocalSettings(path).LastEmail);
     }
 
+    [Fact]
+    public void Theme_accent_and_target_game_are_saved_and_bad_values_fall_back()
+    {
+        var path = Path.Combine(_dir, "settings.json");
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(path, """{ "theme": 5, "accent": "purple", "activeGame": "Roblox" }""");
+        var settings = new LocalSettings(path);
+        Assert.Equal("dark", settings.Theme);    // not a string: default
+        Assert.Null(settings.Accent);            // not #RRGGBB: default
+        Assert.Equal("Roblox", settings.ActiveGame);
+
+        settings.Theme = "light";
+        settings.Accent = "#a78bfa";
+        settings.ActiveGame = null;
+        var reread = new LocalSettings(path);
+        Assert.Equal("light", reread.Theme);
+        Assert.Equal("#A78BFA", reread.Accent);
+        Assert.Null(reread.ActiveGame);
+    }
+
     [Theory]
     [InlineData("http://api.example.com/v1", false)]
     [InlineData("https://api.example.com/v1", true)]
