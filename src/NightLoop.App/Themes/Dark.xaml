@@ -4,6 +4,8 @@
   <views:NotConverter x:Key="Not" />
   <views:ZeroToVisibleConverter x:Key="ZeroToVisible" />
   <views:CategoryBrushConverter x:Key="CategoryBrush" />
+  <views:BoolToVisibleConverter x:Key="BoolToVisible" />
+  <views:TextToVisibleConverter x:Key="TextToVisible" />
   <!-- Colors from the Night-loop design mockups. -->
   <SolidColorBrush x:Key="Bg" Color="#0E1117" />
   <SolidColorBrush x:Key="Sidebar" Color="#11141B" />
@@ -95,6 +97,37 @@
     <Setter Property="CaretBrush" Value="{StaticResource Text}" />
     <Setter Property="Padding" Value="8,5" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <Style TargetType="PasswordBox">
+    <Setter Property="Background" Value="{StaticResource Bg}" />
+    <Setter Property="Foreground" Value="{StaticResource Text}" />
+    <Setter Property="BorderBrush" Value="{StaticResource Border}" />
+    <Setter Property="CaretBrush" Value="{StaticResource Text}" />
+    <Setter Property="Padding" Value="8,5" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <!-- Sign-in screens -->
+  <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource Muted}">
+    <Setter Property="Margin" Value="0,14,0,6" />
+  </Style>
+  <Style x:Key="FieldError" TargetType="TextBlock">
+    <Setter Property="Foreground" Value="{StaticResource Record}" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Margin" Value="0,6,0,0" />
+  </Style>
+  <Style x:Key="LinkButton" TargetType="Button">
+    <Setter Property="Foreground" Value="{StaticResource Accent}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <TextBlock Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}" FontSize="13" />
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
   </Style>
 
   <Style TargetType="CheckBox">
