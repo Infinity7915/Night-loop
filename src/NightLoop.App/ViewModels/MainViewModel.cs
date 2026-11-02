@@ -494,12 +494,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         IsRecording = true;
         StepAside();
+        HideWhileRecording();
         Status = $"Recording… press {RecordHotkeyText} to stop. Keys and clicks on Night-loop itself aren't recorded.";
     }
 
     private void StopRecording()
     {
         IsRecording = false;
+        ShowAfterRecording();
         SyncDoc();
         var result = _recorder.Stop(new RecordingOptions
         {
@@ -515,9 +517,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var count = result.Blocks.Count;
         if (count == 0)
         {
+            var skipped = _recorder.SkippedOwnInputs;
             Status = result.Truncated
                 ? "This macro is full, so nothing more could be recorded. Delete some blocks first."
-                : "Nothing was recorded. Keys and clicks on Night-loop itself are skipped, so click into the app you want first.";
+                : skipped > 0
+                    ? $"Nothing was recorded: all {skipped} keys and clicks went to Night-loop itself, which Record skips. Click into the app you want first."
+                    : "Nothing was recorded. No keys or clicks reached Night-loop while it was recording. If the app you used runs as administrator, run Night-loop as administrator too.";
             return;
         }
 
@@ -559,6 +564,27 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
         StartEditorRun(new RunSettings { TargetExe = TargetExe, Debug = true, StartIndex = SelectedBlock?.Index ?? 0 });
+    }
+
+    private bool _hiddenForRecording;
+    private WindowState _stateBeforeRecording;
+
+    /// <summary>Night-loop gets out of the way while recording: minimized, so nothing lands on it.</summary>
+    private void HideWhileRecording()
+    {
+        if (Application.Current?.MainWindow is not { } window || window.WindowState == WindowState.Minimized) return;
+        _hiddenForRecording = true;
+        _stateBeforeRecording = window.WindowState;
+        window.WindowState = WindowState.Minimized;
+    }
+
+    /// <summary>Recording stopped: Night-loop comes back with the new blocks in view.</summary>
+    private void ShowAfterRecording()
+    {
+        if (!_hiddenForRecording || Application.Current?.MainWindow is not { } window) return;
+        _hiddenForRecording = false;
+        window.WindowState = _stateBeforeRecording;
+        window.Activate();
     }
 
     /// <summary>
