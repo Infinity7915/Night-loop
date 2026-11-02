@@ -5,9 +5,9 @@ macros from blocks (keys, clicks, waits, loops, if/else and more).
 
 Night-loop never touches game memory. It only sends ordinary input through Windows, like a keyboard and mouse would.
 
-> **Status: early development.** Record and replay work, macros sync to your account through the
-> private server, and the app updates itself from GitHub Releases. Screen reading (text, image and pixel
-> detection), the rest of Settings and the full block editor are on the roadmap below.
+> **Status: early development.** Record and replay, the block editor, screen reading (text, image and pixel
+> detection) and Settings work. Macros sync to your account through the private server, and the app updates
+> itself from GitHub Releases.
 
 ## What works today
 
@@ -20,14 +20,18 @@ Night-loop never touches game memory. It only sends ordinary input through Windo
   **Ctrl+Alt+End** stops every macro at once. A target lock waits instead of typing into another window.
 - **Engine**: loops, repeat-until, if/else, labels and go-to, repeat count or forever, humanize
   (random timing and mouse jitter), breakpoints and single-step, several macros at once.
-- **Editor**: build macros from blocks in seven categories (Input, Camera, Timing, Detect, Logic, Window,
+- **Editor**: build macros from 38 blocks in seven categories (Input, Camera, Timing, Detect, Logic, Window,
   Utility). Reorder, duplicate, switch off or add notes to blocks, edit each block's settings in the side
-  panel, and debug with breakpoints, **Step** and **Run from**.
+  panel, and debug with breakpoints, **Step** and **Run from**. Block settings can be picked straight off the
+  screen: a point, a color, a region or a picture to look for. New macros start with a starter sequence
+  (focus, resize and position the game window, a loop to fill in, a notification), which Settings can turn off.
+- **Screen reading**: wait for text (Windows' built-in text recognition), an image or a pixel color; find and
+  click; scan and turn the camera until something shows up; if/until conditions on what's on screen.
 - **Saved macros**: groups with colors, search, a drafts banner with **Save all**, and per-macro start/stop
-  keys (toggle, hold or once) with an on/off switch, so several macros can run side by side.
-- **Settings**: dark (deep purple), light or system theme with four accent colors, target games (add any
-  running app), account changes (username, email, password with email codes), two-factor sign-in, download
-  my data, delete account.
+  keys (toggle or hold) with an on/off switch, so several macros can run side by side.
+- **Settings**: dark (deep purple), light or system theme with four accent colors, target games (Roblox,
+  Fortnite, Minecraft, or add any running app), a switch for the starter sequence new macros begin with,
+  account changes (username, email, password with email codes), two-factor sign-in, delete account.
 - **Accounts**: sign up with an emailed code, sign in (optionally trusting a PC for 30 days), forgot
   password. One PC is signed in at a time; signing in elsewhere signs this PC out and stops its macros.
 - **Sync**: macros live on your account (up to 15). Edits autosave as a draft within a couple of seconds;
@@ -37,7 +41,8 @@ Night-loop never touches game memory. It only sends ordinary input through Windo
 - **Updates**: installed copies update themselves from GitHub Releases on launch, on Refresh, from
   Settings → Check now and every 4 hours, downloading only what changed. A running macro is never
   interrupted by an update. See [docs/releasing.md](docs/releasing.md).
-- **Import/Export** macros as JSON files; an imported file becomes a new macro on your account.
+- **No import or export.** Macros only live on your account. The server also turns away app versions older
+  than 0.2.0.
 - **Privacy**: the app only talks to the server over HTTPS (plain HTTP only for a server on your own PC), and
   keeps its sign-in token encrypted with Windows DPAPI. On the server, passwords and tokens are only stored as
   one-way hashes, and emails and PC names are encrypted. See the server's `docs/privacy.md`.
@@ -102,7 +107,7 @@ More in [docs/architecture.md](docs/architecture.md) and [docs/macro-format.md](
 | M2 Client shell | Sign-in screens, DPAPI session, Home | Done |
 | M3 Macros API | Server macro storage, drafts, 15-macro limit | Done (server repo); app syncs macros |
 | M4 Editor UI | Block palette, inspector, saved list | Done |
-| M6 Vision | Capture, OCR, image and pixel detection | |
+| M6 Vision | Capture, OCR, image and pixel detection | Done |
 | M8 Settings | Appearance, target games, account changes, 2FA | Done |
 | M9 Ship | Velopack updates, release workflow, deployment | Updates and releases done; server deployment to come |
 | M10 | Public 1.0 | |
