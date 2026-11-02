@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>NightLoop.App</RootNamespace>
+    <AssemblyName>NightLoop</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NightLoop.Contracts\NightLoop.Contracts.csproj" />
+    <ProjectReference Include="..\NightLoop.Engine\NightLoop.Engine.csproj" />
+    <ProjectReference Include="..\NightLoop.LocalData\NightLoop.LocalData.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\icon.png" />
+    <None Include="Assets\icon.svg" />
+  </ItemGroup>
+</Project>

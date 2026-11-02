@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>NightLoop.Contracts</RootNamespace>
+    <Description>Shapes and rules shared by the Night-loop app and server: the macro document format, block types, limits and error codes.</Description>
+  </PropertyGroup>
+</Project>
