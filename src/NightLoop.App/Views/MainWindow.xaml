@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:NightLoop.App.ViewModels"
         xmlns:views="clr-namespace:NightLoop.App.Views"
+        xmlns:controls="clr-namespace:NightLoop.App.Controls"
         Title="Night-loop" Icon="/Assets/icon.png"
         Width="1280" Height="800" MinWidth="960" MinHeight="600"
         WindowStartupLocation="CenterScreen">
@@ -13,8 +14,14 @@
     <DataTemplate DataType="{x:Type vm:AuthViewModel}">
       <views:AuthView />
     </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:HomeViewModel}">
+      <views:HomeView />
+    </DataTemplate>
     <DataTemplate DataType="{x:Type vm:MainViewModel}">
       <views:MacrosView />
+    </DataTemplate>
+    <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
+      <views:SettingsView />
     </DataTemplate>
   </Window.Resources>
 
@@ -35,11 +42,20 @@
             <TextBlock Text="{Binding VersionText}" Style="{StaticResource Eyebrow}" />
           </StackPanel>
         </StackPanel>
-        <Border DockPanel.Dock="Top" Margin="0,24,0,0" Background="{StaticResource PanelRaised}" CornerRadius="8" Padding="12,9">
-          <TextBlock Text="⚡  Macros" FontWeight="SemiBold" />
-        </Border>
+        <StackPanel DockPanel.Dock="Top" Margin="0,24,0,0">
+          <!-- Icons are Segoe Fluent Icons / MDL2 glyphs: Home, Lightning bolt, Settings. -->
+          <RadioButton Style="{StaticResource NavTab}" Content="Home" Tag="&#xE80F;" IsChecked="{Binding IsHomeTab}" />
+          <RadioButton Style="{StaticResource NavTab}" Content="Macros" Tag="&#xE945;" IsChecked="{Binding IsMacrosTab}" />
+          <RadioButton Style="{StaticResource NavTab}" Content="Settings" Tag="&#xE713;" IsChecked="{Binding IsSettingsTab}" />
+        </StackPanel>
         <Border DockPanel.Dock="Bottom" Style="{StaticResource Card}" Padding="12" VerticalAlignment="Bottom">
           <StackPanel>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8"
+                        Visibility="{Binding Updates.CanRestart, Converter={StaticResource BoolToVisible}}">
+              <Ellipse Width="7" Height="7" Fill="{StaticResource Accent}" VerticalAlignment="Center" />
+              <Button Style="{StaticResource LinkButton}" Content="Update ready · Restart" Margin="6,0,0,0"
+                      Command="{Binding Updates.RestartCommand}" />
+            </StackPanel>
             <TextBlock Text="SIGNED IN AS" Style="{StaticResource Eyebrow}" />
             <TextBlock Text="{Binding Username}" FontWeight="SemiBold" Margin="0,4,0,0"
                        TextTrimming="CharacterEllipsis" ToolTip="{Binding Username}" />
@@ -52,6 +68,6 @@
       </DockPanel>
     </Border>
 
-    <ContentControl Grid.Column="1" Content="{Binding CurrentPage}" Focusable="False" />
+    <controls:PageHost Grid.Column="1" Content="{Binding CurrentPage}" />
   </Grid>
 </Window>

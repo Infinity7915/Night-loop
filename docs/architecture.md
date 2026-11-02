@@ -10,7 +10,9 @@ NightLoop.App ──► NightLoop.Engine ──► NightLoop.Contracts ◄──
      │                                       ▲
      ├──► NightLoop.Client ──────────────────┘
      │          │
-     └──► NightLoop.LocalData ◄┘
+     ├──► NightLoop.LocalData ◄┘
+     │
+     └──► NightLoop.Updates ──► GitHub (Releases + announcements.md)
 ```
 
 - **Contracts** has no Windows code. It defines `MacroDoc`, the block catalog (`BlockTypes`), `KeyCatalog`
@@ -24,8 +26,13 @@ NightLoop.App ──► NightLoop.Engine ──► NightLoop.Contracts ◄──
 - **Engine** targets plain `net8.0` so its logic runs in tests on any OS. Classes that call Win32 are marked
   `[SupportedOSPlatform("windows10.0.17763")]` and use [CsWin32](https://github.com/microsoft/CsWin32)
   generated P/Invoke (`NativeMethods.txt`), so there are no hand-written signatures.
-- **App** is WPF with CommunityToolkit.Mvvm. It's per-monitor DPI aware (`app.manifest`) so recorded and
-  replayed pixel coordinates match on every monitor.
+- **Updates** has no UI code either: `UpdateService` (check → download → restart, one check at a time, failures
+  keep the current version) over `VelopackUpdater`, and `AnnouncementFeed`, which reads `announcements.md` from
+  the repo and caches it. Both talk only to GitHub. See [releasing.md](releasing.md).
+- **App** is WPF with CommunityToolkit.Mvvm. `Program.Main` runs Velopack's hooks before WPF starts. Pages are
+  Loading → Sign in → Home / Macros / Settings; `Controls/PageHost` cross-fades between them (off when Windows
+  animation effects are off). `NightLoop.exe --smoke <folder>` draws every screen to a PNG for CI. It's per-monitor DPI aware (`app.manifest`) so recorded and replayed pixel coordinates match on every
+  monitor.
 
 ## Replay pipeline
 
@@ -85,6 +92,6 @@ Loading ──► GET /health, saved token? ──► GET /me ──► Macros p
 
 ## Not built yet
 
-Vision (text, image, pixel detection) raises a clear fault when a macro uses it. Settings screens (username,
-email, password, 2FA; the API calls exist in `ApiClient`), groups in the UI, Velopack updates and the full
-editor follow the roadmap in the README.
+Vision (text, image, pixel detection) raises a clear fault when a macro uses it. The rest of Settings
+(appearance, target games, username, email, password, 2FA; the API calls exist in `ApiClient`), groups in the
+UI and the full editor follow the roadmap in the README.

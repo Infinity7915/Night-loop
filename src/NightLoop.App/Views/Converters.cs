@@ -59,3 +59,11 @@ public sealed class CategoryBrushConverter : IValueConverter
         return brush;
     }
 }
+
+/// <summary>True when the bound update stage matches the parameter, e.g. ConverterParameter=Checking.</summary>
+public sealed class IsStageConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value?.ToString() == parameter as string;
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
+}

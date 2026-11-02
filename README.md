@@ -5,9 +5,9 @@ macros from blocks (keys, clicks, waits, loops, if/else and more).
 
 Night-loop never touches game memory. It only sends ordinary input through Windows, like a keyboard and mouse would.
 
-> **Status: early development.** Record and replay work, and macros sync to your account through the
-> private server. Screen reading (text, image and pixel detection), settings screens and the full block
-> editor are on the roadmap below.
+> **Status: early development.** Record and replay work, macros sync to your account through the
+> private server, and the app updates itself from GitHub Releases. Screen reading (text, image and pixel
+> detection), the rest of Settings and the full block editor are on the roadmap below.
 
 ## What works today
 
@@ -24,10 +24,21 @@ Night-loop never touches game memory. It only sends ordinary input through Windo
   password. One PC is signed in at a time; signing in elsewhere signs this PC out and stops its macros.
 - **Sync**: macros live on your account (up to 15). Edits autosave as a draft within a couple of seconds;
   **Save** makes it the saved copy. Open them from any PC.
+- **Home**: greeting, stopwatch, active macros, update status, and an announcements box whose text is
+  [`announcements.md`](announcements.md) in this repo. Edit that file on GitHub and the app shows it.
+- **Updates**: installed copies update themselves from GitHub Releases on launch, on Refresh, from
+  Settings → Check now and every 4 hours, downloading only what changed. A running macro is never
+  interrupted by an update. See [docs/releasing.md](docs/releasing.md).
 - **Import/Export** macros as JSON files; an imported file becomes a new macro on your account.
 - **Privacy**: the app only talks to the server over HTTPS (plain HTTP only for a server on your own PC), and
   keeps its sign-in token encrypted with Windows DPAPI. On the server, passwords and tokens are only stored as
   one-way hashes, and emails and PC names are encrypted. See the server's `docs/privacy.md`.
+
+## Download
+
+Get **NightLoop-win-Setup.exe** from the [latest release](https://github.com/Infinity7915/Night-loop/releases/latest)
+and run it. It installs for your Windows user (no admin) and keeps itself up to date. Windows may say "Windows
+protected your PC" because the app isn't code-signed yet: click **More info → Run anyway**.
 
 ## Using it
 
@@ -64,8 +75,10 @@ See [docs/building.md](docs/building.md) for more.
 | `src/NightLoop.Engine` | Runs and records macros. No UI code. Compiler, runner, input, window control, hotkeys, recording |
 | `src/NightLoop.Client` | Talks to the server: API client, sign-in session, saved token, device id, draft autosave |
 | `src/NightLoop.LocalData` | Per-PC files: target games list, settings.json |
+| `src/NightLoop.Updates` | Velopack updates from GitHub Releases, and the Home announcements from `announcements.md` |
 | `src/NightLoop.App` | WPF desktop app |
-| `tests/` | xUnit tests for Contracts, Engine (fake input) and Client (fake server) |
+| `tests/` | xUnit tests for Contracts, Engine (fake input), Client (fake server) and Updates |
+| `announcements.md` | The text in the Home screen's announcements box |
 
 More in [docs/architecture.md](docs/architecture.md) and [docs/macro-format.md](docs/macro-format.md).
 
@@ -77,11 +90,13 @@ More in [docs/architecture.md](docs/architecture.md) and [docs/macro-format.md](
 | M5 Engine core | Compiler, runner, SendInput, logic blocks, hotkeys, panic key | Done (vision-free parts) |
 | M7 Recording | Hooks to blocks, target-game lock | Done (window blocks need testing in games) |
 | M1 Accounts | Server: register, verify, sign in, sessions | Done (server repo) |
-| M2 Client shell | Sign-in screens, DPAPI session | Done (Home screen still to come) |
+| M2 Client shell | Sign-in screens, DPAPI session, Home | Done |
 | M3 Macros API | Server macro storage, drafts, 15-macro limit | Done (server repo); app syncs macros |
 | M4 Editor UI | Block palette, inspector, saved list | |
 | M6 Vision | Capture, OCR, image and pixel detection | |
-| M8–M10 | Settings, updates (Velopack), deployment, 1.0 | |
+| M8 Settings | Appearance, target games, account changes, 2FA | Updates and sign out done |
+| M9 Ship | Velopack updates, release workflow, deployment | Updates and releases done; server deployment to come |
+| M10 | Public 1.0 | |
 
 ## License
 

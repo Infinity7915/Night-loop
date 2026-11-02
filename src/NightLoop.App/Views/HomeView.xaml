@@ -1,0 +1,113 @@
+<UserControl x:Class="NightLoop.App.Views.HomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:updates="clr-namespace:NightLoop.Updates;assembly=NightLoop.Updates">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="40,32,40,32">
+      <Grid>
+        <StackPanel>
+          <TextBlock Text="HOME" Style="{StaticResource Eyebrow}" />
+          <TextBlock Text="{Binding Greeting}" Style="{StaticResource PageTitle}" />
+          <TextBlock Text="{Binding DateText}" Style="{StaticResource Muted}" FontSize="14" />
+        </StackPanel>
+        <Button HorizontalAlignment="Right" VerticalAlignment="Center" Command="{Binding RefreshCommand}"
+                ToolTip="Get the latest announcements and install any update">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xE72C;" FontFamily="{StaticResource Icons}" VerticalAlignment="Center" />
+            <TextBlock Text="Refresh" Margin="8,0,0,0" />
+          </StackPanel>
+        </Button>
+      </Grid>
+
+      <UniformGrid Columns="3" Margin="0,24,0,0">
+        <!-- Stopwatch -->
+        <Border Style="{StaticResource Card}" Padding="20,18" Margin="0,0,8,0">
+          <StackPanel>
+            <TextBlock Text="Stopwatch" Style="{StaticResource Muted}" />
+            <TextBlock Margin="0,6,0,10" FontFamily="{StaticResource Mono}">
+              <Run Text="{Binding Stopwatch.Main, Mode=OneWay}" FontSize="26" /><Run Text="{Binding Stopwatch.Fraction, Mode=OneWay}" FontSize="15" Foreground="{StaticResource TextMuted}" />
+            </TextBlock>
+            <UniformGrid Columns="3">
+              <Button Style="{StaticResource PrimaryButton}" Margin="0,0,4,0" Command="{Binding Stopwatch.StartCommand}" Content="Start" />
+              <Button Margin="2,0" Command="{Binding Stopwatch.StopCommand}" Content="Stop" />
+              <Button Margin="4,0,0,0" Command="{Binding Stopwatch.ClearCommand}" Content="Clear" />
+            </UniformGrid>
+          </StackPanel>
+        </Border>
+
+        <!-- Active macros -->
+        <Border Style="{StaticResource Card}" Padding="20,18" Margin="8,0">
+          <StackPanel>
+            <TextBlock Text="Active macros" Style="{StaticResource Muted}" />
+            <TextBlock FontSize="22" FontWeight="Bold" Margin="0,6,0,8">
+              <Run Text="{Binding Shell.Macros.ActiveRunCount, Mode=OneWay, FallbackValue=0}" /><Run Text=" running" />
+            </TextBlock>
+            <Button Style="{StaticResource LinkButton}" Content="Open Macros →" HorizontalAlignment="Left"
+                    Command="{Binding OpenMacrosCommand}" />
+          </StackPanel>
+        </Border>
+
+        <!-- Updates -->
+        <Border Style="{StaticResource Card}" Padding="20,18" Margin="8,0,0,0">
+          <StackPanel>
+            <TextBlock Text="Updates" Style="{StaticResource Muted}" />
+            <TextBlock Text="{Binding Updates.Title}" FontSize="22" FontWeight="Bold" Margin="0,6,0,4"
+                       TextTrimming="CharacterEllipsis" ToolTip="{Binding Updates.Title}" />
+            <TextBlock Text="{Binding Updates.Detail}" Style="{StaticResource Muted}" TextWrapping="Wrap" />
+            <ProgressBar Margin="0,10,0,0" Value="{Binding Updates.Progress, Mode=OneWay}"
+                         IsIndeterminate="{Binding Updates.Stage, Mode=OneWay, Converter={StaticResource IsStage}, ConverterParameter=Checking}"
+                         Visibility="{Binding Updates.IsWorking, Converter={StaticResource BoolToVisible}}" />
+            <Button Style="{StaticResource PrimaryButton}" Content="Restart" HorizontalAlignment="Left" Margin="0,10,0,0"
+                    Command="{Binding Updates.RestartCommand}"
+                    Visibility="{Binding Updates.CanRestart, Converter={StaticResource BoolToVisible}}" />
+          </StackPanel>
+        </Border>
+      </UniformGrid>
+
+      <!-- Announcements: announcements.md in the GitHub repository -->
+      <Border Style="{StaticResource Card}" Padding="24,20" Margin="0,24,0,0">
+        <StackPanel>
+          <Grid>
+            <TextBlock Text="Updates &amp; announcements" Style="{StaticResource CardTitle}" />
+            <TextBlock Text="{Binding AnnouncementMeta}" Style="{StaticResource Eyebrow}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+          </Grid>
+          <TextBlock Text="Nothing new right now." Style="{StaticResource Muted}" Margin="0,12,0,0"
+                     Visibility="{Binding HasAnnouncements, Converter={StaticResource BoolToVisible}, ConverterParameter=invert}" />
+          <ItemsControl ItemsSource="{Binding Announcements}" Margin="0,6,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="{x:Type updates:AnnouncementBlock}">
+                <Grid Margin="0,6,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock x:Name="Dot" Text="•" Foreground="{StaticResource Accent}" Margin="2,0,10,0" Visibility="Collapsed" />
+                  <TextBlock x:Name="Body" Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap" LineHeight="21" />
+                </Grid>
+                <DataTemplate.Triggers>
+                  <DataTrigger Binding="{Binding Kind}" Value="{x:Static updates:AnnouncementBlockKind.Heading}">
+                    <Setter TargetName="Body" Property="FontWeight" Value="SemiBold" />
+                    <Setter TargetName="Body" Property="FontSize" Value="15" />
+                    <Setter TargetName="Body" Property="Margin" Value="0,8,0,0" />
+                  </DataTrigger>
+                  <DataTrigger Binding="{Binding Kind}" Value="{x:Static updates:AnnouncementBlockKind.Bullet}">
+                    <Setter TargetName="Dot" Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                  <DataTrigger Binding="{Binding Kind}" Value="{x:Static updates:AnnouncementBlockKind.Paragraph}">
+                    <Setter TargetName="Body" Property="Foreground" Value="#C9CEDA" />
+                  </DataTrigger>
+                </DataTemplate.Triggers>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <Border Margin="0,24,0,0" Padding="16,12" CornerRadius="10" BorderBrush="{StaticResource Border}" BorderThickness="1">
+        <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap">
+          <Run Text="&#xE72E;" FontFamily="{StaticResource Icons}" /><Run Text="  Signed in. Night-loop re-checks your session every minute and stops macros if the server ends it." />
+        </TextBlock>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
