@@ -25,11 +25,11 @@ public sealed class BoolToVisibleConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
-/// <summary>Visible when the bound text is not empty (used for error lines).</summary>
+/// <summary>Visible when the bound text is not empty (used for error lines); ConverterParameter=invert flips it.</summary>
 public sealed class TextToVisibleConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
-        value is string { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
+        (value is string { Length: > 0 }) ^ (parameter as string == "invert") ? Visibility.Visible : Visibility.Collapsed;
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
 
@@ -105,4 +105,12 @@ public sealed class NullToVisibleConverter : IValueConverter
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
         (value is not null) ^ (parameter as string == "invert") ? Visibility.Visible : Visibility.Collapsed;
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotSupportedException();
+}
+
+/// <summary>True when all bound values are the same text, ignoring case (e.g. which group color is picked).</summary>
+public sealed class StringsEqualConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture) =>
+        values.Length > 1 && values.All(v => string.Equals(v?.ToString(), values[0]?.ToString(), StringComparison.OrdinalIgnoreCase));
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }

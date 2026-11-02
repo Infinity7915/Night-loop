@@ -175,6 +175,35 @@ public class RunnerTests
     }
 
     [Fact]
+    public async Task Start_paused_holds_before_the_first_block_then_steps_one_at_a_time()
+    {
+        var input = new FakeInput();
+        var doc = new MacroBuilder().Press("A").Press("B").Build();
+        var run = new MacroRun(MacroCompiler.Compile(doc), new RunEnvironment { Input = input, Delay = new FakeDelay() },
+            new RunSettings { StartPaused = true });
+        run.Start();
+
+        await WaitFor(() => run.State == RunState.AtBreakpoint);
+        Assert.Equal(0, run.CurrentIndex);
+        Assert.Empty(input.Log);
+
+        run.StepOnce();
+        await WaitFor(() => run.State == RunState.AtBreakpoint && run.CurrentIndex == 1);
+        Assert.Equal(["down A", "up A"], input.Log);
+
+        run.Continue();
+        await run.Completion.WaitAsync(Timeout);
+        Assert.Equal("up B", input.Log[^1]);
+    }
+
+    [Fact]
+    public async Task Run_from_starts_at_the_chosen_block()
+    {
+        var (_, input, _) = await RunAsync(new MacroBuilder().Press("A").Press("B").Build(), new RunSettings { StartIndex = 1 });
+        Assert.Equal(["down B", "up B"], input.Log);
+    }
+
+    [Fact]
     public async Task Vision_conditions_fault_with_a_clear_message_for_now()
     {
         var doc = new MacroBuilder().If(new JsonObject { ["kind"] = "textVisible", ["text"] = "hi" }).Press("A").End().Build();
