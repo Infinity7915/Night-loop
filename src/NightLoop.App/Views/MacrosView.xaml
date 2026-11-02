@@ -364,8 +364,9 @@
             <!-- Add block: category chips, then the open category's blocks -->
             <Border BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Padding="20,16">
               <StackPanel>
-                <WrapPanel>
-                  <TextBlock Text="Add block" Style="{StaticResource SmallLabel}" Margin="0,0,12,0" />
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Left" Text="Add block" Style="{StaticResource SmallLabel}" Margin="0,13,12,0"
+                             VerticalAlignment="Top" />
                   <ItemsControl ItemsSource="{Binding Categories}">
                     <ItemsControl.ItemsPanel>
                       <ItemsPanelTemplate>
@@ -404,7 +405,7 @@
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
-                </WrapPanel>
+                </DockPanel>
                 <ItemsControl ItemsSource="{Binding PaletteItems}" Margin="0,12,0,0"
                               Visibility="{Binding OpenCategory, Converter={StaticResource NullToVisible}}">
                   <ItemsControl.ItemsPanel>
