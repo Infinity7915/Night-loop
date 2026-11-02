@@ -6,6 +6,7 @@ using NightLoop.Contracts.MacroDocument;
 using NightLoop.Engine.Compiler;
 using NightLoop.Engine.Hotkeys;
 using NightLoop.Engine.Runtime;
+using NightLoop.LocalData;
 
 namespace NightLoop.App.ViewModels;
 
@@ -69,9 +70,9 @@ public sealed partial class MainViewModel
 
     /// <summary>The macro's own game when it names one we know, otherwise the target picked in Settings.</summary>
     private string? ExeFor(string? targetGame) =>
-        targetGame is not null && _games.Games.FirstOrDefault(g => g.Game.Name == targetGame) is { } option
-            ? option.Game.Exe
-            : SelectedGame.Exe;
+        GamesStore.CurrentName(targetGame) is { } name && _games.Games.FirstOrDefault(g => g.Game.Name == name) is { } option
+            ? option.Game.Resolve(TargetGamesViewModel.IsRunning)
+            : TargetExe;
 
     private void TrackRun(Guid id, MacroRun run)
     {

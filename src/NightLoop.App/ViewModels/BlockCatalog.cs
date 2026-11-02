@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using NightLoop.Contracts.MacroDocument;
 
@@ -6,16 +7,13 @@ namespace NightLoop.App.ViewModels;
 /// <summary>How a block field is edited in the inspector.</summary>
 public enum FieldKind
 {
-    /// <summary>Whole number. Optional ones may be left blank (removed from params).</summary>
-    Int,
+    /// <summary>One line of text (numbers, keys, colors, regions…).</summary>
     Text,
-    /// <summary>Multi-line text that grows to fit (utility.description).</summary>
+    /// <summary>Multi-line text that grows to fit (Description).</summary>
     MultiLine,
     /// <summary>Pick one of <see cref="FieldDef.Choices"/>.</summary>
     Choice,
-    /// <summary>A key name from KeyCatalog.</summary>
-    Key,
-    /// <summary>A saved macro's name (typed, with saved names suggested).</summary>
+    /// <summary>A saved macro's name, picked from the account's macros.</summary>
     MacroName,
 }
 
@@ -26,22 +24,24 @@ public sealed record Choice(string Value, string Label)
 }
 
 /// <summary>
-/// One editable field. <see cref="Path"/> is a params key, or "from.x" style for nested points.
-/// Condition fields use the pseudo paths "condition.kind" and "condition.value" (see <see cref="Conditions"/>).
+/// One editable field. <see cref="Get"/> reads the block as text and <see cref="Set"/> writes it back, returning an error
+/// message instead when the text isn't valid (the block then keeps its last good value).
 /// </summary>
 public sealed record FieldDef(
-    string Path,
+    string Key,
     string Label,
     FieldKind Kind,
-    int Min = int.MinValue,
-    int Max = int.MaxValue,
+    Func<Block, string> Get,
+    Func<Block, string, string?> Set,
     IReadOnlyList<Choice>? Choices = null,
-    bool Optional = false,
-    int MaxLength = 200,
+    string? Placeholder = null,
     string? Hint = null,
-    bool IntChoice = false);
+    int MaxLength = 200,
+    Func<Block, bool>? ShowIf = null,
+    bool AllMacros = false,
+    bool Mono = true);
 
-/// <summary>A palette entry: one block type (sometimes with preset params, like Pause vs Resume macro).</summary>
+/// <summary>A palette entry: one block type with its defaults, inspector fields and one-line summary.</summary>
 public sealed record BlockDef(
     string Key,
     string Type,
@@ -51,15 +51,17 @@ public sealed record BlockDef(
     string Description,
     Func<JsonObject> Defaults,
     IReadOnlyList<FieldDef> Fields,
-    bool NeedsVision = false)
+    Func<Block, string> Summary,
+    bool Hidden = false)
 {
-    /// <summary>Shown on palette cards for blocks the engine can't run yet.</summary>
-    public string Badge => NeedsVision ? "Coming soon" : "";
+    /// <summary>The category's color, for the palette card's edge.</summary>
+    public string Color => BlockCatalog.ColorOf(Category);
 }
 
 /// <summary>
-/// The block catalog from schema section 6, with the labels and descriptions from the Macros mockup. The palette,
-/// the inspector and the timeline all read from here.
+/// The block catalog from the Macros mockup: 38 blocks in seven categories, with the mockup's labels, tags,
+/// descriptions, fields and summaries. The palette, the inspector and the timeline all read from here. Hidden entries
+/// only edit blocks from older macros.
 /// </summary>
 public static class BlockCatalog
 {
@@ -69,167 +71,608 @@ public static class BlockCatalog
         ("Logic", "#58A6FF"), ("Window", "#4CC9F0"), ("Utility", "#C9D1D9"),
     ];
 
-    private static readonly Choice[] Buttons = [new("left", "Left"), new("right", "Right"), new("middle", "Middle"), new("x1", "Back (X1)"), new("x2", "Forward (X2)")];
-    private static readonly Choice[] KeyActions = [new("press", "Press"), new("down", "Hold down"), new("up", "Release")];
-    private static readonly Choice[] RelativeTo = [new("screen", "Screen"), new("gameWindow", "Game window")];
+    private static readonly Choice[] Buttons = [new("left", "Left"), new("right", "Right"), new("middle", "Middle")];
+    private static readonly Choice[] KeyActions = [new("press", "Press"), new("down", "Down"), new("up", "Up")];
+    private static readonly Choice[] ClickCounts = [new("1", "1"), new("2", "2"), new("3", "3")];
+    private static readonly Choice[] MoveModes = [new("absolute", "Absolute"), new("relative", "Relative")];
+    private static readonly Choice[] UpDown = [new("up", "Up"), new("down", "Down")];
+    private static readonly Choice[] TurnMethods = [new("rightDrag", "Right-drag"), new("arrowKeys", "Arrow keys"), new("mouseMove", "Mouse move")];
     private static readonly Choice[] Directions = [new("right", "Right"), new("left", "Left"), new("up", "Up"), new("down", "Down")];
-    private static readonly Choice[] ClickCounts = [new("1", "Single"), new("2", "Double"), new("3", "Triple")];
-    private static readonly Choice[] PauseModes = [new("pause", "Pause it"), new("resume", "Resume it")];
-    private static readonly Choice[] Sounds = [new("default", "Default"), new("beep", "Beep"), new("exclamation", "Exclamation"), new("asterisk", "Asterisk"), new("question", "Question")];
-    private static readonly Choice[] OnTimeout = [new("continue", "Continue"), new("stop", "Stop macro")];
-
-    private static readonly FieldDef[] ConditionFields =
+    private static readonly Choice[] RightLeft = [new("right", "Right"), new("left", "Left")];
+    private static readonly Choice[] Zoom = [new("in", "In"), new("out", "Out")];
+    private static readonly Choice[] PauseWhen = [new("now", "Right away"), new("afterBlock", "After its current block")];
+    private static readonly Choice[] ResumeFrom = [new("paused", "Where it paused"), new("start", "The start")];
+    private static readonly Choice[] Matches = [new("exact", "Exact"), new("contains", "Contains")];
+    private static readonly Choice[] FindTargets = [new("text", "Text"), new("image", "Image"), new("pixel", "Pixel color")];
+    private static readonly Choice[] WhenFound = [new("click", "Click it"), new("center", "Center camera on it"), new("continue", "Continue")];
+    private static readonly Choice[] Monitors = [new("1", "Primary"), new("2", "Monitor 2"), new("3", "Monitor 3"), new("0", "Current")];
+    private static readonly Choice[] Anchors =
     [
-        new("condition.kind", "Condition", FieldKind.Choice, Choices: Conditions.Kinds),
-        new("condition.value", "Value", FieldKind.Text, Optional: true, MaxLength: 200,
-            Hint: "Text to look for, or a process name like RobloxPlayerBeta.exe"),
+        new("center", "Center"), new("topLeft", "Top-left"), new("topRight", "Top-right"),
+        new("bottomLeft", "Bottom-left"), new("bottomRight", "Bottom-right"), new("custom", "Custom"),
     ];
+    private static readonly Choice[] NotifyKinds = [new("toast", "Toast"), new("sound", "Sound"), new("both", "Toast + sound")];
+    private static readonly Choice[] Sounds = [new("default", "Default"), new("beep", "Beep"), new("exclamation", "Exclamation"), new("asterisk", "Asterisk"), new("question", "Question")];
 
-    private static readonly FieldDef Ms = new("ms", "Duration (ms)", FieldKind.Int, MacroLimits.WaitMinMs, MacroLimits.WaitMaxMs);
+    private const int Coord = 32_767;
 
     public static readonly IReadOnlyList<BlockDef> All =
     [
-        // ---- Input ----
+        // ---- Input (8) ----
         new("key", BlockTypes.Key, "Key", "KEY", "Input", "Press, hold down or release one key.",
-            () => new() { ["key"] = "E", ["action"] = "press", ["holdMs"] = 30 },
-            [new("key", "Key", FieldKind.Key), new("action", "Action", FieldKind.Choice, Choices: KeyActions),
-             new("holdMs", "Hold for (ms)", FieldKind.Int, 0, MacroLimits.WaitMaxMs, Optional: true, Hint: "Used by Press. Blank = 30 ms")]),
+            () => new() { ["key"] = "E", ["action"] = "press" },
+            [F.Key("key", "Key"), F.Pick("action", "Action", KeyActions, "press")],
+            b => $"{Label(KeyActions, b.GetString("action", "press"))} {b.GetString("key", "?")}"),
+        new("combo", BlockTypes.Combo, "Key combo", "CMB", "Input", "Press several keys together, like Ctrl + Shift + E.",
+            () => new() { ["keys"] = "Ctrl + E" },
+            [F.Combo("keys", "Keys")],
+            b => b.GetString("keys", "")),
+        new("holdkey", BlockTypes.HoldKey, "Hold key", "HLD", "Input", "Hold a key for a set time. Good for walking.",
+            () => new() { ["key"] = "W", ["holdMs"] = 1000 },
+            [F.Key("key", "Key"), F.Int("holdMs", "Hold for (ms)", 1, MacroLimits.WaitMaxMs)],
+            b => $"{b.GetString("key", "?")} for {b.GetInt("holdMs", 0)} ms"),
         new("click", BlockTypes.Click, "Click", "CLK", "Input", "Click at a position, or where the mouse is.",
-            () => new() { ["button"] = "left", ["clicks"] = 1 },
-            [new("button", "Button", FieldKind.Choice, Choices: Buttons),
-             new("clicks", "Clicks", FieldKind.Choice, Choices: ClickCounts, IntChoice: true),
-             new("x", "X", FieldKind.Int, -32_768, 32_767, Optional: true, Hint: "Leave X and Y blank to click where the mouse is"),
-             new("y", "Y", FieldKind.Int, -32_768, 32_767, Optional: true),
-             new("relativeTo", "Relative to", FieldKind.Choice, Choices: RelativeTo)]),
-        new("move", BlockTypes.Move, "Mouse move", "MOVE", "Input", "Move the mouse to a point.",
-            () => new() { ["x"] = 0, ["y"] = 0, ["relativeTo"] = "screen", ["durationMs"] = 120 },
-            [new("x", "X", FieldKind.Int, -32_768, 32_767), new("y", "Y", FieldKind.Int, -32_768, 32_767),
-             new("relativeTo", "Relative to", FieldKind.Choice, Choices: RelativeTo),
-             new("durationMs", "Duration (ms)", FieldKind.Int, 0, MacroLimits.WaitMaxMs)]),
-        new("drag", BlockTypes.Drag, "Drag", "DRAG", "Input", "Hold a button and drag between two points.",
-            () => new() { ["button"] = "left", ["from"] = new JsonObject { ["x"] = 0, ["y"] = 0 }, ["to"] = new JsonObject { ["x"] = 100, ["y"] = 0 }, ["relativeTo"] = "screen", ["durationMs"] = 300 },
-            [new("button", "Button", FieldKind.Choice, Choices: Buttons),
-             new("from.x", "From X", FieldKind.Int, -32_768, 32_767), new("from.y", "From Y", FieldKind.Int, -32_768, 32_767),
-             new("to.x", "To X", FieldKind.Int, -32_768, 32_767), new("to.y", "To Y", FieldKind.Int, -32_768, 32_767),
-             new("relativeTo", "Relative to", FieldKind.Choice, Choices: RelativeTo),
-             new("durationMs", "Duration (ms)", FieldKind.Int, 0, MacroLimits.WaitMaxMs)]),
-        new("scroll", BlockTypes.Scroll, "Scroll", "SCRL", "Input", "Scroll the wheel up or down.",
-            () => new() { ["amount"] = -3 },
-            [new("amount", "Notches", FieldKind.Int, MacroLimits.ScrollMin, MacroLimits.ScrollMax, Hint: "Positive scrolls up, negative scrolls down")]),
-        new("type", BlockTypes.Type, "Type text", "TYPE", "Input", "Type a string, like a chat message.",
+            () => new() { ["button"] = "left", ["clicks"] = 1, ["x"] = 960, ["y"] = 540, ["relativeTo"] = "gameWindow" },
+            [F.Pick("button", "Button", Buttons, "left"), F.IntPick("clicks", "Clicks", ClickCounts, 1),
+             F.Int("x", "X", -Coord, Coord, optional: true, placeholder: "Where the mouse is"),
+             F.Int("y", "Y", -Coord, Coord, optional: true, placeholder: "Where the mouse is")],
+            ClickSummary),
+        new("move", BlockTypes.Move, "Mouse move", "MOV", "Input", "Move to a point, or by an offset.",
+            () => new() { ["mode"] = "absolute", ["x"] = 0, ["y"] = 0, ["durationMs"] = 120, ["relativeTo"] = "gameWindow" },
+            [F.Pick("mode", "Mode", MoveModes, "absolute"), F.Int("x", "X", -Coord, Coord), F.Int("y", "Y", -Coord, Coord),
+             F.Int("durationMs", "Duration (ms)", 0, MacroLimits.WaitMaxMs)],
+            b => $"{(b.GetString("mode") == "relative" ? "by " : "to ")}{b.GetInt("x", 0)}, {b.GetInt("y", 0)} · {b.GetInt("durationMs", 0)} ms"),
+        new("drag", BlockTypes.Drag, "Drag", "DRG", "Input", "Hold a button and drag between two points.",
+            () => new()
+            {
+                ["button"] = "left", ["from"] = new JsonObject { ["x"] = 0, ["y"] = 0 }, ["to"] = new JsonObject { ["x"] = 100, ["y"] = 0 },
+                ["durationMs"] = 300, ["relativeTo"] = "gameWindow",
+            },
+            [F.Pick("button", "Button", Buttons, "left"),
+             F.Int("from.x", "From X", -Coord, Coord), F.Int("from.y", "From Y", -Coord, Coord),
+             F.Int("to.x", "To X", -Coord, Coord), F.Int("to.y", "To Y", -Coord, Coord)],
+            b => b.GetPoint("from") is { } f && b.GetPoint("to") is { } t ? $"{f.X},{f.Y} → {t.X},{t.Y}" : ""),
+        new("scroll", BlockTypes.Scroll, "Scroll", "SCR", "Input", "Scroll the wheel up or down.",
+            () => new() { ["direction"] = "down", ["amount"] = 3 },
+            [F.ScrollDirection(), F.ScrollAmount()],
+            b => $"{Label(UpDown, F.ScrollDir(b))} {Math.Abs(b.GetInt("amount", 0))}"),
+        new("text", BlockTypes.Type, "Type text", "TXT", "Input", "Type a string, like a chat message.",
             () => new() { ["text"] = "gg", ["delayMs"] = 30 },
-            [new("text", "Text", FieldKind.Text, MaxLength: MacroLimits.TypeTextMaxLength),
-             new("delayMs", "Delay per key (ms)", FieldKind.Int, 0, 10_000)]),
+            [F.Text("text", "Text", MacroLimits.TypeTextMaxLength, mono: false), F.Int("delayMs", "Delay per key (ms)", 0, 10_000)],
+            b => $"\"{b.GetString("text", "")}\""),
 
-        // ---- Camera ----
-        new("camturn", BlockTypes.CameraTurn, "Turn camera", "CAM", "Camera", "Rotate the view with relative mouse movement.",
-            () => new() { ["direction"] = "right", ["amountPx"] = 120, ["durationMs"] = 150 },
-            [new("direction", "Direction", FieldKind.Choice, Choices: Directions),
-             new("amountPx", "Amount (px)", FieldKind.Int, 1, 100_000),
-             new("durationMs", "Duration (ms)", FieldKind.Int, 0, MacroLimits.WaitMaxMs)]),
-        new("camtext", BlockTypes.CameraTurnUntilText, "Turn until text", "SCN", "Camera", "Turn the camera step by step until some text is on screen.",
-            () => new() { ["direction"] = "right", ["text"] = "Collect", ["stepPx"] = 120, ["timeoutMs"] = 10_000 },
-            [new("direction", "Direction", FieldKind.Choice, Choices: Directions), new("text", "Text", FieldKind.Text),
-             new("stepPx", "Step (px)", FieldKind.Int, 1, 100_000), new("timeoutMs", "Timeout (ms)", FieldKind.Int, 1, MacroLimits.WaitMaxMs)],
-            NeedsVision: true),
-        new("camimage", BlockTypes.CameraTurnUntilImage, "Turn until image", "SCNI", "Camera", "Turn the camera until a saved picture is on screen.",
-            () => new() { ["direction"] = "right", ["templateId"] = "", ["threshold"] = 0.85, ["stepPx"] = 120, ["timeoutMs"] = 10_000 },
-            [new("direction", "Direction", FieldKind.Choice, Choices: Directions),
-             new("stepPx", "Step (px)", FieldKind.Int, 1, 100_000), new("timeoutMs", "Timeout (ms)", FieldKind.Int, 1, MacroLimits.WaitMaxMs)],
-            NeedsVision: true),
+        // ---- Camera (3) ----
+        new("camturn", BlockTypes.CameraTurn, "Turn camera", "CAM", "Camera", "Rotate the view by right-drag, arrow keys or mouse.",
+            () => new() { ["method"] = "rightDrag", ["direction"] = "right", ["amountPx"] = 120 },
+            [F.Pick("method", "Method", TurnMethods, "mouseMove"), F.Pick("direction", "Direction", Directions, "right"),
+             F.Int("amountPx", "Amount (px)", 1, 100_000)],
+            b => $"{Label(Directions, b.GetString("direction", "right"))} {b.GetInt("amountPx", 0)}px · {Label(TurnMethods, b.GetString("method", "mouseMove"))}"),
+        new("camzoom", BlockTypes.CameraZoom, "Zoom camera", "ZM", "Camera", "Zoom in or out a number of steps.",
+            () => new() { ["direction"] = "out", ["steps"] = 5 },
+            [F.Pick("direction", "Zoom", Zoom, "out"), F.Int("steps", "Steps", 1, MacroLimits.ZoomStepsMax)],
+            b => $"{Label(Zoom, b.GetString("direction", "out"))} ×{b.GetInt("steps", 1)}"),
+        new("camcenter", BlockTypes.CameraCenter, "Center on target", "CTR", "Camera", "Turn until the last found match is in the middle.",
+            () => new() { ["tolerancePx"] = 40 },
+            [F.Int("tolerancePx", "Tolerance (px)", 1, 10_000)],
+            b => $"within {b.GetInt("tolerancePx", 40)}px"),
 
-        // ---- Timing ----
+        // ---- Timing (5) ----
         new("wait", BlockTypes.Wait, "Wait", "WAIT", "Timing", "Pause for a fixed time.",
-            () => new() { ["ms"] = 500 }, [Ms]),
+            () => new() { ["ms"] = 500 },
+            [F.Int("ms", "Duration (ms)", MacroLimits.WaitMinMs, MacroLimits.WaitMaxMs)],
+            b => $"{b.GetInt("ms", 0)} ms"),
         new("randwait", BlockTypes.WaitRandom, "Random wait", "RND", "Timing", "Pause a random time between two values.",
             () => new() { ["minMs"] = 300, ["maxMs"] = 800 },
-            [new("minMs", "Min (ms)", FieldKind.Int, MacroLimits.WaitMinMs, MacroLimits.WaitMaxMs),
-             new("maxMs", "Max (ms)", FieldKind.Int, MacroLimits.WaitMinMs, MacroLimits.WaitMaxMs)]),
+            [F.Int("minMs", "Min (ms)", MacroLimits.WaitMinMs, MacroLimits.WaitMaxMs), F.Int("maxMs", "Max (ms)", MacroLimits.WaitMinMs, MacroLimits.WaitMaxMs)],
+            b => $"{b.GetInt("minMs", 0)}–{b.GetInt("maxMs", 0)} ms"),
+        new("waitkey", BlockTypes.WaitForKey, "Wait for key", "WKY", "Timing", "Pause until you press a key.",
+            () => new() { ["key"] = "F1" },
+            [F.Key("key", "Key")],
+            b => $"until {b.GetString("key", "?")}"),
         new("pausem", BlockTypes.Pause, "Pause macro", "PAUS", "Timing", "Pause another running macro, for example while this one handles a crash or reconnect.",
-            () => new() { ["target"] = "", ["mode"] = "pause" },
-            [new("target", "Macro", FieldKind.MacroName, MaxLength: MacroLimits.NameMaxLength), new("mode", "Do", FieldKind.Choice, Choices: PauseModes)]),
-        new("resumem", BlockTypes.Pause, "Resume macro", "RSME", "Timing", "Unpause a macro so it carries on from where it stopped.",
-            () => new() { ["target"] = "", ["mode"] = "resume" },
-            [new("target", "Macro", FieldKind.MacroName, MaxLength: MacroLimits.NameMaxLength), new("mode", "Do", FieldKind.Choice, Choices: PauseModes)]),
+            () => new() { ["target"] = "*", ["when"] = "afterBlock", ["autoResume"] = true },
+            [F.MacroName("target", "Macro", all: true), F.Pick("when", "Pause", PauseWhen, "afterBlock"),
+             F.YesNo("autoResume", "Resume when this macro ends", fallback: false)],
+            PauseSummary),
+        new("resumem", BlockTypes.Resume, "Resume macro", "RSME", "Timing", "Unpause a macro so it carries on from where it stopped.",
+            () => new() { ["target"] = "*", ["from"] = "paused" },
+            [F.MacroName("target", "Macro", all: true), F.Pick("from", "Continue from", ResumeFrom, "paused")],
+            b => $"{MacroLabel(b.GetString("target", ""))} · {Label(ResumeFrom, b.GetString("from", "paused")).ToLowerInvariant()}"),
 
-        // ---- Detect (needs screen reading) ----
+        // ---- Detect (5) ----
         new("waittext", BlockTypes.WaitForText, "Wait for text", "OCR", "Detect", "Read the screen until the exact characters appear.",
-            () => new() { ["text"] = "Quest complete", ["timeoutMs"] = 10_000, ["onTimeout"] = "continue" },
-            [new("text", "Text", FieldKind.Text), new("timeoutMs", "Timeout (ms)", FieldKind.Int, 1, MacroLimits.WaitMaxMs),
-             new("onTimeout", "On timeout", FieldKind.Choice, Choices: OnTimeout)],
-            NeedsVision: true),
+            () => new() { ["text"] = "Quest complete", ["match"] = "exact", ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
+            [F.Text("text", "Text", MacroLimits.TypeTextMaxLength, mono: false), F.Pick("match", "Match", Matches, "exact"),
+             F.YesNo("matchCase", "Case", fallback: false, yes: "Match case", no: "Ignore case"),
+             F.Region(), F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
+             F.OnFail(), F.FailLabel()],
+            b => $"\"{b.GetString("text", "")}\" · {b.GetString("match", "exact")} · {b.GetInt("timeoutMs", 10_000)} ms"),
         new("waitimage", BlockTypes.WaitForImage, "Wait for image", "IMG", "Detect", "Wait until a saved picture shows up on screen.",
-            () => new() { ["templateId"] = "", ["threshold"] = 0.85, ["timeoutMs"] = 10_000, ["onTimeout"] = "continue" },
-            [new("timeoutMs", "Timeout (ms)", FieldKind.Int, 1, MacroLimits.WaitMaxMs), new("onTimeout", "On timeout", FieldKind.Choice, Choices: OnTimeout)],
-            NeedsVision: true),
-        new("pixel", BlockTypes.DetectPixelColor, "Pixel color", "PIX", "Detect", "Check one point's color, like a health bar.",
-            () => new() { ["x"] = 0, ["y"] = 0, ["color"] = "#FFFFFF", ["tolerance"] = 10 },
-            [new("x", "X", FieldKind.Int, -32_768, 32_767), new("y", "Y", FieldKind.Int, -32_768, 32_767),
-             new("color", "Color (#RRGGBB)", FieldKind.Text, MaxLength: 7), new("tolerance", "Tolerance", FieldKind.Int, 0, 255)],
-            NeedsVision: true),
+            () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
+            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.Region(),
+             F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
+             F.OnFail(), F.FailLabel()],
+            b => $"{ImageName(b)} · {b.GetInt("confidencePct", 90)}% · {b.GetInt("timeoutMs", 10_000)} ms"),
+        new("waitpixel", BlockTypes.DetectPixelColor, "Wait for pixel", "PIX", "Detect", "Wait until one point turns a color, like a health bar.",
+            () => new() { ["x"] = 0, ["y"] = 0, ["color"] = "#FFFFFF", ["tolerance"] = 10, ["timeoutMs"] = 5000, ["onFail"] = "continue", ["relativeTo"] = "gameWindow" },
+            [F.Int("x", "X", -Coord, Coord), F.Int("y", "Y", -Coord, Coord), F.Color("color", "Color"),
+             F.Int("tolerance", "Tolerance", 0, 255), F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
+             F.OnFail(), F.FailLabel()],
+            b => $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)} = {b.GetString("color", "")} · {b.GetInt("timeoutMs", 5000)} ms"),
+        new("findclick", BlockTypes.FindClick, "Find & click", "FND", "Detect", "Find text, an image or a color and click it.",
+            () => new() { ["target"] = "text", ["value"] = "Claim", ["button"] = "left", ["timeoutMs"] = 5000, ["onFail"] = "continue" },
+            [F.Pick("target", "Find", FindTargets, "text"), F.FindValue(), F.Pick("button", "Button", Buttons, "left"),
+             F.Region(), F.OnFail(), F.FailLabel()],
+            b => $"{Label(FindTargets, b.GetString("target", "text"))} \"{b.GetString("value", "")}\" → {b.GetString("button", "left")} click"),
+        new("scan", BlockTypes.ScanTurn, "Scan & turn", "SCN", "Detect", "Turn the camera step by step until a target is seen.",
+            () => new() { ["target"] = "text", ["value"] = "Collect", ["direction"] = "right", ["stepPx"] = 120, ["maxTurns"] = 12, ["whenFound"] = "click", ["onFail"] = "continue" },
+            [F.Pick("target", "Look for", FindTargets, "text"), F.FindValue(), F.Pick("direction", "Turn", RightLeft, "right"),
+             F.Int("stepPx", "Step (px)", 1, 10_000), F.Int("maxTurns", "Max turns", 1, MacroLimits.ScanTurnsMax),
+             F.Pick("whenFound", "When found", WhenFound, "click"), F.OnFail(), F.FailLabel()],
+            b => $"{Label(FindTargets, b.GetString("target", "text"))} \"{b.GetString("value", "")}\" · {b.GetString("direction", "right")} {b.GetInt("stepPx", 120)}px ×{b.GetInt("maxTurns", 12)}"),
 
-        // ---- Logic ----
-        new("if", BlockTypes.If, "If", "IF", "Logic", "Run the blocks inside only when a condition is true. Add an End after them.",
-            () => new() { ["condition"] = new JsonObject { ["kind"] = "windowFocused" } }, ConditionFields),
-        new("else", BlockTypes.Else, "Else", "ELSE", "Logic", "Runs when the If above was false.", () => [], []),
-        new("end", BlockTypes.End, "End", "END", "Logic", "Closes the nearest Loop, Repeat until or If.", () => [], []),
-        new("loop", BlockTypes.Loop, "Loop", "LOOP", "Logic", "Repeat the blocks inside a set number of times. Add an End after them.",
-            () => new() { ["count"] = 10 }, [new("count", "Times", FieldKind.Int, MacroLimits.CountMin, MacroLimits.CountMax)]),
-        new("until", BlockTypes.RepeatUntil, "Repeat until", "UNTL", "Logic", "Repeat the blocks inside until a condition is true. Add an End after them.",
-            () => new() { ["condition"] = new JsonObject { ["kind"] = "not", ["condition"] = new JsonObject { ["kind"] = "windowFocused" } }, ["maxIterations"] = 100 },
-            [.. ConditionFields, new("maxIterations", "Max tries", FieldKind.Int, MacroLimits.CountMin, MacroLimits.CountMax)]),
+        // ---- Logic (9) ----
+        new("loop", BlockTypes.Loop, "Loop", "LOOP", "Logic", "Repeat the blocks inside a set number of times, or forever.",
+            () => new() { ["count"] = 10 },
+            [F.LoopCount()],
+            b => b.GetBool("forever") == true ? "Forever" : $"{b.GetInt("count", 1)} times"),
+        new("until", BlockTypes.RepeatUntil, "Repeat until", "UNTL", "Logic", "Repeat the blocks inside until a condition is true.",
+            () => new() { ["condition"] = new JsonObject { ["kind"] = "textVisible", ["text"] = "Done" }, ["maxIterations"] = 0 },
+            [F.ConditionKind(), F.ConditionValue(), F.Int("maxIterations", "Max tries (0 = no limit)", 0, MacroLimits.CountMax)],
+            b => Conditions.Describe(b.GetObject("condition"))),
+        new("ifb", BlockTypes.If, "If", "IF", "Logic", "Run the blocks inside only when a condition is true.",
+            () => new() { ["condition"] = new JsonObject { ["kind"] = "textVisible", ["text"] = "Done" } },
+            [F.ConditionKind(), F.ConditionValue()],
+            b => Conditions.Describe(b.GetObject("condition"))),
+        new("elseb", BlockTypes.Else, "Else", "ELSE", "Logic", "Runs when the If above was false.", () => [], [], _ => ""),
+        new("end", BlockTypes.End, "End", "END", "Logic", "Closes the nearest Loop, Repeat until or If.", () => [], [], _ => ""),
         new("label", BlockTypes.Label, "Label", "LBL", "Logic", "A named spot you can jump back to.",
-            () => new() { ["name"] = "start" }, [new("name", "Name", FieldKind.Text, MaxLength: 40)]),
-        new("goto", BlockTypes.Goto, "Go to label", "GOTO", "Logic", "Jump to a label.",
-            () => new() { ["name"] = "start" }, [new("name", "Label", FieldKind.Text, MaxLength: 40)]),
-        new("stop", BlockTypes.Stop, "Stop macro", "STOP", "Logic", "End the run here.", () => [], []),
+            () => new() { ["name"] = "start" }, [F.Text("name", "Name", 40)], b => b.GetString("name", "")),
+        new("gotob", BlockTypes.Goto, "Go to label", "GOTO", "Logic", "Jump to a label.",
+            () => new() { ["name"] = "start" }, [F.Text("name", "Label", 40)], b => $"→ {b.GetString("name", "")}"),
+        new("call", BlockTypes.RunMacro, "Run macro", "CALL", "Logic", "Run another saved macro, then come back.",
+            () => new() { ["macroName"] = "" }, [F.MacroName("macroName", "Macro", all: false)], b => b.GetString("macroName", "")),
+        new("stop", BlockTypes.Stop, "Stop macro", "STOP", "Logic", "End the run here.", () => [], [], _ => ""),
 
-        // ---- Window ----
-        new("focus", BlockTypes.WindowFocus, "Focus window", "WIN", "Window", "Bring the target game to the front.", () => [], []),
+        // ---- Window (4) ----
+        new("focus", BlockTypes.WindowFocus, "Focus window", "WIN", "Window", "Bring a game or app to the front.",
+            () => [], [F.Process()], b => ProcessName(b)),
+        new("waitwin", BlockTypes.WaitForWindow, "Wait for window", "WWN", "Window", "Pause until a window opens or gets focus.",
+            () => new() { ["timeoutMs"] = 30_000 },
+            [F.Process(), F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes")],
+            b => $"{ProcessName(b)} · {b.GetInt("timeoutMs", 30_000)} ms"),
         new("resize", BlockTypes.WindowResize, "Resize window", "SIZE", "Window", "Set the game window to an exact size so recorded positions line up every run.",
             () => new() { ["width"] = 1280, ["height"] = 720 },
-            [new("width", "Width (px)", FieldKind.Int, 1, 16_384), new("height", "Height (px)", FieldKind.Int, 1, 16_384)]),
+            [F.Process(), F.Int("width", "Width (px)", 1, 16_384), F.Int("height", "Height (px)", 1, 16_384)],
+            b => $"{b.GetInt("width", 0)}×{b.GetInt("height", 0)}"),
         new("position", BlockTypes.WindowPosition, "Position window", "POS", "Window", "Move the game window to the same spot on screen so clicks land in the right place.",
-            () => new() { ["x"] = 0, ["y"] = 0 },
-            [new("x", "X", FieldKind.Int, -32_768, 32_767), new("y", "Y", FieldKind.Int, -32_768, 32_767)]),
+            () => new() { ["monitor"] = 1, ["anchor"] = "topLeft", ["x"] = 0, ["y"] = 0 },
+            [F.Process(), F.IntPick("monitor", "Monitor", Monitors, 1), F.Pick("anchor", "Snap to", Anchors, "custom"),
+             F.Int("x", "X (Custom only)", -Coord, Coord), F.Int("y", "Y (Custom only)", -Coord, Coord)],
+            PositionSummary),
 
-        // ---- Utility ----
+        // ---- Utility (4) ----
+        new("notify", BlockTypes.Notify, "Notify", "NTF", "Utility", "Show a toast or play a sound.",
+            () => new() { ["kind"] = "toast", ["message"] = "Done" },
+            [F.Pick("kind", "Type", NotifyKinds, "toast"), F.Text("message", "Message", 200, optional: true, mono: false)],
+            b => $"{Label(NotifyKinds, b.GetString("kind", "toast"))} · \"{b.GetString("message", "")}\""),
+        new("shot", BlockTypes.Screenshot, "Screenshot", "SHOT", "Utility", "Save a picture of the screen or a region.",
+            () => new() { ["file"] = "night-loop.png" },
+            [F.Region(), F.FileName()],
+            b => b.GetString("file", "night-loop.png")),
         new("comment", BlockTypes.Comment, "Comment", "//", "Utility", "A note that does nothing when run.",
-            () => new() { ["text"] = "Section" }, [new("text", "Note", FieldKind.Text, Optional: true, MaxLength: MacroLimits.CommentMaxLength)]),
+            () => new() { ["text"] = "Section" },
+            [F.Text("text", "Note", MacroLimits.CommentMaxLength, optional: true, mono: false)],
+            b => b.GetString("text", "")),
         new("desc", BlockTypes.Description, "Description", "DESC", "Utility", "Longer notes that grow to fit. Does nothing when run.",
-            () => new() { ["text"] = "" }, [new("text", "Text", FieldKind.MultiLine, Optional: true, MaxLength: MacroLimits.DescriptionMaxLength)]),
-        new("notify", BlockTypes.Notify, "Notify", "NTF", "Utility", "Show a message in Night-loop.",
-            () => new() { ["message"] = "Done" }, [new("message", "Message", FieldKind.Text)]),
+            () => new() { ["text"] = "" },
+            [F.Text("text", "Text", MacroLimits.DescriptionMaxLength, optional: true, multiLine: true)],
+            _ => ""),
+
+        // ---- Older blocks: editable, not in the palette ----
         new("sound", BlockTypes.PlaySound, "Play sound", "SND", "Utility", "Play a Windows sound.",
-            () => new() { ["sound"] = "default" }, [new("sound", "Sound", FieldKind.Choice, Choices: Sounds)]),
-        new("call", BlockTypes.RunMacro, "Run macro", "CALL", "Utility", "Run another saved macro, then come back.",
-            () => new() { ["macroName"] = "" }, [new("macroName", "Macro", FieldKind.MacroName, MaxLength: MacroLimits.NameMaxLength)]),
+            () => new() { ["sound"] = "default" }, [F.Pick("sound", "Sound", Sounds, "default")],
+            b => b.GetString("sound", "default"), Hidden: true),
+        new("camtext", BlockTypes.CameraTurnUntilText, "Turn until text", "SCN", "Camera", "Replaced by Scan & turn. Swap it for a Scan & turn block.",
+            () => [], [], b => $"\"{b.GetString("text", "")}\"", Hidden: true),
+        new("camimage", BlockTypes.CameraTurnUntilImage, "Turn until image", "SCN", "Camera", "Replaced by Scan & turn. Swap it for a Scan & turn block.",
+            () => [], [], _ => "", Hidden: true),
     ];
 
     private static readonly Dictionary<string, BlockDef> ByType = All
         .GroupBy(d => d.Type).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
 
-    /// <summary>The definition used to edit a block (the first palette entry of its type).</summary>
+    /// <summary>The blocks shown in the palette (everything but older, hidden types).</summary>
+    public static IEnumerable<BlockDef> Palette => All.Where(d => !d.Hidden);
+
+    /// <summary>The definition used to edit and describe a block.</summary>
     public static BlockDef? For(string type) => ByType.GetValueOrDefault(type);
 
     public static string ColorOf(string category) =>
         Categories.FirstOrDefault(c => string.Equals(c.Name, category, StringComparison.OrdinalIgnoreCase)).Color ?? "#C9D1D9";
+
+    /// <summary>"*" reads as "All other macros" (Pause and Resume).</summary>
+    public static string MacroLabel(string name) => name == "*" ? "All other macros" : name.Length == 0 ? "?" : name;
+
+    private static string Label(IEnumerable<Choice> choices, string value) =>
+        choices.FirstOrDefault(c => c.Value == value)?.Label ?? value;
+
+    private static string ImageName(Block b) =>
+        b.GetString("image") is { Length: > 0 } name ? name : b.GetString("imageData") is { Length: > 0 } ? "picture" : "no picture yet";
+
+    private static string ProcessName(Block b) => b.GetString("process") is { Length: > 0 } p ? p : "target game";
+
+    private static string ClickSummary(Block b)
+    {
+        var button = Label(Buttons, b.GetString("button", "left"));
+        var where = b.GetInt("x") is { } x && b.GetInt("y") is { } y ? $"at {x}, {y}" : "at the mouse";
+        return b.GetString("action", "press") switch
+        {
+            "down" => $"{button} down {where}",
+            "up" => $"{button} up {where}",
+            _ => $"{button} ×{b.GetInt("clicks", 1)} {where}",
+        };
+    }
+
+    private static string PauseSummary(Block b)
+    {
+        if (b.GetString("mode") == "resume") return $"{MacroLabel(b.GetString("target", ""))} · where it paused";
+        var when = Label(PauseWhen, b.GetString("when", "afterBlock")).ToLowerInvariant();
+        return $"{MacroLabel(b.GetString("target", ""))} · {when}{(b.GetBool("autoResume") == true ? " · auto-resume" : "")}";
+    }
+
+    private static string PositionSummary(Block b)
+    {
+        var anchor = b.GetString("anchor", "custom");
+        var monitor = b.GetInt("monitor");
+        var where = anchor == "custom" ? $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)}" : Label(Anchors, anchor).ToLowerInvariant();
+        return monitor is null ? where : $"{where} · {Label(Monitors, monitor.Value.ToString(CultureInfo.InvariantCulture)).ToLowerInvariant()}";
+    }
+}
+
+/// <summary>Builders for the inspector fields.</summary>
+internal static class F
+{
+    private static readonly Choice[] FailActions = [new("continue", "Continue"), new("retry", "Retry"), new("goto", "Go to label"), new("stop", "Stop macro")];
+    private static readonly char[] BadFileChars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
+
+    public static FieldDef Int(string path, string label, int min, int max, bool optional = false, string? placeholder = null, string? hint = null) =>
+        new(path, label, FieldKind.Text,
+            b => P.Text(P.Get(b, path)),
+            (b, text) =>
+            {
+                var t = text.Trim().Replace(",", "", StringComparison.Ordinal);
+                if (t.Length == 0)
+                {
+                    if (!optional) return "Enter a number.";
+                    P.Remove(b, path);
+                    return null;
+                }
+                if (!int.TryParse(t, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var n)) return "Enter a whole number.";
+                if (n < min || n > max) return $"Use {min:N0} to {max:N0}.";
+                P.Set(b, path, n);
+                return null;
+            },
+            Placeholder: placeholder, Hint: hint, MaxLength: 12);
+
+    public static FieldDef Text(string path, string label, int max, bool optional = false, bool multiLine = false, bool mono = true, string? placeholder = null) =>
+        new(path, label, multiLine ? FieldKind.MultiLine : FieldKind.Text,
+            b => P.Text(P.Get(b, path)),
+            (b, text) =>
+            {
+                var t = multiLine ? text : text.Trim();
+                if (t.Trim().Length == 0)
+                {
+                    if (!optional) return $"{label} can't be empty.";
+                    P.Remove(b, path);
+                    return null;
+                }
+                if (t.Length > max) return $"Use at most {max:N0} characters.";
+                P.Set(b, path, t);
+                return null;
+            },
+            Placeholder: placeholder, MaxLength: max, Mono: mono && !multiLine);
+
+    public static FieldDef Key(string path, string label) =>
+        new(path, label, FieldKind.Text,
+            b => P.Text(P.Get(b, path)),
+            (b, text) =>
+            {
+                var t = text.Trim();
+                if (!KeyCatalog.TryGetVirtualKey(t, out var vk)) return "Not a key Night-loop knows. Try A, Space, F1, Shift or Enter.";
+                P.Set(b, path, KeyCatalog.NameOf(vk) ?? t);
+                return null;
+            },
+            MaxLength: 20);
+
+    public static FieldDef Combo(string path, string label) =>
+        new(path, label, FieldKind.Text,
+            b => P.Text(P.Get(b, path)),
+            (b, text) =>
+            {
+                if (!MacroValidator.IsKeyCombo(text)) return "Use keys joined by +, like Ctrl + Shift + E.";
+                P.Set(b, path, string.Join(" + ", text.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)));
+                return null;
+            },
+            MaxLength: 60);
+
+    public static FieldDef Pick(string path, string label, IReadOnlyList<Choice> choices, string fallback) =>
+        new(path, label, FieldKind.Choice,
+            b => P.Text(P.Get(b, path)) is { Length: > 0 } v ? v : fallback,
+            (b, value) =>
+            {
+                P.Set(b, path, value);
+                return null;
+            },
+            choices);
+
+    public static FieldDef IntPick(string path, string label, IReadOnlyList<Choice> choices, int fallback) =>
+        new(path, label, FieldKind.Choice,
+            b => (BlockParams.AsInt(P.Get(b, path)) ?? fallback).ToString(CultureInfo.InvariantCulture),
+            (b, value) =>
+            {
+                P.Set(b, path, int.Parse(value, CultureInfo.InvariantCulture));
+                return null;
+            },
+            choices);
+
+    public static FieldDef YesNo(string path, string label, bool fallback, string yes = "Yes", string no = "No") =>
+        new(path, label, FieldKind.Choice,
+            b => (b.GetBool(path) ?? fallback) ? "true" : "false",
+            (b, value) =>
+            {
+                P.Set(b, path, value == "true");
+                return null;
+            },
+            [new("true", yes), new("false", no)]);
+
+    public static FieldDef Color(string path, string label) =>
+        new("color", label, FieldKind.Text,
+            b => P.Text(P.Get(b, path)),
+            (b, text) =>
+            {
+                var t = text.Trim();
+                if (!t.StartsWith('#')) t = "#" + t;
+                if (!MacroValidator.IsColor(t)) return "Use a color like #FF0000, or Pick color from screen.";
+                P.Set(b, path, t.ToUpperInvariant());
+                return null;
+            },
+            Placeholder: "#RRGGBB", MaxLength: 7);
+
+    /// <summary>"Full window" (or blank) for the whole game window, else x, y, width, height.</summary>
+    public static FieldDef Region() =>
+        new("region", "Region", FieldKind.Text,
+            b => RegionText(b.Params["region"]),
+            (b, text) =>
+            {
+                var t = text.Trim();
+                if (t.Length == 0 || t.Equals("Full window", StringComparison.OrdinalIgnoreCase) || t.Equals("Full screen", StringComparison.OrdinalIgnoreCase))
+                {
+                    b.Params.Remove("region");
+                    return null;
+                }
+                var parts = t.Split(',', StringSplitOptions.TrimEntries);
+                if (parts.Length != 4 || !parts.All(p => int.TryParse(p, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out _)))
+                    return "Use x, y, width, height (or Full window), or Select region on screen.";
+                var n = parts.Select(p => int.Parse(p, CultureInfo.InvariantCulture)).ToArray();
+                if (n[2] < 1 || n[3] < 1) return "Width and height must be at least 1.";
+                b.Params["region"] = new JsonArray(n[0], n[1], n[2], n[3]);
+                return null;
+            },
+            Placeholder: "Full window", MaxLength: 40);
+
+    public static string RegionText(JsonNode? region) =>
+        MacroValidator.ReadRegion(region) is { } r ? $"{r.X}, {r.Y}, {r.Width}, {r.Height}" : "Full window";
+
+    public static FieldDef Process() =>
+        Text("process", "Process", 260, optional: true, placeholder: "The target game");
+
+    /// <summary>The picture's name; the picture itself comes from "Capture image from screen".</summary>
+    public static FieldDef Image() =>
+        new("image", "Image", FieldKind.Text,
+            b => b.GetString("image") ?? "",
+            (b, text) =>
+            {
+                var t = text.Trim();
+                if (t.Length > 120) return "Use at most 120 characters.";
+                if (t.Length == 0) b.Params.Remove("image");
+                else b.Params["image"] = t;
+                return null;
+            },
+            Placeholder: "Capture image from screen",
+            Hint: null, MaxLength: 120);
+
+    /// <summary>Find &amp; click / Scan &amp; turn: the text, the picture's name or the color to look for.</summary>
+    public static FieldDef FindValue() =>
+        new("value", "Value", FieldKind.Text,
+            b => b.GetString("value") ?? "",
+            (b, text) =>
+            {
+                var t = text.Trim();
+                var target = b.GetString("target", "text");
+                if (target == "pixel")
+                {
+                    if (!t.StartsWith('#')) t = "#" + t;
+                    if (!MacroValidator.IsColor(t)) return "Use a color like #FF0000, or Pick color from screen.";
+                    b.Params["value"] = t.ToUpperInvariant();
+                    return null;
+                }
+                if (t.Length == 0) return target == "image" ? "Name the picture, then Capture image from screen." : "Say what text to look for.";
+                if (t.Length > MacroLimits.TypeTextMaxLength) return $"Use at most {MacroLimits.TypeTextMaxLength} characters.";
+                b.Params["value"] = t;
+                return null;
+            },
+            MaxLength: MacroLimits.TypeTextMaxLength);
+
+    public static FieldDef OnFail() => Pick("onFail", "On fail", FailActions, "continue");
+
+    public static FieldDef FailLabel() =>
+        Text("failLabel", "Label to go to", 40) with { ShowIf = b => b.GetString("onFail") == "goto" };
+
+    public static FieldDef MacroName(string path, string label, bool all) =>
+        new(path, label, FieldKind.MacroName,
+            b => b.GetString(path) ?? "",
+            (b, value) =>
+            {
+                if (value.Length == 0) return "Pick a macro.";
+                b.Params[path] = value;
+                return null;
+            },
+            AllMacros: all);
+
+    public static FieldDef FileName() =>
+        new("file", "File name", FieldKind.Text,
+            b => b.GetString("file") ?? "",
+            (b, text) =>
+            {
+                var t = text.Trim();
+                if (t.Length == 0)
+                {
+                    b.Params.Remove("file");
+                    return null;
+                }
+                if (t.Length > MacroLimits.FileNameMaxLength) return $"Use at most {MacroLimits.FileNameMaxLength} characters.";
+                if (t.IndexOfAny(BadFileChars) >= 0) return "File names can't use / \\ : * ? \" < > |";
+                b.Params["file"] = t;
+                return null;
+            },
+            Placeholder: "night-loop.png", Hint: "Saved in Pictures\\Night-loop", MaxLength: MacroLimits.FileNameMaxLength);
+
+    /// <summary>Loop: a number, or Forever.</summary>
+    public static FieldDef LoopCount() =>
+        new("count", "Times (number or Forever)", FieldKind.Text,
+            b => b.GetBool("forever") == true ? "Forever" : (b.GetInt("count") ?? 1).ToString(CultureInfo.InvariantCulture),
+            (b, text) =>
+            {
+                var t = text.Trim().Replace(",", "", StringComparison.Ordinal);
+                if (t.Equals("forever", StringComparison.OrdinalIgnoreCase) || t == "∞")
+                {
+                    b.Params.Remove("count");
+                    b.Params["forever"] = true;
+                    return null;
+                }
+                if (!int.TryParse(t, NumberStyles.None, CultureInfo.InvariantCulture, out var n) || n < MacroLimits.CountMin || n > MacroLimits.CountMax)
+                    return $"Use {MacroLimits.CountMin:N0} to {MacroLimits.CountMax:N0}, or Forever.";
+                b.Params.Remove("forever");
+                b.Params["count"] = n;
+                return null;
+            },
+            MaxLength: 12);
+
+    public static FieldDef ScrollDirection() =>
+        new("direction", "Direction", FieldKind.Choice,
+            ScrollDir,
+            (b, value) =>
+            {
+                b.Params["amount"] = Math.Max(1, Math.Abs(b.GetInt("amount", 3)));
+                b.Params["direction"] = value;
+                return null;
+            },
+            [new("up", "Up"), new("down", "Down")]);
+
+    public static FieldDef ScrollAmount() =>
+        new("amount", "Notches", FieldKind.Text,
+            b => Math.Abs(b.GetInt("amount", 0)).ToString(CultureInfo.InvariantCulture),
+            (b, text) =>
+            {
+                if (!int.TryParse(text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var n) || n < 1 || n > MacroLimits.ScrollMax)
+                    return $"Use 1 to {MacroLimits.ScrollMax}.";
+                b.Params["direction"] = ScrollDir(b);
+                b.Params["amount"] = n;
+                return null;
+            },
+            MaxLength: 3);
+
+    /// <summary>Older scroll blocks have a signed amount and no direction.</summary>
+    public static string ScrollDir(Block b) => b.GetString("direction") ?? (b.GetInt("amount", 0) < 0 ? "down" : "up");
+
+    public static FieldDef ConditionKind() =>
+        new("condition.kind", "Condition", FieldKind.Choice,
+            b => Conditions.Read(b.GetObject("condition")).Kind,
+            (b, kind) =>
+            {
+                var (old, value) = Conditions.Read(b.GetObject("condition"));
+                if (old == kind) return null;
+                // Switching kinds keeps the value only when it still makes sense.
+                var keep = Conditions.ValueKind(old) == Conditions.ValueKind(kind) ? value : Conditions.DefaultValue(kind);
+                b.Params["condition"] = Conditions.Write(kind, keep, null);
+                return null;
+            },
+            Conditions.Kinds);
+
+    public static FieldDef ConditionValue() =>
+        new("condition.value", "Value", FieldKind.Text,
+            b => Conditions.Read(b.GetObject("condition")).Value,
+            (b, text) =>
+            {
+                var condition = b.GetObject("condition");
+                var (kind, _) = Conditions.Read(condition);
+                if (Conditions.Check(kind, text) is { } error) return error;
+                b.Params["condition"] = Conditions.Write(kind, text, condition);
+                return null;
+            },
+            MaxLength: 200);
+}
+
+/// <summary>Reads and writes nested params like "from.x".</summary>
+internal static class P
+{
+    public static JsonNode? Get(Block b, string path)
+    {
+        JsonNode? node = b.Params;
+        foreach (var part in path.Split('.'))
+            node = node is JsonObject o ? o[part] : null;
+        return node;
+    }
+
+    public static void Set(Block b, string path, JsonNode? value)
+    {
+        var parts = path.Split('.');
+        var obj = b.Params;
+        for (var i = 0; i < parts.Length - 1; i++)
+            obj = obj[parts[i]] as JsonObject ?? (JsonObject)(obj[parts[i]] = new JsonObject());
+        obj[parts[^1]] = value;
+    }
+
+    public static void Remove(Block b, string path)
+    {
+        var parts = path.Split('.');
+        var obj = b.Params;
+        for (var i = 0; i < parts.Length - 1; i++)
+        {
+            if (obj[parts[i]] is not JsonObject child) return;
+            obj = child;
+        }
+        obj.Remove(parts[^1]);
+    }
+
+    public static string Text(JsonNode? node) => node switch
+    {
+        JsonValue v when v.TryGetValue(out string? s) => s,
+        JsonValue v when v.TryGetValue(out bool flag) => flag ? "true" : "false",
+        JsonValue v => BlockParams.AsInt(v)?.ToString(CultureInfo.InvariantCulture) ?? v.ToJsonString(),
+        _ => "",
+    };
 }
 
 /// <summary>
-/// The simple condition editor: one kind plus one value, mapped to the JSON condition objects of schema section 6
-/// ("not" wraps the negative kinds).
+/// The condition editor of If and Repeat until: one kind plus one value, as in the mockup, mapped to the JSON
+/// condition objects ("not" wraps the negative kinds).
 /// </summary>
 public static class Conditions
 {
     public static readonly Choice[] Kinds =
     [
-        new("windowFocused", "Game window focused"),
-        new("!windowFocused", "Game window not focused"),
-        new("processRunning", "Process running"),
+        new("textVisible", "Text visible"),
+        new("!textVisible", "Text not visible"),
+        new("imageVisible", "Image visible"),
+        new("pixelColor", "Pixel matches"),
+        new("windowFocused", "Window focused"),
         new("!processRunning", "Process not running"),
-        new("textVisible", "Text visible (coming soon)"),
-        new("!textVisible", "Text not visible (coming soon)"),
+        new("keyHeld", "Key held"),
+        // Older macros may use these.
+        new("!windowFocused", "Window not focused"),
+        new("processRunning", "Process running"),
     ];
 
     /// <summary>Reads (kind, value) from a condition object. Unknown shapes come back as their raw kind.</summary>
@@ -244,27 +687,98 @@ public static class Conditions
         }
         return kind switch
         {
-            "processRunning" => (kind, Str(c, "name") ?? ""),
+            "processRunning" or "windowFocused" => (kind, Str(c, "name") ?? ""),
             "textVisible" => (kind, Str(c, "text") ?? ""),
+            "imageVisible" => (kind, Str(c, "image") ?? (Str(c, "imageData") is { Length: > 0 } ? "picture" : "")),
+            "keyHeld" => (kind, Str(c, "key") ?? ""),
+            "pixelColor" => (kind, $"{BlockParams.AsInt(c["x"]) ?? 0}, {BlockParams.AsInt(c["y"]) ?? 0}, {Str(c, "color") ?? "#FFFFFF"}"),
             _ => (kind, ""),
         };
     }
 
-    public static JsonObject Write(string kind, string value)
+    /// <summary>Builds the condition object. Extra settings of <paramref name="old"/> (region, picture…) are kept.</summary>
+    public static JsonObject Write(string kind, string value, JsonObject? old)
     {
         var negate = kind.StartsWith('!');
         var k = negate ? kind[1..] : kind;
-        var obj = new JsonObject { ["kind"] = k };
-        if (k == "processRunning") obj["name"] = value.Trim();
-        if (k == "textVisible") obj["text"] = value;
+        var inner = old is null ? null : Str(old, "kind") == "not" ? old["condition"] as JsonObject : old;
+        var obj = inner is not null && Str(inner, "kind") == k ? (JsonObject)inner.DeepClone() : new JsonObject { ["kind"] = k };
+        var v = value.Trim();
+        switch (k)
+        {
+            case "processRunning":
+                obj["name"] = v;
+                break;
+            case "windowFocused":
+                if (v.Length > 0) obj["name"] = v; else obj.Remove("name");
+                break;
+            case "textVisible":
+                obj["text"] = v;
+                break;
+            case "imageVisible":
+                if (v.Length > 0) obj["image"] = v; else obj.Remove("image");
+                break;
+            case "keyHeld":
+                obj["key"] = KeyCatalog.TryGetVirtualKey(v, out var vk) ? KeyCatalog.NameOf(vk) ?? v : v;
+                break;
+            case "pixelColor":
+                if (ParsePixel(v) is { } p)
+                {
+                    obj["x"] = p.X;
+                    obj["y"] = p.Y;
+                    obj["color"] = p.Color;
+                    obj["relativeTo"] ??= "gameWindow";
+                }
+                break;
+        }
         return negate ? new JsonObject { ["kind"] = "not", ["condition"] = obj } : obj;
     }
+
+    /// <summary>Why the value doesn't fit the kind, or null.</summary>
+    public static string? Check(string kind, string value)
+    {
+        var v = value.Trim();
+        return kind.TrimStart('!') switch
+        {
+            "processRunning" when v.Length == 0 => "Enter a process name, like RobloxPlayerBeta.exe.",
+            "textVisible" when v.Length == 0 => "Enter the text to look for.",
+            "textVisible" when v.Length > MacroLimits.TypeTextMaxLength => $"Use at most {MacroLimits.TypeTextMaxLength} characters.",
+            "keyHeld" when !KeyCatalog.IsKnown(v) => "Not a key Night-loop knows. Try Shift, Space or F1.",
+            "pixelColor" when ParsePixel(v) is null => "Use x, y, #RRGGBB, or Pick color from screen.",
+            _ => null,
+        };
+    }
+
+    /// <summary>Kinds whose values mean the same thing (so switching between them keeps the value).</summary>
+    public static string ValueKind(string kind) => kind.TrimStart('!') switch
+    {
+        "processRunning" or "windowFocused" => "process",
+        var k => k,
+    };
+
+    public static string DefaultValue(string kind) => kind.TrimStart('!') switch
+    {
+        "textVisible" => "Done",
+        "keyHeld" => "Shift",
+        "pixelColor" => "0, 0, #FFFFFF",
+        _ => "",
+    };
 
     public static string Describe(JsonObject? c)
     {
         var (kind, value) = Read(c);
-        var label = Kinds.FirstOrDefault(k => k.Value == kind)?.Label.Replace(" (coming soon)", "") ?? kind;
-        return value.Length > 0 ? $"{label} \"{value}\"" : label;
+        var label = Kinds.FirstOrDefault(k => k.Value == kind)?.Label ?? kind;
+        return value.Length > 0 ? $"{label} {value}" : label;
+    }
+
+    private static (int X, int Y, string Color)? ParsePixel(string text)
+    {
+        var parts = text.Split(',', StringSplitOptions.TrimEntries);
+        if (parts.Length != 3) return null;
+        if (!int.TryParse(parts[0], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var x)) return null;
+        if (!int.TryParse(parts[1], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var y)) return null;
+        var color = parts[2].StartsWith('#') ? parts[2] : "#" + parts[2];
+        return MacroValidator.IsColor(color) ? (x, y, color.ToUpperInvariant()) : null;
     }
 
     private static string? Str(JsonObject o, string key) =>

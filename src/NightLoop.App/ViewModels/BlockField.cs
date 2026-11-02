@@ -1,6 +1,4 @@
-using System.Text.Json.Nodes;
 using CommunityToolkit.Mvvm.ComponentModel;
-using NightLoop.Contracts.MacroDocument;
 
 namespace NightLoop.App.ViewModels;
 
@@ -11,17 +9,17 @@ namespace NightLoop.App.ViewModels;
 public sealed partial class BlockField : ObservableObject
 {
     private readonly BlockRow _row;
-    private readonly Action<BlockRow> _changed;
-    private bool _loading;
+    private readonly Action<BlockRow, BlockField> _changed;
+    private readonly bool _loading;
 
-    public BlockField(BlockRow row, FieldDef def, Action<BlockRow> changed, IReadOnlyList<string>? macroNames = null)
+    public BlockField(BlockRow row, FieldDef def, Action<BlockRow, BlockField> changed, IReadOnlyList<string>? macroNames = null)
     {
         _row = row;
         Def = def;
         _changed = changed;
-        MacroNames = macroNames ?? [];
         _loading = true;
-        Value = Read();
+        Value = def.Get(row.Block);
+        Choices = def.Kind == FieldKind.MacroName ? MacroChoices(def, Value, macroNames ?? []) : def.Choices ?? [];
         _loading = false;
     }
 
@@ -29,15 +27,17 @@ public sealed partial class BlockField : ObservableObject
     public string Label => Def.Label;
     public string? Hint => Def.Hint;
     public bool HasHint => !string.IsNullOrEmpty(Def.Hint);
-    public FieldKind Kind => Def.Kind;
-    public IReadOnlyList<Choice> Choices => Def.Choices ?? [];
-    public IReadOnlyList<string> MacroNames { get; }
+    public string Placeholder => Def.Placeholder ?? "";
+    public IReadOnlyList<Choice> Choices { get; }
     public int MaxLength => Def.MaxLength;
+    /// <summary>Numbers, keys and colors use the monospace font; notes and messages don't.</summary>
+    public bool IsMono => Def.Mono;
 
-    public bool IsText => Kind is FieldKind.Text or FieldKind.Int or FieldKind.Key;
-    public bool IsMultiLine => Kind == FieldKind.MultiLine;
-    public bool IsChoice => Kind == FieldKind.Choice;
-    public bool IsMacroName => Kind == FieldKind.MacroName;
+    public bool IsText => Def.Kind == FieldKind.Text;
+    public bool IsMultiLine => Def.Kind == FieldKind.MultiLine;
+    public bool IsChoice => Def.Kind is FieldKind.Choice or FieldKind.MacroName;
+    /// <summary>Choice fields can change which other fields show, so the inspector rebuilds after them.</summary>
+    public bool RebuildsInspector => IsChoice;
 
     [ObservableProperty] private string _value = "";
     [ObservableProperty] private string _error = "";
@@ -46,92 +46,35 @@ public sealed partial class BlockField : ObservableObject
     public Choice? SelectedChoice
     {
         get => Choices.FirstOrDefault(c => c.Value == Value);
-        set { if (value is not null) Value = value.Value; }
+        set { if (value is not null && value.Value != Value) Value = value.Value; }
     }
 
     partial void OnValueChanged(string value)
     {
         OnPropertyChanged(nameof(SelectedChoice));
         if (_loading) return;
-        Error = Write(value) ?? "";
-        if (Error.Length == 0)
+        string? error;
+        try
         {
-            _row.Refresh();
-            _changed(_row);
+            error = Def.Set(_row.Block, value);
         }
+        catch (Exception ex) when (ex is FormatException or InvalidOperationException or OverflowException)
+        {
+            error = "That value isn't valid here.";
+        }
+        Error = error ?? "";
+        if (Error.Length > 0) return;
+        _row.Refresh();
+        _changed(_row, this);
     }
 
-    private JsonObject Params => _row.Block.Params;
-
-    private string Read()
+    /// <summary>Saved macros to pick from, plus "All other macros" for Pause / Resume and the current value if it's gone.</summary>
+    private static List<Choice> MacroChoices(FieldDef def, string current, IReadOnlyList<string> names)
     {
-        if (Def.Path.StartsWith("condition.", StringComparison.Ordinal))
-        {
-            var (kind, value) = Conditions.Read(Params["condition"] as JsonObject);
-            return Def.Path == "condition.kind" ? kind : value;
-        }
-        var node = Find(create: false, out var key)?[key];
-        return node switch
-        {
-            JsonValue v when v.TryGetValue(out string? s) => s,
-            JsonValue v => v.ToJsonString(),
-            _ => "",
-        };
-    }
-
-    /// <summary>Writes the value; returns an error message instead when it isn't valid.</summary>
-    private string? Write(string text)
-    {
-        if (Def.Path.StartsWith("condition.", StringComparison.Ordinal))
-        {
-            var (kind, value) = Conditions.Read(Params["condition"] as JsonObject);
-            if (Def.Path == "condition.kind") kind = text; else value = text;
-            if (kind.TrimStart('!') == "processRunning" && string.IsNullOrWhiteSpace(value))
-                return Def.Path == "condition.value" ? "Enter a process name, like RobloxPlayerBeta.exe." : null;
-            Params["condition"] = Conditions.Write(kind, value);
-            return null;
-        }
-
-        var parent = Find(create: true, out var key)!;
-        var trimmed = text.Trim();
-        switch (Def.Kind)
-        {
-            case FieldKind.Int:
-            case FieldKind.Choice when Def.IntChoice:
-                if (trimmed.Length == 0 && Def.Optional)
-                {
-                    parent.Remove(key);
-                    return null;
-                }
-                if (!int.TryParse(trimmed, out var n)) return "Enter a whole number.";
-                if (n < Def.Min || n > Def.Max) return $"Use {Def.Min:N0} to {Def.Max:N0}.";
-                parent[key] = n;
-                return null;
-            case FieldKind.Key:
-                if (!KeyCatalog.IsKnown(trimmed)) return "Not a key Night-loop knows. Try A, Space, F1, LeftShift or Enter.";
-                parent[key] = KeyCatalog.TryGetVirtualKey(trimmed, out var vk) ? KeyCatalog.NameOf(vk) ?? trimmed : trimmed;
-                return null;
-            default:
-                if (trimmed.Length == 0 && !Def.Optional) return $"{Def.Label} can't be empty.";
-                if (text.Length > Def.MaxLength) return $"Use at most {Def.MaxLength:N0} characters.";
-                if (trimmed.Length == 0) parent.Remove(key);
-                else parent[key] = Def.Kind == FieldKind.MultiLine ? text : trimmed;
-                return null;
-        }
-    }
-
-    /// <summary>Finds the object holding the field ("from.x" → params.from) and the key inside it.</summary>
-    private JsonObject? Find(bool create, out string key)
-    {
-        var parts = Def.Path.Split('.');
-        var obj = Params;
-        for (var i = 0; i < parts.Length - 1; i++)
-        {
-            if (obj[parts[i]] is JsonObject child) obj = child;
-            else if (create) obj = (JsonObject)(obj[parts[i]] = new JsonObject());
-            else { key = parts[^1]; return null; }
-        }
-        key = parts[^1];
-        return obj;
+        var list = new List<Choice>();
+        if (def.AllMacros) list.Add(new Choice("*", "All other macros"));
+        list.AddRange(names.Distinct(StringComparer.Ordinal).Select(n => new Choice(n, n)));
+        if (current.Length > 0 && list.All(c => c.Value != current)) list.Add(new Choice(current, current));
+        return list;
     }
 }

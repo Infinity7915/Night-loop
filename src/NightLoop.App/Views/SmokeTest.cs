@@ -73,16 +73,25 @@ public static class SmokeTest
             return macros;
         }
 
-        var screens = new (string Name, Func<FrameworkElement> Make, int Height)[]
+        // Settings needs the app shell behind it (account, updates, games). It stays offline here.
+        SettingsViewModel? settings = null;
+        SettingsViewModel SampleSettings() => settings ??= new SettingsViewModel(new ShellViewModel());
+
+        // Pages render at the width they get in the window: 1060 at the default 1280 window (minus the 220 sidebar),
+        // 740 at the smallest window. The narrow ones catch rows that overlap or get cut off when the window shrinks.
+        var screens = new (string Name, Func<FrameworkElement> Make, int Width, int Height)[]
         {
-            ("loading", () => new LoadingView { DataContext = loading }, 800),
-            ("auth", () => new AuthView(), 800),
-            ("home", () => new HomeView(), 800),
-            ("macros", () => new MacrosView { DataContext = SampleMacros() }, 800),
+            ("loading", () => new LoadingView { DataContext = loading }, 1280, 800),
+            ("auth", () => new AuthView(), 1280, 800),
+            ("home", () => new HomeView(), 1060, 800),
+            ("macros", () => new MacrosView { DataContext = SampleMacros() }, 1060, 800),
             // The whole Macros page, down to the saved macros list.
-            ("macros-full", () => new MacrosView { DataContext = SampleMacros() }, 1900),
-            ("settings", () => new SettingsView(), 800),
-            ("window", MainWindowContent, 800),
+            ("macros-full", () => new MacrosView { DataContext = SampleMacros() }, 1060, 2300),
+            ("macros-narrow", () => new MacrosView { DataContext = SampleMacros() }, 740, 3000),
+            ("macros-wide", () => new MacrosView { DataContext = SampleMacros() }, 1700, 2000),
+            ("settings", () => new SettingsView { DataContext = SampleSettings() }, 1060, 1700),
+            ("settings-narrow", () => new SettingsView { DataContext = SampleSettings() }, 740, 1900),
+            ("window", MainWindowContent, 1280, 800),
         };
 
         // Every screen in both palettes, with the accent each one is most often seen with.
@@ -94,10 +103,10 @@ public static class SmokeTest
         return failures == 0 ? 0 : 1;
     }
 
-    private static int Draw(Application app, string folder, string mode, (string Name, Func<FrameworkElement> Make, int Height)[] screens)
+    private static int Draw(Application app, string folder, string mode, (string Name, Func<FrameworkElement> Make, int Width, int Height)[] screens)
     {
         var failures = 0;
-        foreach (var (screen, make, height) in screens)
+        foreach (var (screen, make, width, height) in screens)
         {
             var name = $"{screen}-{mode}";
             try
@@ -106,13 +115,17 @@ public static class SmokeTest
                 var view = make();
                 var host = new System.Windows.Controls.Border { Background = (Brush)app.FindResource("Bg"), Child = view };
                 System.Windows.Documents.TextElement.SetForeground(host, (Brush)app.FindResource("Text"));
-                host.Measure(new Size(1280, height));
-                host.Arrange(new Rect(0, 0, 1280, height));
-                host.UpdateLayout();
+                // Drag the width through every size first, like resizing the window, so layout errors show up here.
+                foreach (var w in new[] { 740, 960, 1300, 1900, 1100, 800, width })
+                {
+                    host.Measure(new Size(w, height));
+                    host.Arrange(new Rect(0, 0, w, height));
+                    host.UpdateLayout();
+                }
                 // Let queued work run (bindings that resolve late, such as ElementName ones in templates), then lay out again.
                 app.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
                 host.UpdateLayout();
-                var bitmap = new RenderTargetBitmap(1280, height, 96, 96, PixelFormats.Pbgra32);
+                var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
                 bitmap.Render(host);
                 var png = new PngBitmapEncoder();
                 png.Frames.Add(BitmapFrame.Create(bitmap));

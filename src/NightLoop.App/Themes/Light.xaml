@@ -18,6 +18,11 @@
   <SolidColorBrush x:Key="WarningBorder" Color="#F0D9A8" />
   <SolidColorBrush x:Key="Success" Color="#16A34A" />
   <SolidColorBrush x:Key="Overlay" Color="#801C1630" />
+  <SolidColorBrush x:Key="Inset" Color="#F8F6FC" />
+  <SolidColorBrush x:Key="TextFaint" Color="#8A82A3" />
+  <SolidColorBrush x:Key="SuccessSoft" Color="#E5F6EC" />
+  <SolidColorBrush x:Key="RecordSoft" Color="#FCEAEA" />
+  <SolidColorBrush x:Key="Structural" Color="#EEF0FB" />
   <SolidColorBrush x:Key="Accent" Color="#A78BFA" />
   <SolidColorBrush x:Key="AccentText" Color="#140B2E" />
   <SolidColorBrush x:Key="AccentLink" Color="#6D4FD0" />

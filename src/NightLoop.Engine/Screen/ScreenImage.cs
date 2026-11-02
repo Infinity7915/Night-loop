@@ -30,6 +30,19 @@ public sealed class ScreenImage
         }
     }
 
+    /// <summary>A copy of part of the image. The rectangle is in screen coordinates and is clipped to the image.</summary>
+    public ScreenImage Crop(int left, int top, int width, int height)
+    {
+        var x0 = Math.Clamp(left - Left, 0, Width - 1);
+        var y0 = Math.Clamp(top - Top, 0, Height - 1);
+        var w = Math.Clamp(width, 1, Width - x0);
+        var h = Math.Clamp(height, 1, Height - y0);
+        var pixels = new byte[w * h * 4];
+        for (var row = 0; row < h; row++)
+            Array.Copy(Bgra, ((y0 + row) * Width + x0) * 4, pixels, row * w * 4, w * 4);
+        return new ScreenImage(Left + x0, Top + y0, w, h, pixels);
+    }
+
     /// <summary>Screen point of the pixel closest to the middle of the matching area, or null when no pixel matches.</summary>
     public (int X, int Y)? Find(Rgb color, int tolerance)
     {

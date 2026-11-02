@@ -1,10 +1,10 @@
 using System.Collections.ObjectModel;
-using System.IO;
 using System.Media;
 using System.Windows;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Win32;
+using NightLoop.App.Services;
 using NightLoop.Client;
 using NightLoop.Contracts;
 using NightLoop.Contracts.Api;
@@ -14,6 +14,7 @@ using NightLoop.Engine.Hotkeys;
 using NightLoop.Engine.Input;
 using NightLoop.Engine.Recording;
 using NightLoop.Engine.Runtime;
+using NightLoop.Engine.Screen;
 using NightLoop.Engine.Window;
 using NightLoop.LocalData;
 
@@ -31,28 +32,38 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public static readonly Hotkey RecordHotkey = new(HotkeyModifiers.None, 0x78); // F9
     public static readonly Hotkey PlayHotkey = new(HotkeyModifiers.None, 0x75);   // F6
 
-    private static readonly FieldDef NoteField = new("note", "Note (optional)", FieldKind.Text, Optional: true,
-        MaxLength: MacroLimits.CommentMaxLength, Hint: "Shows under the block");
+    private static readonly FieldDef NoteField = F.Text("note", "Note (optional)", MacroLimits.CommentMaxLength,
+        optional: true, mono: false, placeholder: "Shows under the block");
 
     private readonly RunManager _runs;
+    private readonly Win32WindowService _windows = new();
+    private readonly Win32ScreenCapture _screen = new();
+    private readonly LocalSettings _settings;
     private readonly InputRecorder _recorder = new();
     private readonly HotkeyManager _hotkeys = new();
     private readonly List<IDisposable> _hotkeyRegistrations = [];
     private readonly ApiClient _api;
     private readonly TargetGamesViewModel _games;
-    private MacroDoc _doc = NewDoc();
+    private MacroDoc _doc = new() { Name = "New macro" };
     private MacroRun? _run;
     private DraftAutosaver? _autosaver;
     private Guid? _macroId;
     private bool _loading;
     private bool _creating;
 
-    public MainViewModel(ApiClient api, TargetGamesViewModel games)
+    public MainViewModel(ApiClient api, TargetGamesViewModel games, LocalSettings? settings = null)
     {
         _api = api;
         _games = games;
+        _settings = settings ?? new LocalSettings();
         _games.TargetChanged += OnTargetChanged;
-        _runs = new RunManager(new Win32InputSender(), new Win32WindowService());
+        _runs = new RunManager(new Win32InputSender(), _windows)
+        {
+            Screen = _screen,
+            Text = WindowsTextReader.TryCreate(),
+            IsKeyDown = KeyState.IsDown,
+            SaveScreenshot = Screenshots.Save,
+        };
         _runs.RunStepChanged += (run, index) => OnUi(() => { if (run == _run) Highlight(index); });
         _runs.RunStateChanged += (run, state) => OnUi(() =>
         {
@@ -62,32 +73,43 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(IsBusy));
         });
         _runs.Notify = message => OnUi(() => Status = message);
+        _toastTimer = new DispatcherTimer(TimeSpan.FromSeconds(5), DispatcherPriority.Normal, (_, _) => HideToast(), Dispatcher.CurrentDispatcher);
+        _toastTimer.Stop();
         _runs.PlaySound = PlayWindowsSound;
         _runs.RunMacro = RunMacroByNameAsync;
 
         Categories = BlockCatalog.Categories
-            .Select(c => new PaletteCategory(c.Name, c.Color, BlockCatalog.All.Count(d => d.Category == c.Name)))
+            .Select(c => new PaletteCategory(c.Name, c.Color, BlockCatalog.Palette.Count(d => d.Category == c.Name)))
             .ToList();
 
         TryRegister(RecordHotkey, () => OnUi(ToggleRecord));
         TryRegister(PlayHotkey, () => OnUi(TogglePlay));
         TryRegister(Hotkey.Panic, () => OnUi(StopAll));
+
+        // A new macro starts with the starter sequence (when it's on in Settings).
+        ApplyDoc(NewDoc(), starter: true);
     }
 
     /// <summary>The target game picked in Settings.</summary>
     public TargetGamesViewModel Games => _games;
     private GameTarget SelectedGame => _games.Target;
+    /// <summary>The target game's program (the running one, for games with two), or null for N/A.</summary>
+    private string? TargetExe => SelectedGame.Resolve(TargetGamesViewModel.IsRunning);
 
     public ObservableCollection<BlockRow> Blocks { get; } = [];
     public ObservableCollection<BlockField> InspectorFields { get; } = [];
+    public ObservableCollection<InspectorTool> InspectorTools { get; } = [];
     public IReadOnlyList<PaletteCategory> Categories { get; }
     public ObservableCollection<BlockDef> PaletteItems { get; } = [];
 
     public string RecordHotkeyText => RecordHotkey.ToString();
     public string PanicHotkeyText => Hotkey.Panic.ToString();
 
-    /// <summary>The loaded macro's own start key, or F6 (the editor's Play key) when it has none.</summary>
-    public string PlayHotkeyText => string.IsNullOrEmpty(EditorHotkey) ? PlayHotkey.ToString() : EditorHotkey;
+    /// <summary>The loaded macro's own start key, or F6 (the editor's Play key) when it has none. Shown as "Ctrl + F5".</summary>
+    public string PlayHotkeyText => KeyText(string.IsNullOrEmpty(EditorHotkey) ? PlayHotkey.ToString() : EditorHotkey);
+
+    /// <summary>"Ctrl+F5" as the mockup shows it: "Ctrl + F5".</summary>
+    public static string KeyText(string hotkey) => hotkey.Replace("+", " + ", StringComparison.Ordinal);
 
     [ObservableProperty] private string _macroName = "New macro";
     [ObservableProperty]
@@ -103,12 +125,29 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int _repeatCount = 1;
     [ObservableProperty] private bool _repeatForever;
     [ObservableProperty] private bool _humanize;
-    [ObservableProperty] private int _timingJitterPct = 10;
-    [ObservableProperty] private int _mouseJitterPx = 2;
-    [ObservableProperty] private string _status = "Press Record (or F9), or add blocks from the palette.";
-    [ObservableProperty] private string _syncText = "Not on your account yet";
+    [ObservableProperty] private int _timingJitterPct = 15;
+    [ObservableProperty] private int _mouseJitterPx = 3;
+    [ObservableProperty] private int _speedPct = 100;
+    /// <summary>The latest message. It shows as a toast at the bottom of the page for a few seconds.</summary>
+    [ObservableProperty] private string _status = "";
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasSelection), nameof(RunFromText), nameof(InspectorTitle), nameof(InspectorDescription), nameof(InspectorEyebrow))]
+    [NotifyPropertyChangedFor(nameof(SyncKind), nameof(SaveText))]
+    private string _syncText = "Not on your account yet";
+
+    /// <summary>Colors the sync pill: saved (green), draft (amber), saving (accent), muted or error.</summary>
+    public string SyncKind => SyncText switch
+    {
+        "Saved to account" => "saved",
+        "Draft · autosaved" => "draft",
+        "Saving…" => "saving",
+        "Not on your account yet" => "muted",
+        _ => "error",
+    };
+
+    /// <summary>The inspector's save button.</summary>
+    public string SaveText => SyncText switch { "Saved to account" => "Saved to account", "Saving…" => "Saving…", _ => "Save to account" };
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelection), nameof(RunFromText), nameof(InspectorTitle), nameof(InspectorDescription), nameof(InspectorEyebrow), nameof(SelectedNumber))]
     private BlockRow? _selectedBlock;
     [ObservableProperty] private PaletteCategory? _openCategory;
 
@@ -122,19 +161,26 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _isCapturingEditorHotkey;
     [ObservableProperty] private string _editorHotkeyError = "";
 
-    public string EditorHotkeyLabel => IsCapturingEditorHotkey ? "Press a key…" : string.IsNullOrEmpty(EditorHotkey) ? "None" : EditorHotkey;
+    public string EditorHotkeyLabel => IsCapturingEditorHotkey
+        ? "Press a key combo… (Esc cancels)"
+        : string.IsNullOrEmpty(EditorHotkey) ? "None  ·  Change" : $"{KeyText(EditorHotkey)}  ·  Change";
 
     partial void OnIsCapturingEditorHotkeyChanged(bool value) => OnPropertyChanged(nameof(EditorHotkeyLabel));
 
     public bool HasSelection => SelectedBlock is not null;
-    public string RunFromText => SelectedBlock is null ? "Run from…" : $"Run from {SelectedBlock.Number}";
-    public string InspectorEyebrow => SelectedBlock is null ? "EDIT BLOCK" : $"EDIT BLOCK {SelectedBlock.Number}";
-    public string InspectorTitle => SelectedBlock?.Title ?? "No block selected";
+    public string SelectedNumber => SelectedBlock?.Number ?? "—";
+    public string RunFromText => $"Run from {SelectedNumber}";
+    public string InspectorEyebrow => $"EDIT BLOCK {SelectedNumber}";
+    public string InspectorTitle => SelectedBlock?.Title ?? "Nothing selected";
     public string InspectorDescription => SelectedBlock is null
-        ? "Click a block on the timeline to change it, or add one from the palette."
+        ? "Pick a block on the left to edit it."
         : BlockCatalog.For(SelectedBlock.Block.Type)?.Description ?? "";
 
     public string PlayText => IsStepping ? "Continue" : IsPlaying ? "Stop" : "Play";
+
+    /// <summary>The loaded macro's run state pill: "Running" or "Off".</summary>
+    public string RunStateText => IsPlaying ? "Running" : "Off";
+    partial void OnIsPlayingChanged(bool value) => OnPropertyChanged(nameof(RunStateText));
 
     /// <summary>Macros running right now (Home's "Active macros" card).</summary>
     public int ActiveRunCount => _runs.ActiveRuns.Count;
@@ -148,7 +194,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Set by the shell: opens Settings, where the target game is picked.</summary>
     public Action? OpenSettings { get; set; }
 
-    private void OnTargetChanged(GameTarget value) => MarkChanged();
+    private void OnTargetChanged(GameTarget value)
+    {
+        if (_loading) return;
+        // An untouched starter macro is rebuilt for the new game (window blocks come and go) instead of saved.
+        if (_pristine && _macroId is null)
+        {
+            ApplyDoc(NewDoc(), starter: true);
+            return;
+        }
+        MarkChanged();
+    }
 
     // Every editor field that ends up in the document autosaves.
     partial void OnMacroNameChanged(string value) => MarkChanged();
@@ -157,6 +213,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     partial void OnHumanizeChanged(bool value) => MarkChanged();
     partial void OnTimingJitterPctChanged(int value) => MarkChanged();
     partial void OnMouseJitterPxChanged(int value) => MarkChanged();
+    partial void OnSpeedPctChanged(int value) => MarkChanged();
+    partial void OnRecordMouseMovesChanged(bool value) => MarkChanged();
     partial void OnEditorHotkeyChanged(string value) => OnEditorOptionChanged();
     partial void OnEditorTriggerModeChanged(string value) => OnEditorOptionChanged();
     partial void OnEditorRunAlongsideChanged(bool value) => OnEditorOptionChanged();
@@ -192,7 +250,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         OpenCategory = open;
         PaletteItems.Clear();
         if (open is null) return;
-        foreach (var d in BlockCatalog.All.Where(d => d.Category == open.Name)) PaletteItems.Add(d);
+        foreach (var d in BlockCatalog.Palette.Where(d => d.Category == open.Name)) PaletteItems.Add(d);
     }
 
     /// <summary>Adds a block after the selected one (or at the end). Openers get their End added too.</summary>
@@ -207,14 +265,22 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         var at = SelectedBlock is null ? _doc.Blocks.Count : SelectedBlock.Index + 1;
         var block = Block.Create(NextId(), def.Type, def.Defaults());
+        ApplyTargetDefaults(block);
         _doc.Blocks.Insert(at, block);
         if (BlockTypes.IsOpener(def.Type) && _doc.Blocks.Count < MacroLimits.MaxBlocks)
             _doc.Blocks.Insert(at + 1, Block.Create(NextId(), BlockTypes.End));
         ShowBlocks(selectIndex: at);
         MarkChanged();
-        Status = def.NeedsVision
-            ? $"Added {def.Label}. It needs screen reading, which is coming in a later update, so it can't run yet."
-            : $"Added {def.Label}.";
+        if (BlockTypes.NeedsVision(block) && _runs.Text is null && block.Type is BlockTypes.WaitForText or BlockTypes.FindClick or BlockTypes.ScanTurn)
+            Status = "Reading text needs Windows text recognition. Add a language with text recognition in Windows Settings › Time & language › Language.";
+    }
+
+    /// <summary>Turning the camera depends on the game: Roblox turns with a right-drag, most others with the mouse.</summary>
+    private void ApplyTargetDefaults(Block block)
+    {
+        if (block.Type != BlockTypes.CameraTurn) return;
+        var roblox = SelectedGame.Exe?.Contains("Roblox", StringComparison.OrdinalIgnoreCase) == true;
+        block.Params["method"] = SelectedGame.Exe is null || roblox ? "rightDrag" : "mouseMove";
     }
 
     // ---------------- Timeline row actions ----------------
@@ -274,15 +340,26 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         MarkChanged();
     }
 
+    private void OnFieldChanged(BlockRow row, BlockField field)
+    {
+        OnRowChanged(row);
+        // A choice can show or hide other fields and tools (On fail → Go to label, Find → Image…).
+        if (field.RebuildsInspector)
+            Application.Current?.Dispatcher.BeginInvoke(() => { if (SelectedBlock == row) BuildInspector(); }, DispatcherPriority.Background);
+    }
+
     private void BuildInspector()
     {
         InspectorFields.Clear();
+        InspectorTools.Clear();
         if (SelectedBlock is not { } row) return;
         var def = BlockCatalog.For(row.Block.Type);
         var names = LibraryNames();
-        foreach (var f in def?.Fields ?? []) InspectorFields.Add(new BlockField(row, f, OnRowChanged, names));
+        foreach (var f in def?.Fields ?? [])
+            if (f.ShowIf?.Invoke(row.Block) != false) InspectorFields.Add(new BlockField(row, f, OnFieldChanged, names));
+        foreach (var tool in ToolsFor(row.Block)) InspectorTools.Add(tool);
         if (row.Block.Type is not (BlockTypes.Comment or BlockTypes.Description))
-            InspectorFields.Add(new BlockField(row, NoteField, OnRowChanged));
+            InspectorFields.Add(new BlockField(row, NoteField, OnFieldChanged));
     }
 
     private string NextId()
@@ -302,14 +379,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             var result = _recorder.Stop();
             IsRecording = false;
-            // Recording adds to the end, so blocks added by hand stay.
+            // Recorded blocks go after the selected block (or at the end), so blocks added by hand stay.
             var room = MacroLimits.MaxBlocks - _doc.Blocks.Count;
+            var at = _recordAt is { } i && i <= _doc.Blocks.Count ? i : _doc.Blocks.Count;
+            var added = 0;
             foreach (var b in result.Blocks.Take(room))
             {
                 b.Id = NextId();
-                _doc.Blocks.Add(b);
+                _doc.Blocks.Insert(at + added++, b);
             }
-            ShowBlocks();
+            ShowBlocks(selectIndex: added > 0 ? at + added - 1 : -1);
             MarkChanged();
             Status = result.Truncated || result.Blocks.Count > room
                 ? $"Recording stopped at the {MacroLimits.MaxBlocks}-block limit."
@@ -317,9 +396,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
 
+        _recordAt = SelectedBlock is { } sel ? sel.Index + 1 : null;
         _recorder.Start(new RecorderSettings
         {
-            TargetExe = SelectedGame.Exe,
+            TargetExe = TargetExe,
             StopHotkey = RecordHotkey,
             RecordMouseMoves = RecordMouseMoves,
         });
@@ -337,7 +417,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             else running.Stop();
             return;
         }
-        StartEditorRun(new RunSettings { TargetExe = SelectedGame.Exe, Debug = true });
+        StartEditorRun(new RunSettings { TargetExe = TargetExe, Debug = true });
     }
 
     /// <summary>Step: start paused at the selected (or first) block, then run one block per press.</summary>
@@ -352,7 +432,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         StartEditorRun(new RunSettings
         {
-            TargetExe = SelectedGame.Exe,
+            TargetExe = TargetExe,
             Debug = true,
             StartPaused = true,
             StartIndex = SelectedBlock?.Index ?? 0,
@@ -364,7 +444,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (IsRecording || SelectedBlock is null) return;
         if (_run is { IsActive: true }) return;
-        StartEditorRun(new RunSettings { TargetExe = SelectedGame.Exe, Debug = true, StartIndex = SelectedBlock.Index });
+        StartEditorRun(new RunSettings { TargetExe = TargetExe, Debug = true, StartIndex = SelectedBlock.Index });
     }
 
     private void StartEditorRun(RunSettings settings)
@@ -412,18 +492,25 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _ = _runs.StopAllAsync();
     }
 
-    // ---------------- New / Save / Delete / Import / Export ----------------
+    // ---------------- New / Save / Delete ----------------
 
-    /// <summary>Starts a blank macro. It reaches the account (and takes a slot) on its first edit.</summary>
+    /// <summary>
+    /// Starts a new macro (with the starter sequence when it's on). It reaches the account, and takes one of the
+    /// slots, on its first edit.
+    /// </summary>
     [RelayCommand]
     private async Task NewMacroAsync()
     {
         if (IsRecording || IsPlaying) return;
+        if (_rows.Count >= _limit)
+        {
+            ShowLimit = true;
+            return;
+        }
         await CloseCurrentAsync();
-        ApplyDoc(NewDoc());
+        ApplyDoc(NewDoc(), starter: true);
         SyncText = "Not on your account yet";
         RefreshRows();
-        Status = "New macro. Add blocks or record something and it saves to your account.";
     }
 
     [RelayCommand]
@@ -453,8 +540,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (IsRecording || IsPlaying) return;
         if (_macroId is not { } id)
         {
-            ApplyDoc(NewDoc());
-            Status = "Cleared.";
+            ApplyDoc(NewDoc(), starter: false);
             return;
         }
         await DeleteMacroAsync(id, MacroName);
@@ -479,43 +565,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         StopAll();
         Status = "Lost contact with the server for 5 minutes, so macros were stopped.";
-    }
-
-    [RelayCommand]
-    private void Export()
-    {
-        SyncDoc();
-        var dialog = new SaveFileDialog { Filter = "Night-loop macro (*.json)|*.json", FileName = $"{MacroName}.json" };
-        if (dialog.ShowDialog() != true) return;
-        File.WriteAllText(dialog.FileName, MacroJson.Serialize(_doc, indented: true));
-        Status = $"Saved {Path.GetFileName(dialog.FileName)}.";
-    }
-
-    [RelayCommand]
-    private async Task ImportAsync()
-    {
-        if (IsRecording || IsPlaying) return;
-        var dialog = new OpenFileDialog { Filter = "Night-loop macro (*.json)|*.json" };
-        if (dialog.ShowDialog() != true) return;
-        try
-        {
-            var doc = MacroJson.Deserialize(File.ReadAllText(dialog.FileName));
-            var issues = MacroValidator.Validate(doc);
-            if (issues.Count > 0)
-            {
-                Status = $"That macro has problems: {issues[0]}";
-                return;
-            }
-            // An imported file becomes a new macro on the account.
-            await CloseCurrentAsync();
-            ApplyDoc(doc);
-            Status = $"Loaded {doc.Blocks.Count} blocks.";
-            await CreateOnServerAsync();
-        }
-        catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException)
-        {
-            Status = $"Couldn't open that file: {ex.Message}";
-        }
     }
 
     // ---------------- Editor hotkey capture ----------------
@@ -560,7 +609,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             await CloseCurrentAsync();
             var macro = await _api.GetMacroAsync(id);
             Attach(macro);
-            ApplyDoc(macro.Current ?? NewDoc());
+            ApplyDoc(macro.Current ?? NewDoc(), starter: false);
             RefreshRows();
             Status = macro.DraftDoc is null ? $"Opened \"{macro.Name}\"." : $"Opened \"{macro.Name}\" with unsaved changes.";
         }
@@ -627,6 +676,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private void MarkChanged()
     {
         if (_loading) return;
+        _pristine = false;
         if (_autosaver is not null)
         {
             SyncDoc();
@@ -643,7 +693,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         SyncText = state switch
         {
             SyncState.Saved => "Saved to account",
-            SyncState.Pending or SyncState.Saving => "Saving draft…",
+            SyncState.Pending or SyncState.Saving => "Saving…",
             SyncState.Draft => "Draft · autosaved",
             SyncState.Offline => "Offline — changes not saved",
             SyncState.Conflict => "Changed on another PC",
@@ -667,16 +717,22 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
         var copy = _autosaver.LoadServerCopy();
-        ApplyDoc(copy.Current ?? NewDoc());
+        ApplyDoc(copy.Current ?? NewDoc(), starter: false);
         Status = "Loaded the server copy.";
     }
 
-    /// <summary>Shows a document in the editor without triggering autosave.</summary>
-    private void ApplyDoc(MacroDoc doc)
+    /// <summary>
+    /// Shows a document in the editor without triggering autosave. <paramref name="starter"/>: a new macro, which
+    /// gets the starter sequence when it's on in Settings.
+    /// </summary>
+    private void ApplyDoc(MacroDoc doc, bool starter = false)
     {
         _loading = true;
+        int? select = null;
         try
         {
+            if (starter && _settings.StarterSequence) select = AddStarterBlocks(doc);
+            _pristine = starter;
             _doc = doc;
             MacroName = doc.Name;
             RepeatForever = doc.Options.Repeat.Mode == RepeatModes.Forever;
@@ -684,13 +740,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             Humanize = doc.Options.Humanize.Enabled;
             TimingJitterPct = doc.Options.Humanize.TimingJitterPct;
             MouseJitterPx = doc.Options.Humanize.MousePx;
+            SpeedPct = doc.Options.SpeedPct is >= MacroLimits.SpeedMinPct and <= MacroLimits.SpeedMaxPct ? doc.Options.SpeedPct : 100;
             EditorHotkey = doc.Options.HotkeyStart ?? "";
             EditorTriggerMode = doc.Options.TriggerMode;
             EditorRunAlongside = doc.Options.RunAlongside;
             EditorHotkeyError = "";
             // A macro remembers the game it was made for; opening it switches the target to that game.
             if (doc.TargetGame is not null) _games.SelectByName(doc.TargetGame);
-            ShowBlocks(selectIndex: null);
+            ShowBlocks(selectIndex: select);
         }
         finally
         {
@@ -712,6 +769,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             TimingJitterPct = Math.Clamp(TimingJitterPct, 0, MacroLimits.TimingJitterMaxPct),
             MousePx = Math.Clamp(MouseJitterPx, 0, MacroLimits.HumanizeMouseMaxPx),
         };
+        _doc.Options.SpeedPct = Math.Clamp(SpeedPct, MacroLimits.SpeedMinPct, MacroLimits.SpeedMaxPct);
         _doc.Options.HotkeyStart = string.IsNullOrEmpty(EditorHotkey) ? null : EditorHotkey;
         _doc.Options.HotkeyStop = _doc.Options.HotkeyStart;
         _doc.Options.TriggerMode = EditorTriggerMode;
@@ -802,10 +860,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private static void OnUi(Action action) => Application.Current?.Dispatcher.BeginInvoke(action);
 
-    private static MacroDoc NewDoc() => new() { Name = "New macro" };
+    private static MacroDoc NewDoc() => new()
+    {
+        Name = "New macro",
+        Options = new MacroOptions { Humanize = new HumanizeOptions { Enabled = true, TimingJitterPct = 15, MousePx = 3 } },
+    };
 
     public void Dispose()
     {
+        _toastTimer.Stop();
         _games.TargetChanged -= OnTargetChanged;
         _ = DisposeAutosaverAsync();
         _recorder.Dispose();

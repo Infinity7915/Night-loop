@@ -1,7 +1,6 @@
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Win32;
 using NightLoop.Client;
 using NightLoop.Contracts.Api;
 
@@ -9,7 +8,7 @@ namespace NightLoop.App.ViewModels;
 
 /// <summary>
 /// Settings → Account (schema sections 4 and 5): change username, email and password, two-factor settings,
-/// export or delete the account, sign out. Every change asks for the current password; email and password
+/// delete the account, sign out. Macros never leave the server, so there is no data download here. Every change asks for the current password; email and password
 /// changes also need a code sent by email. The server enforces all of it.
 /// </summary>
 public sealed partial class AccountViewModel : ObservableObject
@@ -32,13 +31,14 @@ public sealed partial class AccountViewModel : ObservableObject
     public string UsernameHint => User switch
     {
         null => "",
-        { UsernameIsDefault: true } => "Default name · pick your own",
-        { UsernameChangesLeft: 0 } => "No more changes left",
-        { UsernameChangesLeft: 1 } => "1 change left",
-        { UsernameChangesLeft: var n } => $"{n} changes left",
+        { UsernameIsDefault: true } => "Default name · pick your own — your first pick is free",
+        { UsernameChangesLeft: 0 } => "No username changes left",
+        { UsernameChangesLeft: var n } => $"{n} of {AccountRules.MaxUsernameChanges} changes left",
     };
 
     public bool UsernameIsDefault => User?.UsernameIsDefault == true;
+    /// <summary>The username hint shows in amber for a default name or the last change.</summary>
+    public bool UsernameHintWarns => User is { UsernameIsDefault: true } or { UsernameChangesLeft: <= 1 };
     public bool CanChangeUsername => User?.UsernameChangesLeft > 0;
 
     /// <summary>Bound to the switch. Changing it asks for the password first, then saves.</summary>
@@ -71,6 +71,7 @@ public sealed partial class AccountViewModel : ObservableObject
         OnPropertyChanged(nameof(Email));
         OnPropertyChanged(nameof(UsernameHint));
         OnPropertyChanged(nameof(UsernameIsDefault));
+        OnPropertyChanged(nameof(UsernameHintWarns));
         OnPropertyChanged(nameof(CanChangeUsername));
         OnPropertyChanged(nameof(TwofaEnabled));
         OnPropertyChanged(nameof(TwofaMode));
@@ -225,23 +226,6 @@ public sealed partial class AccountViewModel : ObservableObject
         finally
         {
             d.IsBusy = false;
-        }
-    }
-
-    [RelayCommand]
-    private async Task ExportDataAsync()
-    {
-        Notice = "";
-        var dialog = new SaveFileDialog { Filter = "JSON (*.json)|*.json", FileName = "night-loop-my-data.json" };
-        if (dialog.ShowDialog() != true) return;
-        try
-        {
-            await File.WriteAllTextAsync(dialog.FileName, await _session.Api.ExportMyDataAsync());
-            Notice = $"Saved your data to {Path.GetFileName(dialog.FileName)}.";
-        }
-        catch (Exception ex) when (ex is ApiException or ServerUnreachableException or IOException or UnauthorizedAccessException)
-        {
-            Notice = ex.Message;
         }
     }
 
