@@ -12,6 +12,8 @@ jobs:
   build-and-test:
     # WPF and the Win32 input code are Windows-only, so build and test on Windows.
     runs-on: windows-latest
+    permissions:
+      contents: write # only for "Share screen pictures" below, which writes a hidden ref, never a branch
     steps:
       - uses: actions/checkout@v4
 
@@ -47,6 +49,25 @@ jobs:
         with:
           name: screens
           path: smoke/
+
+      # The cloud session that builds this app can't download Actions artifacts (its network only reaches
+      # github.com), so the pictures also go to a hidden ref it can fetch with git:
+      #   git fetch origin refs/ci-screens/pr-<number>
+      # Hidden refs don't show up as branches. Same-repo pull requests only.
+      - name: Share screen pictures
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: pwsh
+        env:
+          TOKEN: ${{ github.token }}
+          REF: refs/ci-screens/pr-${{ github.event.number }}
+        run: |
+          if (-not (Test-Path smoke)) { "No pictures."; exit 0 }
+          Set-Location smoke
+          git init -q
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -q -m "Screens for ${{ github.event.pull_request.head.sha }}"
+          git push -q --force "https://x-access-token:$env:TOKEN@github.com/${{ github.repository }}.git" "HEAD:$env:REF"
+          "Pushed to $env:REF"
 
       - name: Upload test results
         if: always()
