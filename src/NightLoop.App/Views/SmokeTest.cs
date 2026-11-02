@@ -17,9 +17,13 @@ public static class SmokeTest
     private static FrameworkElement MainWindowContent()
     {
         var window = new MainWindow();
+        // The window itself must carry the dark theme; a white window slipped through once.
+        if (window.Background != Application.Current.FindResource("Bg"))
+            throw new InvalidOperationException($"MainWindow background is {window.Background}, not the theme's Bg.");
         var content = (FrameworkElement)window.Content;
         window.Content = null;
         content.DataContext = window.DataContext;
+        if (content is System.Windows.Controls.Panel panel) panel.Background = window.Background;
         foreach (var key in window.Resources.Keys) content.Resources[key] = window.Resources[key];
         return content;
     }

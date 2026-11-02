@@ -1,5 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Media;
+using NightLoop.App.Controls;
 using NightLoop.App.ViewModels;
 
 namespace NightLoop.App.Views;
@@ -12,6 +14,12 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = _shell;
+    }
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        DarkTitleBar.Apply(this, ((SolidColorBrush)FindResource("Sidebar")).Color, ((SolidColorBrush)FindResource("Text")).Color);
     }
 
     protected override void OnClosing(CancelEventArgs e)
