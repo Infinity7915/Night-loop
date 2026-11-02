@@ -42,6 +42,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly LocalSettings _settings;
     private readonly InputRecorder _recorder = new();
     private readonly HotkeyManager _hotkeys = new();
+    private bool _disposed;
     private IDisposable? _recordKey;
     private IDisposable? _playKey;
     private IDisposable? _panicKey;
@@ -1131,6 +1132,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return; // a second Dispose would wait on hotkey and hook threads that are gone
+        _disposed = true;
         _toastTimer.Stop();
         _games.TargetChanged -= OnTargetChanged;
         _ = DisposeAutosaverAsync();
