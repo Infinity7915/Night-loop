@@ -37,6 +37,15 @@ public sealed class LocalFilesTests : IDisposable
         Assert.Equal("a@b.co", new LocalSettings(path).LastEmail);
     }
 
+    [Theory]
+    [InlineData("http://api.example.com/v1", false)]
+    [InlineData("https://api.example.com/v1", true)]
+    [InlineData("http://localhost:5080/v1", true)]
+    [InlineData("http://127.0.0.1:5080/v1", true)]
+    [InlineData("ftp://api.example.com", false)]
+    public void Only_https_or_local_servers_are_accepted(string url, bool accepted) =>
+        Assert.Equal(accepted, LocalSettings.Normalize(url) is not null);
+
     [Fact]
     public void Missing_settings_fall_back_to_the_default_server()
     {

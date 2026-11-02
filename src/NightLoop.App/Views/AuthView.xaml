@@ -88,7 +88,7 @@
           <Button Content="Forgot password?" Command="{Binding ShowCommand}" CommandParameter="{x:Static vm:AuthMode.Forgot}"
                   Style="{StaticResource LinkButton}" Margin="0,10,0,0" HorizontalAlignment="Left"
                   Visibility="{Binding IsSignIn, Converter={StaticResource BoolToVisible}}" />
-          <CheckBox Content="I accept the Night-loop terms" IsChecked="{Binding AcceptedTerms}" Margin="0,14,0,0"
+          <CheckBox Content="I'm at least 13 and accept the terms and privacy policy" IsChecked="{Binding AcceptedTerms}" Margin="0,14,0,0"
                     Visibility="{Binding IsSignUp, Converter={StaticResource BoolToVisible}}" />
         </StackPanel>
 

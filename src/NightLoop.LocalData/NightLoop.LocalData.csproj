@@ -4,4 +4,7 @@
     <RootNamespace>NightLoop.LocalData</RootNamespace>
     <Description>Per-PC files in %LOCALAPPDATA%\NightLoop: settings.json and games.json.</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="NightLoop.Client.Tests" />
+  </ItemGroup>
 </Project>

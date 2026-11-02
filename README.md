@@ -25,6 +25,9 @@ Night-loop never touches game memory. It only sends ordinary input through Windo
 - **Sync**: macros live on your account (up to 15). Edits autosave as a draft within a couple of seconds;
   **Save** makes it the saved copy. Open them from any PC.
 - **Import/Export** macros as JSON files; an imported file becomes a new macro on your account.
+- **Privacy**: the app only talks to the server over HTTPS (plain HTTP only for a server on your own PC), and
+  keeps its sign-in token encrypted with Windows DPAPI. On the server, passwords and tokens are only stored as
+  one-way hashes, and emails and PC names are encrypted. See the server's `docs/privacy.md`.
 
 ## Using it
 

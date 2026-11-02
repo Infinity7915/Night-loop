@@ -39,9 +39,9 @@ public sealed class LocalSettings(string path)
         if (string.IsNullOrWhiteSpace(raw)) return null;
         var text = raw.Trim();
         if (!text.EndsWith('/')) text += "/";
-        return Uri.TryCreate(text, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp)
-            ? uri
-            : null;
+        if (!Uri.TryCreate(text, UriKind.Absolute, out var uri)) return null;
+        // Passwords and tokens only travel over HTTPS. Plain HTTP is allowed for a server on this PC (development).
+        return uri.Scheme == Uri.UriSchemeHttps || (uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback) ? uri : null;
     }
 
     private JsonObject? Read()
