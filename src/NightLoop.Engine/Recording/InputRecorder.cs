@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.CompilerServices;
@@ -30,7 +31,9 @@ public sealed class RecorderSettings
 /// <summary>
 /// Records keyboard and mouse with low-level hooks (WH_KEYBOARD_LL, WH_MOUSE_LL), plus Raw Input for the mouse's
 /// own motion: games that hide or lock the cursor to turn the camera only see that motion, and it's what replay
-/// sends back. The hook callbacks only copy the event and return, so the rest of Windows never waits on us.
+/// sends back. The hook callbacks only stamp the event and queue it; a worker thread does the rest (which window
+/// it was aimed at, game-relative positions). Windows quietly removes a low-level hook that answers too slowly,
+/// and asking which window is under the cursor can wait on a busy game, so none of that runs inside the hook.
 /// Input Night-loop injects itself is ignored, so replaying while recording doesn't loop.
 /// </summary>
 [SupportedOSPlatform("windows10.0.17763")]
@@ -55,6 +58,18 @@ public sealed class InputRecorder : IDisposable
     private int _rawDx;
     private int _rawDy;
     private Point _lastPoint;
+    private readonly ConcurrentQueue<Pending> _pending = new();
+    private readonly AutoResetEvent _wake = new(false);
+    private Thread? _worker;
+    private volatile bool _accepting;
+    private int _skippedOwn;
+
+    /// <summary>One input as the hook saw it, waiting for the worker.</summary>
+    private readonly record struct Pending(byte Source, uint Message, uint Data, Point Pt, long T, int Dx, int Dy);
+    private const byte FromKeyboard = 0, FromMouse = 1, FromRaw = 2;
+
+    /// <summary>Inputs skipped in the last recording because they were aimed at Night-loop itself.</summary>
+    public int SkippedOwnInputs => _skippedOwn;
 
     /// <summary>Raised on a thread-pool thread when the stop hotkey is pressed. Call <see cref="Stop"/> from it.</summary>
     public event Action? StopHotkeyPressed;
@@ -78,6 +93,8 @@ public sealed class InputRecorder : IDisposable
         _swallowKeyUp = -1;
         _lastMoveMs = long.MinValue;
         _rawDx = _rawDy = 0;
+        _skippedOwn = 0;
+        _pending.Clear();
         RefreshTarget();
         _targetRefresh = new Timer(_ => RefreshTarget(), null, 1000, 1000);
 
@@ -97,6 +114,8 @@ public sealed class InputRecorder : IDisposable
             throw new InvalidOperationException("Windows refused the input hooks, so recording can't start.");
         }
         _clock.Restart();
+        _worker = new Thread(Work) { IsBackground = true, Name = "Night-loop recorder worker" };
+        _worker.Start();
         // Where the cursor starts, so the first click glides from the right place on replay.
         if (PInvoke.GetCursorPos(out var start))
         {
@@ -105,6 +124,7 @@ public sealed class InputRecorder : IDisposable
             Add(RawInputEvent.Move(0, p.X, p.Y, p.Game, hidden: IsCursorHidden()));
         }
         IsRecording = true;
+        _accepting = true;
     }
 
     /// <summary>Stops recording and turns what was captured into blocks.</summary>
@@ -113,6 +133,7 @@ public sealed class InputRecorder : IDisposable
         if (!IsRecording) return new RecordingResult([], false);
         StopHooks();
         IsRecording = false;
+        StopWorker();
 
         List<RawInputEvent> events;
         lock (_lock) events = [.. _events];
@@ -135,6 +156,51 @@ public sealed class InputRecorder : IDisposable
         _loop?.Dispose();
         _loop = null;
         Interlocked.CompareExchange(ref s_active, null, this);
+    }
+
+    private void Enqueue(in Pending p)
+    {
+        if (!_accepting) return;
+        _pending.Enqueue(p);
+        _wake.Set();
+    }
+
+    private void Work()
+    {
+        while (_accepting)
+        {
+            _wake.WaitOne(50);
+            Drain();
+        }
+    }
+
+    private void StopWorker()
+    {
+        _accepting = false;
+        _wake.Set();
+        _worker?.Join(TimeSpan.FromSeconds(2));
+        _worker = null;
+        Drain(); // anything still queued
+    }
+
+    private void Drain()
+    {
+        while (_pending.TryDequeue(out var p))
+        {
+            try
+            {
+                switch (p.Source)
+                {
+                    case FromKeyboard: OnKey(p.Message, p.Data, p.T); break;
+                    case FromMouse: OnMouse(p.Message, p.Pt, p.Data, p.T); break;
+                    default: _rawDx += p.Dx; _rawDy += p.Dy; break;
+                }
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                // One odd event (a window closing under the cursor) shouldn't end the recording.
+            }
+        }
     }
 
     private void RefreshTarget() =>
@@ -161,10 +227,9 @@ public sealed class InputRecorder : IDisposable
     private bool IsOwnWindowInFront() =>
         _settings.IgnoreOwnWindows && Win32WindowService.ProcessIdOf(PInvoke.GetForegroundWindow()) == _ownPid;
 
-    private void OnKey(uint message, uint vk)
+    private void OnKey(uint message, uint vk, long t)
     {
         var down = message is PInvoke.WM_KEYDOWN or PInvoke.WM_SYSKEYDOWN;
-        var t = _clock.ElapsedMilliseconds;
         var key = (int)vk;
 
         if (!down && key == _swallowKeyUp)
@@ -182,7 +247,11 @@ public sealed class InputRecorder : IDisposable
             if (handler is not null) ThreadPool.QueueUserWorkItem(_ => handler());
             return;
         }
-        if (IsOwnWindowInFront()) return;
+        if (IsOwnWindowInFront())
+        {
+            _skippedOwn++;
+            return;
+        }
 
         Add(down ? RawInputEvent.KeyDown(t, key) : RawInputEvent.KeyUp(t, key));
     }
@@ -196,9 +265,8 @@ public sealed class InputRecorder : IDisposable
             && Any(0x5B, 0x5C) == mods.HasFlag(HotkeyModifiers.Win);
     }
 
-    private void OnMouse(uint message, Point pt, uint mouseData)
+    private void OnMouse(uint message, Point pt, uint mouseData, long t)
     {
-        var t = _clock.ElapsedMilliseconds;
         switch (message)
         {
             case PInvoke.WM_MOUSEMOVE:
@@ -207,7 +275,7 @@ public sealed class InputRecorder : IDisposable
                 AddMove(t, pt);
                 return;
             case PInvoke.WM_MOUSEWHEEL:
-                if (IsOwnWindowAt(pt)) return;
+                if (IsOwnWindowAt(pt)) { _skippedOwn++; return; }
                 FlushMove(t, pt);
                 var w = Locate(pt);
                 Add(RawInputEvent.Wheel(t, (short)(mouseData >> 16), w.X, w.Y));
@@ -226,7 +294,12 @@ public sealed class InputRecorder : IDisposable
             PInvoke.WM_XBUTTONUP => ((mouseData >> 16) == 2 ? MouseButton.X2 : MouseButton.X1, false),
             _ => null,
         };
-        if (button is null || IsOwnWindowAt(pt)) return;
+        if (button is null) return;
+        if (IsOwnWindowAt(pt))
+        {
+            _skippedOwn++;
+            return;
+        }
 
         FlushMove(t, pt);
         var p = Locate(pt);
@@ -295,8 +368,7 @@ public sealed class InputRecorder : IDisposable
         if (read == unchecked((uint)-1) || raw.header.dwType != (uint)RID_DEVICE_INFO_TYPE.RIM_TYPEMOUSE) return;
         // Injected input (ours or another tool's) has no device. Absolute devices (pens, remote desktop) have no motion to add up.
         if (raw.header.hDevice.IsNull || ((ushort)raw.data.mouse.usFlags & 0x01) != 0) return;
-        _rawDx += raw.data.mouse.lLastX;
-        _rawDy += raw.data.mouse.lLastY;
+        Enqueue(new Pending(FromRaw, 0, 0, default, 0, raw.data.mouse.lLastX, raw.data.mouse.lLastY));
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
@@ -309,7 +381,7 @@ public sealed class InputRecorder : IDisposable
             {
                 var k = (KBDLLHOOKSTRUCT*)lParam.Value;
                 if (k->dwExtraInfo != Win32InputSender.InjectedMarker)
-                    self.OnKey((uint)wParam.Value, k->vkCode);
+                    self.Enqueue(new Pending(FromKeyboard, (uint)wParam.Value, k->vkCode, default, self._clock.ElapsedMilliseconds, 0, 0));
             }
             catch
             {
@@ -329,7 +401,7 @@ public sealed class InputRecorder : IDisposable
             {
                 var m = (MSLLHOOKSTRUCT*)lParam.Value;
                 if (m->dwExtraInfo != Win32InputSender.InjectedMarker)
-                    self.OnMouse((uint)wParam.Value, m->pt, m->mouseData);
+                    self.Enqueue(new Pending(FromMouse, (uint)wParam.Value, m->mouseData, m->pt, self._clock.ElapsedMilliseconds, 0, 0));
             }
             catch
             {
@@ -345,6 +417,7 @@ public sealed class InputRecorder : IDisposable
         {
             StopHooks();
             IsRecording = false;
+            StopWorker();
         }
     }
 }
