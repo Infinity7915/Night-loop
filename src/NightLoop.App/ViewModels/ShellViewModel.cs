@@ -47,6 +47,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
         _updateTimer = new DispatcherTimer(TimeSpan.FromHours(4), DispatcherPriority.Background,
             (_, _) => _ = Updates.CheckAsync(restartWhenReady: false), Dispatcher.CurrentDispatcher);
 
+        Games = new TargetGamesViewModel(new GamesStore(), _settings);
+
         _currentPage = Loading = new LoadingViewModel(StartAsync, UpdateFromLoadingAsync);
         _ = StartAsync();
     }
@@ -58,6 +60,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
     public ApiClient Api { get; }
     public AccountSession Session { get; }
     public LoadingViewModel Loading { get; }
+    /// <summary>The target game, picked in Settings and used by Macros. Lives on this PC, so it survives sign-out.</summary>
+    public TargetGamesViewModel Games { get; }
     public UpdatesViewModel Updates { get; }
     public string VersionText => $"v{AppVersion}";
 
@@ -69,7 +73,12 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
     public bool ShowSidebar => CurrentPage is HomeViewModel or MainViewModel or SettingsViewModel;
 
     [ObservableProperty] private string _username = "";
-    [ObservableProperty] private bool _isOffline;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ConnectionText))]
+    private bool _isOffline;
+
+    /// <summary>Sidebar status line.</summary>
+    public string ConnectionText => IsOffline ? "Offline · reconnecting" : "Server connected";
 
     public MainViewModel? Macros { get; private set; }
     public HomeViewModel? Home { get; private set; }
@@ -91,10 +100,15 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
     public bool IsSettingsTab
     {
         get => CurrentPage is SettingsViewModel;
-        set { if (value && Settings is not null) CurrentPage = Settings; }
+        set { if (value && Settings is not null) { CurrentPage = Settings; Settings.OnShown(); } }
     }
 
     partial void OnUsernameChanged(string value) => Home?.OnUsernameChanged();
+
+    partial void OnCurrentPageChanged(object? oldValue, object newValue)
+    {
+        if (oldValue is SettingsViewModel s && newValue != s) s.OnHidden();
+    }
 
     /// <summary>
     /// Loading screen: install any new release first (from GitHub, so it works even if the server is down), then
@@ -180,7 +194,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
     {
         Username = Session.User?.Username ?? "";
         DisposePages();
-        Macros = new MainViewModel(Api);
+        Macros = new MainViewModel(Api, Games) { OpenSettings = () => IsSettingsTab = true };
         Macros.PropertyChanged += OnMacrosChanged;
         Home = new HomeViewModel(this, new AnnouncementFeed(_github, AppPaths.Announcements));
         Settings = new SettingsViewModel(this);
@@ -216,6 +230,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
             Macros.Dispose();
         }
         Home?.Dispose();
+        Settings?.Dispose();
         Macros = null;
         Home = null;
         Settings = null;
@@ -240,7 +255,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
     }
 
     [CommunityToolkit.Mvvm.Input.RelayCommand]
-    private async Task SignOutAsync()
+    public async Task SignOutAsync()
     {
         if (Macros is not null) await Macros.FlushAsync();
         await Session.SignOutAsync();
