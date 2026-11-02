@@ -50,9 +50,10 @@ protected your PC" because the app isn't code-signed yet: click **More info → 
 
 ## Using it
 
-Night-loop needs its server. Run [Night-loop-Server](https://github.com/Infinity7915/Night-loop-Server)
-locally (its README has the two commands) or set `NIGHTLOOP_SERVER` / `serverUrl` in
-`%LOCALAPPDATA%\NightLoop\settings.json` to your server's `https://…/v1` address.
+Night-loop signs in to the public server at `https://api.night-loop.win/v1/`. To use your own instead (for
+example [Night-loop-Server](https://github.com/Infinity7915/Night-loop-Server) running locally), set
+`NIGHTLOOP_SERVER` or `serverUrl` in `%LOCALAPPDATA%\NightLoop\settings.json`, like
+`http://localhost:5080/v1/`.
 
 1. Create an account or sign in. In development the server prints the 6-digit code in its console.
 2. Pick a target game (or N/A for any window).
