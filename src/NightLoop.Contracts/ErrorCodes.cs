@@ -31,4 +31,12 @@ public static class ErrorCodes
     public const string RateLimited = "rate_limited";
     public const string TooManyAttempts = "too_many_attempts";
     public const string ServerError = "server_error";
+
+    // Codes the API uses beyond the section 11 map.
+    /// <summary>422: the "I accept the terms" box was not ticked at sign-up.</summary>
+    public const string TermsRequired = "terms_required";
+    /// <summary>409: discard-draft on a macro that was never saved (delete it instead).</summary>
+    public const string NoSavedCopy = "no_saved_copy";
+    /// <summary>428: a macro write arrived without an If-Match version.</summary>
+    public const string VersionRequired = "version_required";
 }

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>NightLoop.Client</RootNamespace>
+    <Description>Talks to the Night-loop server: typed API client, sign-in session, saved token, device id and macro autosave. No UI code.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NightLoop.Contracts\NightLoop.Contracts.csproj" />
+    <ProjectReference Include="..\NightLoop.LocalData\NightLoop.LocalData.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="NightLoop.Client.Tests" />
+  </ItemGroup>
+</Project>

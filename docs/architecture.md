@@ -1,20 +1,26 @@
 # Architecture
 
-Night-loop is a WPF desktop app plus (later) a private ASP.NET Core server. The full plan lives in the
+Night-loop is a WPF desktop app plus a private ASP.NET Core server ([Night-loop-Server](https://github.com/Infinity7915/Night-loop-Server)). The full plan lives in the
 project schema document; this page describes what is in this repository today.
 
 ## Projects
 
 ```
-NightLoop.App  ──►  NightLoop.Engine  ──►  NightLoop.Contracts
-      │                                         ▲
-      └──────►  NightLoop.LocalData             │
-                                    (server will reference this too)
+NightLoop.App ──► NightLoop.Engine ──► NightLoop.Contracts ◄── Night-loop-Server (git submodule)
+     │                                       ▲
+     ├──► NightLoop.Client ──────────────────┘
+     │          │
+     └──► NightLoop.LocalData ◄┘
 ```
 
 - **Contracts** has no Windows code. It defines `MacroDoc`, the block catalog (`BlockTypes`), `KeyCatalog`
-  (key names ↔ virtual keys), `Hotkey`, every limit (`MacroLimits`) and `MacroValidator`. The server will
-  run the same validator, so the client and server always agree on what a valid macro is.
+  (key names ↔ virtual keys), `Hotkey`, every limit (`MacroLimits`), `MacroValidator`, the API's request and
+  response records (`Api/ApiModels.cs`) and account rules (`AccountRules`). The server compiles this project
+  through a git submodule, so both sides agree on what a valid macro or a login response is.
+- **Client** talks to the server and has no UI code, so it's tested on any OS: `ApiClient` (typed calls,
+  error codes → `ApiException`), `AccountSession` (saved token, sign-in/up, 60-second heartbeat, session
+  replaced), `DraftAutosaver` (1.5 s debounce, If-Match versions, conflicts, offline retry),
+  `DeviceIdentity` (install.id and hashed hardware fingerprint) and `DpapiSessionStore` (session.bin).
 - **Engine** targets plain `net8.0` so its logic runs in tests on any OS. Classes that call Win32 are marked
   `[SupportedOSPlatform("windows10.0.17763")]` and use [CsWin32](https://github.com/microsoft/CsWin32)
   generated P/Invoke (`NativeMethods.txt`), so there are no hand-written signatures.
@@ -57,7 +63,28 @@ WH_KEYBOARD_LL / WH_MOUSE_LL ──► InputRecorder ──► RawInputEvent lis
 `HotkeyManager` calls `RegisterHotKey` on its own message-loop thread and runs callbacks on the thread pool.
 A combo already owned by another program raises `HotkeyTakenException` ("F6 is already used by another program").
 
+## Accounts and sync
+
+```
+Loading ──► GET /health, saved token? ──► GET /me ──► Macros page
+   │                                  └─► Sign in ──► (code) ──► Macros page
+   └─► offline: Retry
+```
+
+- The session token and "trust this PC" tokens live in `%LOCALAPPDATA%\NightLoop\session.bin`, encrypted
+  with DPAPI for the current Windows user. `install.id` is a random GUID made on first run.
+- One PC at a time: when another PC signs in, the next call (or the heartbeat within 60 s) gets
+  `session_replaced`. The app stops every macro, releases held keys and returns to sign-in with
+  "Signed in on another device".
+- If the server can't be reached for 5 minutes, running macros stop until it answers again.
+- A new macro reaches the account on its first edit (it takes one of the 15 slots as a draft). Later edits
+  autosave the draft; **Save** makes it the saved copy. If another PC changed it meanwhile, the app asks
+  whether to keep this version or load the server copy.
+- The server URL comes from `serverUrl` in `settings.json` or the `NIGHTLOOP_SERVER` environment variable,
+  and defaults to `http://localhost:5080/v1/` until a public server exists.
+
 ## Not built yet
 
-Vision (text, image, pixel detection) raises a clear fault when a macro uses it. Accounts, server sync,
-Velopack updates and the full editor follow the roadmap in the README.
+Vision (text, image, pixel detection) raises a clear fault when a macro uses it. Settings screens (username,
+email, password, 2FA; the API calls exist in `ApiClient`), groups in the UI, Velopack updates and the full
+editor follow the roadmap in the README.
