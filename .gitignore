@@ -1,0 +1,16 @@
+bin/
+obj/
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+TestResults/
+artifacts/
+publish/
+Releases/
+# Secrets never go in the repo
+.env
+*.pfx
+appsettings.Development.json
+appsettings.*.local.json

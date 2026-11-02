@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>NightLoop.LocalData</RootNamespace>
+    <Description>Per-PC files in %LOCALAPPDATA%\NightLoop: settings.json and games.json.</Description>
+  </PropertyGroup>
+</Project>
