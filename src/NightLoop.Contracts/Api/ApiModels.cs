@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using NightLoop.Contracts.MacroDocument;
 
 namespace NightLoop.Contracts.Api;
@@ -117,6 +118,7 @@ public sealed record MacroDto(
     DateTimeOffset UpdatedAt)
 {
     /// <summary>The copy the editor should open: the draft when there is one, else the saved copy.</summary>
+    [JsonIgnore]
     public MacroDoc? Current => DraftDoc ?? SavedDoc;
 }
 
