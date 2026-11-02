@@ -75,7 +75,7 @@
         <Border Style="{StaticResource SectionCard}">
           <StackPanel>
             <TextBlock Text="Appearance" Style="{StaticResource CardTitle}" />
-            <TextBlock Text="Theme mode and accent color. Saved locally on this PC." Style="{StaticResource Muted}" Margin="0,4,0,0"
+            <TextBlock Text="Theme mode, accent color and how the window sits. Saved locally on this PC." Style="{StaticResource Muted}" Margin="0,4,0,0"
                        TextWrapping="Wrap" />
             <controls:SplitRow Margin="0,20,0,0">
               <TextBlock Text="Mode" Style="{StaticResource RowLabel}" />
@@ -107,6 +107,15 @@
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
             </controls:SplitRow>
+            <DockPanel Margin="0,20,0,0">
+              <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding AlwaysOnTop}" VerticalAlignment="Center"
+                        ToolTip="Always on top" Margin="16,0,0,0" />
+              <StackPanel>
+                <TextBlock Text="Always on top" FontWeight="SemiBold" FontSize="14" />
+                <TextBlock Text="Keeps Night-loop above every other window, games included. Clicks a macro sends where Night-loop sits land on Night-loop, so keep it to one side."
+                           Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+            </DockPanel>
           </StackPanel>
         </Border>
 
@@ -381,6 +390,8 @@
                     </StackPanel>
                   </Border>
                 </controls:SplitRow>
+                <TextBlock Text="{Binding TwofaModeHint}" Style="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"
+                           Visibility="{Binding TwofaEnabled, Converter={StaticResource BoolToVisible}}" />
                 <TextBlock Text="With two-factor off, anyone who has your password can sign in." FontSize="12" Foreground="{DynamicResource Warning}"
                            TextWrapping="Wrap" Margin="0,14,0,0"
                            Visibility="{Binding TwofaEnabled, Converter={StaticResource BoolToVisible}, ConverterParameter=invert}" />

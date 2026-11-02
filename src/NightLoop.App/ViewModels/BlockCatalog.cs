@@ -15,6 +15,10 @@ public enum FieldKind
     Choice,
     /// <summary>A saved macro's name, picked from the account's macros.</summary>
     MacroName,
+    /// <summary>A Label in this macro (Go to label, On fail → Go to label).</summary>
+    LabelName,
+    /// <summary>A program: clicking the box opens File Explorer to pick it (or pick a running app).</summary>
+    Program,
 }
 
 /// <summary>One choice: the value stored in JSON and what the user sees.</summary>
@@ -39,7 +43,8 @@ public sealed record FieldDef(
     int MaxLength = 200,
     Func<Block, bool>? ShowIf = null,
     bool AllMacros = false,
-    bool Mono = true);
+    bool Mono = true,
+    bool FullPath = false);
 
 /// <summary>A palette entry: one block type with its defaults, inspector fields and one-line summary.</summary>
 public sealed record BlockDef(
@@ -59,7 +64,7 @@ public sealed record BlockDef(
 }
 
 /// <summary>
-/// The block catalog from the Macros mockup: 38 blocks in seven categories, with the mockup's labels, tags,
+/// The block catalog from the Macros mockup: 39 blocks in seven categories, with the mockup's labels, tags,
 /// descriptions, fields and summaries. The palette, the inspector and the timeline all read from here. Hidden entries
 /// only edit blocks from older macros.
 /// </summary>
@@ -72,7 +77,10 @@ public static class BlockCatalog
     ];
 
     private static readonly Choice[] Buttons = [new("left", "Left"), new("right", "Right"), new("middle", "Middle")];
-    private static readonly Choice[] KeyActions = [new("press", "Press"), new("down", "Down"), new("up", "Up")];
+    private static readonly Choice[] KeyActions = [new("press", "Press"), new("down", "Hold down"), new("up", "Let go")];
+    private static readonly Choice[] ClickActions = [new("press", "Click"), new("down", "Hold down"), new("up", "Let go")];
+    private static readonly Choice[] WaitUntil = [new("front", "Open and in front"), new("open", "Open")];
+    private static readonly Choice[] IfRunning = [new("focus", "Bring it to the front"), new("new", "Open another one")];
     private static readonly Choice[] ClickCounts = [new("1", "1"), new("2", "2"), new("3", "3")];
     private static readonly Choice[] MoveModes = [new("absolute", "Absolute"), new("relative", "Relative")];
     private static readonly Choice[] UpDown = [new("up", "Up"), new("down", "Down")];
@@ -99,10 +107,12 @@ public static class BlockCatalog
     public static readonly IReadOnlyList<BlockDef> All =
     [
         // ---- Input (8) ----
-        new("key", BlockTypes.Key, "Key", "KEY", "Input", "Press, hold down or release one key.",
+        new("key", BlockTypes.Key, "Key", "KEY", "Input", "Press a key, or hold it down and let go later. Blocks between a Hold down and its Let go run while the key is held, like Ctrl + T.",
             () => new() { ["key"] = "E", ["action"] = "press" },
-            [F.Key("key", "Key"), F.Pick("action", "Action", KeyActions, "press")],
-            b => $"{Label(KeyActions, b.GetString("action", "press"))} {b.GetString("key", "?")}"),
+            [F.Key("key", "Key"), F.Pick("action", "Action", KeyActions, "press"),
+             F.Int("holdMs", "Hold for (ms)", 0, MacroLimits.WaitMaxMs, optional: true, placeholder: "30",
+                 hint: "How long the key stays down. Recording measures it.") with { ShowIf = IsPress }],
+            KeySummary),
         new("combo", BlockTypes.Combo, "Key combo", "CMB", "Input", "Press several keys together, like Ctrl + Shift + E.",
             () => new() { ["keys"] = "Ctrl + E" },
             [F.Combo("keys", "Keys")],
@@ -113,9 +123,14 @@ public static class BlockCatalog
             b => $"{b.GetString("key", "?")} for {b.GetInt("holdMs", 0)} ms"),
         new("click", BlockTypes.Click, "Click", "CLK", "Input", "Click at a position, or where the mouse is.",
             () => new() { ["button"] = "left", ["clicks"] = 1, ["x"] = 960, ["y"] = 540, ["relativeTo"] = "gameWindow" },
-            [F.Pick("button", "Button", Buttons, "left"), F.IntPick("clicks", "Clicks", ClickCounts, 1),
+            [F.Pick("button", "Button", Buttons, "left"), F.Pick("action", "Action", ClickActions, "press"),
+             F.IntPick("clicks", "Clicks", ClickCounts, 1) with { ShowIf = IsPress },
+             F.Int("holdMs", "Hold for (ms)", 0, MacroLimits.WaitMaxMs, optional: true, placeholder: "20",
+                 hint: "How long the button stays down. Recording measures it.") with { ShowIf = IsPress },
              F.Int("x", "X", -Coord, Coord, optional: true, placeholder: "Where the mouse is"),
-             F.Int("y", "Y", -Coord, Coord, optional: true, placeholder: "Where the mouse is")],
+             F.Int("y", "Y", -Coord, Coord, optional: true, placeholder: "Where the mouse is"),
+             F.Int("moveMs", "Glide there (ms)", 0, MacroLimits.MoveMaxMs, optional: true, placeholder: "Automatic",
+                 hint: "0 jumps straight there.")],
             ClickSummary),
         new("move", BlockTypes.Move, "Mouse move", "MOV", "Input", "Move to a point, or by an offset.",
             () => new() { ["mode"] = "absolute", ["x"] = 0, ["y"] = 0, ["durationMs"] = 120, ["relativeTo"] = "gameWindow" },
@@ -218,29 +233,41 @@ public static class BlockCatalog
             b => b.GetBool("forever") == true ? "Forever" : $"{b.GetInt("count", 1)} times"),
         new("until", BlockTypes.RepeatUntil, "Repeat until", "UNTL", "Logic", "Repeat the blocks inside until a condition is true.",
             () => new() { ["condition"] = new JsonObject { ["kind"] = "textVisible", ["text"] = "Done" }, ["maxIterations"] = 0 },
-            [F.ConditionKind(), F.ConditionValue(), F.Int("maxIterations", "Max tries (0 = no limit)", 0, MacroLimits.CountMax)],
+            [F.ConditionKind(), F.ConditionValue(), F.ConditionProgram(), F.ConditionRegion(),
+             F.Int("maxIterations", "Max tries (0 = no limit)", 0, MacroLimits.CountMax)],
             b => Conditions.Describe(b.GetObject("condition"))),
         new("ifb", BlockTypes.If, "If", "IF", "Logic", "Run the blocks inside only when a condition is true.",
             () => new() { ["condition"] = new JsonObject { ["kind"] = "textVisible", ["text"] = "Done" } },
-            [F.ConditionKind(), F.ConditionValue()],
+            [F.ConditionKind(), F.ConditionValue(), F.ConditionProgram(), F.ConditionRegion()],
             b => Conditions.Describe(b.GetObject("condition"))),
         new("elseb", BlockTypes.Else, "Else", "ELSE", "Logic", "Runs when the If above was false.", () => [], [], _ => ""),
         new("end", BlockTypes.End, "End", "END", "Logic", "Closes the nearest Loop, Repeat until or If.", () => [], [], _ => ""),
-        new("label", BlockTypes.Label, "Label", "LBL", "Logic", "A named spot you can jump back to.",
+        new("label", BlockTypes.Label, "Label", "LBL", "Logic", "A named spot that Go to label and On fail can jump to.",
             () => new() { ["name"] = "start" }, [F.Text("name", "Name", 40)], b => b.GetString("name", "")),
         new("gotob", BlockTypes.Goto, "Go to label", "GOTO", "Logic", "Jump to a label.",
-            () => new() { ["name"] = "start" }, [F.Text("name", "Label", 40)], b => $"→ {b.GetString("name", "")}"),
+            () => new() { ["name"] = "start" }, [F.LabelName("name", "Label")], b => $"→ {b.GetString("name", "")}"),
         new("call", BlockTypes.RunMacro, "Run macro", "CALL", "Logic", "Run another saved macro, then come back.",
             () => new() { ["macroName"] = "" }, [F.MacroName("macroName", "Macro", all: false)], b => b.GetString("macroName", "")),
         new("stop", BlockTypes.Stop, "Stop macro", "STOP", "Logic", "End the run here.", () => [], [], _ => ""),
 
-        // ---- Window (4) ----
+        // ---- Window (5) ----
+        new("open", BlockTypes.WindowOpen, "Open window", "OPEN", "Window", "Start a program and wait for its window. If it's already running, bring it to the front.",
+            () => new() { ["path"] = "", ["ifRunning"] = "focus", ["wait"] = true, ["timeoutMs"] = 30_000 },
+            [F.Program("path", "Program", fullPath: true),
+             F.Text("args", "Arguments (optional)", MacroLimits.PathMaxLength, optional: true, placeholder: "e.g. -windowed"),
+             F.Pick("ifRunning", "If it's already running", IfRunning, "focus"),
+             F.YesNo("wait", "Wait for its window", fallback: true, yes: "Wait, then bring it to the front", no: "Don't wait"),
+             F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes") with { ShowIf = b => b.GetBool("wait") != false },
+             F.Program("process", "Window to wait for (optional)", placeholder: "The program above",
+                 hint: "Only for launchers that open a different program, like a game launcher.") with { ShowIf = b => b.GetBool("wait") != false }],
+            b => b.GetString("path") is { Length: > 0 } path ? WindowFileName(path) + (b.GetString("args") is { Length: > 0 } a ? $" {a}" : "") : "pick a program"),
         new("focus", BlockTypes.WindowFocus, "Focus window", "WIN", "Window", "Bring a game or app to the front.",
             () => [], [F.Process()], b => ProcessName(b)),
-        new("waitwin", BlockTypes.WaitForWindow, "Wait for window", "WWN", "Window", "Pause until a window opens or gets focus.",
+        new("waitwin", BlockTypes.WaitForWindow, "Wait for window", "WWN", "Window", "Pause until a window opens, or opens and comes to the front.",
             () => new() { ["timeoutMs"] = 30_000 },
-            [F.Process(), F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes")],
-            b => $"{ProcessName(b)} · {b.GetInt("timeoutMs", 30_000)} ms"),
+            [F.Process(), F.Pick("until", "Wait until it's", WaitUntil, "front"),
+             F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes")],
+            b => $"{ProcessName(b)}{(b.GetString("until") == "open" ? " open" : " in front")} · {b.GetInt("timeoutMs", 30_000)} ms"),
         new("resize", BlockTypes.WindowResize, "Resize window", "SIZE", "Window", "Set the game window to an exact size so recorded positions line up every run.",
             () => new() { ["width"] = 1280, ["height"] = 720 },
             [F.Process(), F.Int("width", "Width (px)", 1, 16_384), F.Int("height", "Height (px)", 1, 16_384)],
@@ -302,15 +329,36 @@ public static class BlockCatalog
 
     private static string ProcessName(Block b) => b.GetString("process") is { Length: > 0 } p ? p : "target game";
 
+    private static bool IsPress(Block b) => b.GetString("action", "press") == "press";
+
+    /// <summary>"C:\\Games\\Game.exe" → "Game.exe".</summary>
+    public static string WindowFileName(string path)
+    {
+        var t = path.Trim().Trim('"').TrimEnd('\\', '/');
+        var cut = t.LastIndexOfAny(['\\', '/']);
+        return cut >= 0 ? t[(cut + 1)..] : t;
+    }
+
+    private static string KeySummary(Block b)
+    {
+        var key = b.GetString("key", "?");
+        return b.GetString("action", "press") switch
+        {
+            "down" => $"Hold {key} down",
+            "up" => $"Let go of {key}",
+            _ => b.GetInt("holdMs") is { } h ? $"Press {key} · {h} ms" : $"Press {key}",
+        };
+    }
+
     private static string ClickSummary(Block b)
     {
         var button = Label(Buttons, b.GetString("button", "left"));
         var where = b.GetInt("x") is { } x && b.GetInt("y") is { } y ? $"at {x}, {y}" : "at the mouse";
         return b.GetString("action", "press") switch
         {
-            "down" => $"{button} down {where}",
-            "up" => $"{button} up {where}",
-            _ => $"{button} ×{b.GetInt("clicks", 1)} {where}",
+            "down" => $"Hold {button.ToLowerInvariant()} button {where}",
+            "up" => $"Let go of {button.ToLowerInvariant()} button {where}",
+            _ => $"{button} ×{b.GetInt("clicks", 1)} {where}{(b.GetInt("holdMs") is { } h and > 20 ? $" · {h} ms" : "")}",
         };
     }
 
@@ -464,8 +512,30 @@ internal static class F
     public static string RegionText(JsonNode? region) =>
         MacroValidator.ReadRegion(region) is { } r ? $"{r.X}, {r.Y}, {r.Width}, {r.Height}" : "Full window";
 
-    public static FieldDef Process() =>
-        Text("process", "Process", 260, optional: true, placeholder: "The target game");
+    /// <summary>The program a Window block works on. Clicking the box opens File Explorer; blank means the target game.</summary>
+    public static FieldDef Process() => Program("process", "Program", placeholder: "The target game");
+
+    /// <summary>
+    /// A program, picked in File Explorer (or from the running apps). Window blocks keep just the file name, like
+    /// Game.exe; Open window keeps the whole path (<paramref name="fullPath"/>).
+    /// </summary>
+    public static FieldDef Program(string path, string label, bool fullPath = false, string? placeholder = null, string? hint = null) =>
+        new(path, label, FieldKind.Program,
+            b => b.GetString(path) ?? "",
+            (b, text) =>
+            {
+                var t = text.Trim().Trim('"');
+                if (t.Length == 0)
+                {
+                    if (fullPath) return "Pick the program to open.";
+                    b.Params.Remove(path);
+                    return null;
+                }
+                if (t.Length > MacroLimits.PathMaxLength) return $"Use at most {MacroLimits.PathMaxLength} characters.";
+                b.Params[path] = fullPath ? t : BlockCatalog.WindowFileName(t);
+                return null;
+            },
+            Placeholder: placeholder ?? "Click to pick a program", Hint: hint, MaxLength: MacroLimits.PathMaxLength, FullPath: fullPath);
 
     /// <summary>The picture's name; the picture itself comes from "Capture image from screen".</summary>
     public static FieldDef Image() =>
@@ -507,7 +577,19 @@ internal static class F
     public static FieldDef OnFail() => Pick("onFail", "On fail", FailActions, "continue");
 
     public static FieldDef FailLabel() =>
-        Text("failLabel", "Label to go to", 40) with { ShowIf = b => b.GetString("onFail") == "goto" };
+        LabelName("failLabel", "Label to go to") with { ShowIf = b => b.GetString("onFail") == "goto" };
+
+    /// <summary>One of this macro's labels, picked from a list.</summary>
+    public static FieldDef LabelName(string path, string label) =>
+        new(path, label, FieldKind.LabelName,
+            b => b.GetString(path) ?? "",
+            (b, value) =>
+            {
+                if (value.Length == 0) return "Pick a label.";
+                b.Params[path] = value;
+                return null;
+            },
+            Hint: "The labels in this macro. Add a Label block to jump somewhere new.");
 
     public static FieldDef MacroName(string path, string label, bool all) =>
         new(path, label, FieldKind.MacroName,
@@ -600,8 +682,42 @@ internal static class F
             },
             Conditions.Kinds);
 
+    /// <summary>Window focused / Program running: the program, picked with File Explorer.</summary>
+    public static FieldDef ConditionProgram() =>
+        new FieldDef("condition.name", "Program", FieldKind.Program,
+            b => Conditions.Read(b.GetObject("condition")).Value,
+            (b, text) =>
+            {
+                var condition = b.GetObject("condition");
+                var (kind, _) = Conditions.Read(condition);
+                var name = text.Trim().Length == 0 ? "" : BlockCatalog.WindowFileName(text);
+                if (Conditions.Check(kind, name) is { } error) return error;
+                b.Params["condition"] = Conditions.Write(kind, name, condition);
+                return null;
+            },
+            Placeholder: "Click to pick a program", MaxLength: MacroLimits.PathMaxLength)
+        with { ShowIf = b => Conditions.IsProgramKind(Conditions.Read(b.GetObject("condition")).Kind) };
+
+    /// <summary>Text / image visible: where to look (blank is the whole game window).</summary>
+    public static FieldDef ConditionRegion() =>
+        new FieldDef("condition.region", "Region", FieldKind.Text,
+            b => RegionText(Conditions.Inner(b.GetObject("condition"))?["region"]),
+            (b, text) =>
+            {
+                var probe = Block.Create("x", BlockTypes.Wait);
+                if (Region().Set(probe, text) is { } error) return error;
+                var condition = b.GetObject("condition")?.DeepClone() as JsonObject ?? [];
+                if (Conditions.Inner(condition) is not { } inner) return null;
+                if (probe.Params["region"] is { } r) inner["region"] = r.DeepClone();
+                else inner.Remove("region");
+                b.Params["condition"] = condition;
+                return null;
+            },
+            Placeholder: "Full window", MaxLength: 40)
+        with { ShowIf = b => Conditions.Read(b.GetObject("condition")).Kind.TrimStart('!') is "textVisible" or "imageVisible" };
+
     public static FieldDef ConditionValue() =>
-        new("condition.value", "Value", FieldKind.Text,
+        new FieldDef("condition.value", "Value", FieldKind.Text,
             b => Conditions.Read(b.GetObject("condition")).Value,
             (b, text) =>
             {
@@ -611,7 +727,8 @@ internal static class F
                 b.Params["condition"] = Conditions.Write(kind, text, condition);
                 return null;
             },
-            MaxLength: 200);
+            MaxLength: 200)
+        with { ShowIf = b => !Conditions.IsProgramKind(Conditions.Read(b.GetObject("condition")).Kind), Label = "Value" };
 }
 
 /// <summary>Reads and writes nested params like "from.x".</summary>
@@ -666,14 +783,23 @@ public static class Conditions
         new("textVisible", "Text visible"),
         new("!textVisible", "Text not visible"),
         new("imageVisible", "Image visible"),
+        new("!imageVisible", "Image not visible"),
         new("pixelColor", "Pixel matches"),
+        new("!pixelColor", "Pixel doesn't match"),
         new("windowFocused", "Window focused"),
-        new("!processRunning", "Process not running"),
-        new("keyHeld", "Key held"),
-        // Older macros may use these.
         new("!windowFocused", "Window not focused"),
-        new("processRunning", "Process running"),
+        new("processRunning", "Program running"),
+        new("!processRunning", "Program not running"),
+        new("keyHeld", "Key held"),
+        new("!keyHeld", "Key not held"),
     ];
+
+    /// <summary>The condition itself, inside its "not" when it has one.</summary>
+    public static JsonObject? Inner(JsonObject? c) =>
+        c is not null && Str(c, "kind") == "not" ? c["condition"] as JsonObject : c;
+
+    /// <summary>Kinds whose value is a program (picked with File Explorer).</summary>
+    public static bool IsProgramKind(string kind) => kind.TrimStart('!') is "processRunning" or "windowFocused";
 
     /// <summary>Reads (kind, value) from a condition object. Unknown shapes come back as their raw kind.</summary>
     public static (string Kind, string Value) Read(JsonObject? c)
@@ -740,7 +866,7 @@ public static class Conditions
         var v = value.Trim();
         return kind.TrimStart('!') switch
         {
-            "processRunning" when v.Length == 0 => "Enter a process name, like RobloxPlayerBeta.exe.",
+            "processRunning" when v.Length == 0 => "Pick the program, like RobloxPlayerBeta.exe.",
             "textVisible" when v.Length == 0 => "Enter the text to look for.",
             "textVisible" when v.Length > MacroLimits.TypeTextMaxLength => $"Use at most {MacroLimits.TypeTextMaxLength} characters.",
             "keyHeld" when !KeyCatalog.IsKnown(v) => "Not a key Night-loop knows. Try Shift, Space or F1.",

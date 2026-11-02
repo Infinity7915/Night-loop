@@ -1,4 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using NightLoop.App.Services;
 
 namespace NightLoop.App.ViewModels;
 
@@ -12,14 +14,20 @@ public sealed partial class BlockField : ObservableObject
     private readonly Action<BlockRow, BlockField> _changed;
     private readonly bool _loading;
 
-    public BlockField(BlockRow row, FieldDef def, Action<BlockRow, BlockField> changed, IReadOnlyList<string>? macroNames = null)
+    public BlockField(BlockRow row, FieldDef def, Action<BlockRow, BlockField> changed, IReadOnlyList<string>? macroNames = null,
+        IReadOnlyList<string>? labelNames = null)
     {
         _row = row;
         Def = def;
         _changed = changed;
         _loading = true;
         Value = def.Get(row.Block);
-        Choices = def.Kind == FieldKind.MacroName ? MacroChoices(def, Value, macroNames ?? []) : def.Choices ?? [];
+        Choices = def.Kind switch
+        {
+            FieldKind.MacroName => MacroChoices(def, Value, macroNames ?? []),
+            FieldKind.LabelName => NameChoices(Value, labelNames ?? []),
+            _ => def.Choices ?? [],
+        };
         _loading = false;
     }
 
@@ -35,7 +43,61 @@ public sealed partial class BlockField : ObservableObject
 
     public bool IsText => Def.Kind == FieldKind.Text;
     public bool IsMultiLine => Def.Kind == FieldKind.MultiLine;
-    public bool IsChoice => Def.Kind is FieldKind.Choice or FieldKind.MacroName;
+    public bool IsChoice => Def.Kind is FieldKind.Choice or FieldKind.MacroName or FieldKind.LabelName;
+    /// <summary>A program: the box opens File Explorer, the arrow lists running apps.</summary>
+    public bool IsProgram => Def.Kind == FieldKind.Program;
+
+    /// <summary>Program fields: the file name, big; the folder (Open window only) goes under it.</summary>
+    public string ProgramName => Value.Length == 0 ? "" : BlockCatalog.WindowFileName(Value);
+    public string ProgramFolder => Def.FullPath && Value.Length > 0 && Value.Length > ProgramName.Length
+        ? Value[..^ProgramName.Length].TrimEnd('\\', '/')
+        : "";
+    public bool HasProgram => Value.Length > 0;
+    /// <summary>Optional program boxes (blank means the target game) can be cleared.</summary>
+    public bool CanClear => IsProgram && HasProgram && !Def.FullPath;
+
+    /// <summary>Programs with a window, listed when the arrow next to a program box is pressed.</summary>
+    public List<RunningProgram> RunningPrograms { get; private set; } = [];
+    [ObservableProperty] private bool _isPickingRunning;
+
+    partial void OnIsPickingRunningChanged(bool value)
+    {
+        if (!value) return;
+        RunningPrograms = Programs.Running();
+        OnPropertyChanged(nameof(RunningPrograms));
+    }
+
+    /// <summary>Picked from the running apps.</summary>
+    public RunningProgram? PickedRunning
+    {
+        get => null;
+        set
+        {
+            if (value is null) return;
+            IsPickingRunning = false;
+            if (Def.FullPath)
+            {
+                if (value.Path is null)
+                {
+                    Error = $"Windows won't say where {value.Exe} is (it may be running as administrator). Use File Explorer instead.";
+                    return;
+                }
+                Value = Programs.Portable(value.Path);
+            }
+            else Value = value.Exe;
+        }
+    }
+
+    /// <summary>Clicking a program box: File Explorer.</summary>
+    [RelayCommand]
+    private void Browse()
+    {
+        if (Programs.Browse(Value, anyFile: Def.FullPath) is not { } file) return;
+        Value = Def.FullPath ? Programs.Portable(file) : System.IO.Path.GetFileName(file);
+    }
+
+    [RelayCommand]
+    private void ClearProgram() => Value = "";
     /// <summary>Choice fields can change which other fields show, so the inspector rebuilds after them.</summary>
     public bool RebuildsInspector => IsChoice;
 
@@ -52,6 +114,10 @@ public sealed partial class BlockField : ObservableObject
     partial void OnValueChanged(string value)
     {
         OnPropertyChanged(nameof(SelectedChoice));
+        OnPropertyChanged(nameof(ProgramName));
+        OnPropertyChanged(nameof(ProgramFolder));
+        OnPropertyChanged(nameof(HasProgram));
+        OnPropertyChanged(nameof(CanClear));
         if (_loading) return;
         string? error;
         try
@@ -66,6 +132,14 @@ public sealed partial class BlockField : ObservableObject
         if (Error.Length > 0) return;
         _row.Refresh();
         _changed(_row, this);
+    }
+
+    /// <summary>This macro's labels, plus the current value if its label is gone (so it shows what's broken).</summary>
+    private static List<Choice> NameChoices(string current, IReadOnlyList<string> names)
+    {
+        var list = names.Distinct(StringComparer.Ordinal).Select(n => new Choice(n, n)).ToList();
+        if (current.Length > 0 && list.All(c => c.Value != current)) list.Add(new Choice(current, $"{current} (missing)"));
+        return list;
     }
 
     /// <summary>Saved macros to pick from, plus "All other macros" for Pause / Resume and the current value if it's gone.</summary>

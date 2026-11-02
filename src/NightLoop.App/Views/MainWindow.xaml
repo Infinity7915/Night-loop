@@ -6,7 +6,7 @@
         xmlns:controls="clr-namespace:NightLoop.App.Controls"
         Title="Night-loop" Icon="/Assets/icon.png"
         Width="1280" Height="800" MinWidth="960" MinHeight="600"
-        WindowStartupLocation="CenterScreen" Style="{StaticResource NightWindow}">
+        WindowStartupLocation="CenterScreen" Style="{StaticResource NightWindow}" Topmost="{Binding AlwaysOnTop}">
   <Window.Resources>
     <DataTemplate DataType="{x:Type vm:LoadingViewModel}">
       <views:LoadingView />

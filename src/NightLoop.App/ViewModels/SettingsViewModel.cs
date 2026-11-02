@@ -40,6 +40,18 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>Keeps the window above all others. Kept on this PC.</summary>
+    public bool AlwaysOnTop
+    {
+        get => _shell.AlwaysOnTop;
+        set
+        {
+            if (_shell.AlwaysOnTop == value) return;
+            _shell.AlwaysOnTop = value;
+            OnPropertyChanged();
+        }
+    }
+
     public string ThemeMode
     {
         get => ThemeManager.Mode;

@@ -62,6 +62,13 @@ public class RecordingBuilderTests
     }
 
     [Fact]
+    public void Keys_without_a_name_are_left_out_so_the_macro_stays_valid()
+    {
+        var blocks = Build(E.KeyDown(0, 0xFF), E.KeyUp(40, 0xFF), E.KeyDown(500, A), E.KeyUp(550, A));
+        Assert.Equal(["key A press 50"], Describe(blocks));
+    }
+
+    [Fact]
     public void A_byte_budget_cuts_the_recording_short()
     {
         var events = new List<RawInputEvent>();

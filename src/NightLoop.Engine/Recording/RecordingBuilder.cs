@@ -107,6 +107,8 @@ public static class RecordingBuilder
         {
             switch (e.Kind)
             {
+                // Keys Night-loop has no name for (media keys, some OEM keys) can't be saved in a macro.
+                case RawInputKind.KeyDown or RawInputKind.KeyUp when KeyCatalog.NameOf(e.VirtualKey) is null: continue;
                 case RawInputKind.KeyDown when !keys.Add(e.VirtualKey): continue;
                 case RawInputKind.KeyUp when !keys.Remove(e.VirtualKey): continue;
                 case RawInputKind.MouseDown when !buttons.Add(e.Button): continue;

@@ -284,6 +284,7 @@ public static class MacroValidator
                 Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
                 break;
             case BlockTypes.WindowOpen:
+                Process();
                 Need(Text("path", MacroLimits.PathMaxLength), "Pick the program to open.");
                 Need(Text("args", MacroLimits.PathMaxLength, required: false), "Arguments must be at most 260 characters.");
                 Need(OneOf("ifRunning", ["focus", "new"], "focus"), "If it's already running must be focus or open another.");

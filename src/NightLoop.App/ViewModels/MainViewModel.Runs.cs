@@ -106,16 +106,23 @@ public sealed partial class MainViewModel
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int vKey);
 
-    /// <summary>Why a key can't be a macro's start key, or null when it's free.</summary>
-    internal string? HotkeyProblem(Hotkey h, Guid? forMacro)
+    partial void OnCapturingRowChanged(SavedMacroRow? value) => OnCaptureChanged();
+
+    /// <summary>
+    /// Why a key can't be a macro's start key (or, with <paramref name="recordKey"/>, the record key), or null when
+    /// it's free.
+    /// </summary>
+    internal string? HotkeyProblem(Hotkey h, Guid? forMacro, bool recordKey = false)
     {
-        if (h == RecordHotkey) return $"{h} is the Record key.";
-        if (h == Hotkey.Panic) return $"{h} is the stop-everything key.";
-        if (h == PlayHotkey) return $"{h} is the editor's Play key. Pick another key.";
-        var clash = _rows.FirstOrDefault(r => r.Id != forMacro && Hotkey.TryParse(r.Hotkey, out var other) && other == h);
-        if (clash is not null) return $"{h} already starts \"{clash.Name}\".";
-        if (forMacro != _macroId && _macroId is not null && Hotkey.TryParse(EditorHotkey, out var editorKey) && editorKey == h)
-            return $"{h} already starts \"{MacroName}\".";
+        var key = KeyText(h.ToString());
+        if (!recordKey && h == RecordHotkey) return $"{key} starts and stops recording. Pick another key, or change the record key in the loaded macro's options.";
+        if (h == Hotkey.Panic) return $"{key} is the stop-everything key.";
+        if (h == PlayHotkey) return $"{key} is the editor's Play key. Pick another key.";
+        var clash = _rows.FirstOrDefault(r => (recordKey || r.Id != forMacro) && Hotkey.TryParse(r.Hotkey, out var other) && other == h);
+        if (clash is not null) return $"{key} already starts \"{clash.Name}\".";
+        var editorClash = recordKey || (forMacro != _macroId && _macroId is not null);
+        if (editorClash && Hotkey.TryParse(EditorHotkey, out var editorKey) && editorKey == h)
+            return $"{key} already starts \"{MacroName}\".";
         return null;
     }
 
@@ -123,6 +130,7 @@ public sealed partial class MainViewModel
     private void RefreshHotkeys()
     {
         DisposeMacroHotkeys();
+        if (IsCapturingKey) return; // picking a key: OnCaptureChanged registers them again after
         var keys = _rows.Select(r => (r.Id, Key: r.Id == _macroId ? EditorHotkey : r.Hotkey)).ToList();
         if (_macroId is null && !string.IsNullOrEmpty(EditorHotkey)) keys.Add((Guid.Empty, EditorHotkey));
         foreach (var (id, text) in keys)

@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using NightLoop.Contracts.Api;
 using NightLoop.Contracts.MacroDocument;
+using NightLoop.Engine.Screen;
 
 namespace NightLoop.App.ViewModels;
 
@@ -10,7 +11,8 @@ namespace NightLoop.App.ViewModels;
 /// </summary>
 public sealed partial class MainViewModel
 {
-    internal void ShowSample()
+    /// <summary><paramref name="select"/>: which block the inspector shows ("position", "image" or "open").</summary>
+    internal void ShowSample(string select = "position")
     {
         var coin = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var farming = Guid.Parse("00000000-0000-0000-0000-0000000000a1");
@@ -21,6 +23,10 @@ public sealed partial class MainViewModel
         doc.Name = "Coin farm";
         var blocks = new (string Type, JsonObject? Params)[]
         {
+            (BlockTypes.WindowOpen, new()
+            {
+                ["path"] = @"%LOCALAPPDATA%\Roblox\Versions\RobloxPlayerBeta.exe", ["ifRunning"] = "focus", ["wait"] = true, ["timeoutMs"] = 60_000,
+            }),
             (BlockTypes.WindowFocus, null),
             (BlockTypes.WindowResize, null),
             (BlockTypes.WindowPosition, null),
@@ -36,7 +42,14 @@ public sealed partial class MainViewModel
                 ["whenFound"] = "click", ["onFail"] = "goto", ["failLabel"] = "farm", ["note"] = "spin until the pickup prompt is on screen",
             }),
             (BlockTypes.WaitRandom, new() { ["minMs"] = 400, ["maxMs"] = 900 }),
+            (BlockTypes.Key, new() { ["key"] = "LeftShift", ["action"] = "down", ["note"] = "sprint" }),
             (BlockTypes.HoldKey, new() { ["key"] = "W", ["holdMs"] = 1200 }),
+            (BlockTypes.Wait, new() { ["ms"] = 180 }),
+            (BlockTypes.Key, new() { ["key"] = "LeftShift", ["action"] = "up" }),
+            (BlockTypes.WaitForImage, new()
+            {
+                ["image"] = "coin", ["imageData"] = SampleCoin(), ["confidencePct"] = 85, ["timeoutMs"] = 3000, ["onFail"] = "continue",
+            }),
             (BlockTypes.WaitForText, new() { ["text"] = "+1 Coin", ["match"] = "contains", ["timeoutMs"] = 1500, ["onFail"] = "continue" }),
             (BlockTypes.If, new() { ["condition"] = Conditions.Write("!textVisible", "+1 Coin", null) }),
             (BlockTypes.Key, new() { ["key"] = "Space", ["action"] = "press", ["note"] = "jump in case we are stuck" }),
@@ -49,7 +62,14 @@ public sealed partial class MainViewModel
 
         _macroId = coin;
         ApplyDoc(doc);
-        SelectedBlock = Blocks.Count > 2 ? Blocks[2] : null;
+        var pick = select switch
+        {
+            "image" => BlockTypes.WaitForImage,
+            "open" => BlockTypes.WindowOpen,
+            _ => BlockTypes.WindowPosition,
+        };
+        SelectedBlock = Blocks.FirstOrDefault(r => r.Block.Type == pick);
+        ShowEditorOptions = select == "image";
         ToggleCategory(Categories.First(c => c.Name == "Timing"));
         SyncText = "Draft · autosaved";
 
@@ -67,5 +87,23 @@ public sealed partial class MainViewModel
             ],
             [new GroupDto(farming, "Roblox · coin farming", "#A78BFA", 0), new GroupDto(fishing, "Fishing", "#34D399", 1)],
             MacroLimits.MacrosPerUser));
+    }
+
+    /// <summary>A small round coin picture for the sample's Wait for image block.</summary>
+    private static string SampleCoin()
+    {
+        const int size = 40;
+        var px = new byte[size * size * 4];
+        for (var y = 0; y < size; y++)
+        for (var x = 0; x < size; x++)
+        {
+            var d = Math.Sqrt((x - 19.5) * (x - 19.5) + (y - 19.5) * (y - 19.5));
+            var v = d < 14 ? 230 - (int)(d * 4) : d < 18 ? 120 : 30;
+            if (d < 9 && Math.Abs(x - 19.5) < 2) v = 90; // the coin's mark
+            var i = (y * size + x) * 4;
+            px[i] = px[i + 1] = px[i + 2] = (byte)v;
+            px[i + 3] = 255;
+        }
+        return ImageTemplate.FromImage(new ScreenImage(0, 0, size, size, px)).Encode();
     }
 }

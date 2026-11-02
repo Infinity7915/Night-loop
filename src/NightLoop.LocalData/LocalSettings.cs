@@ -62,6 +62,20 @@ public sealed class LocalSettings(string path)
         set => WriteNode("starterSequence", value);
     }
 
+    /// <summary>Keep Night-loop above every other window (Settings › Appearance). Off unless turned on.</summary>
+    public bool AlwaysOnTop
+    {
+        get => Read()?["alwaysOnTop"] is JsonValue v && v.TryGetValue(out bool on) && on;
+        set => WriteNode("alwaysOnTop", value);
+    }
+
+    /// <summary>The start / stop recording key, like "F9" or "Ctrl+Shift+R". Null means the default (F9).</summary>
+    public string? RecordHotkey
+    {
+        get => ReadString("recordHotkey");
+        set => Write("recordHotkey", value);
+    }
+
     public static bool IsHexColor(string s) =>
         s.Length == 7 && s[0] == '#' && s.Skip(1).All(Uri.IsHexDigit);
 
