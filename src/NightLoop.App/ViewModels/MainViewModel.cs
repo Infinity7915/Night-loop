@@ -47,7 +47,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _selectedGame = Games[0];
         _runs = new RunManager(new Win32InputSender(), new Win32WindowService());
         _runs.RunStepChanged += (_, index) => OnUi(() => Highlight(index));
-        _runs.RunStateChanged += (run, state) => OnUi(() => OnRunState(run, state));
+        _runs.RunStateChanged += (run, state) => OnUi(() =>
+        {
+            OnRunState(run, state);
+            OnPropertyChanged(nameof(ActiveRunCount));
+            OnPropertyChanged(nameof(IsBusy));
+        });
         _runs.Notify = message => OnUi(() => Status = message);
 
         TryRegister(RecordHotkey, () => OnUi(ToggleRecord));
@@ -65,7 +70,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty] private GameTarget _selectedGame;
     [ObservableProperty] private string _macroName = "New macro";
-    [ObservableProperty] private bool _isRecording;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBusy))]
+    private bool _isRecording;
     [ObservableProperty] private bool _isPlaying;
     [ObservableProperty] private bool _recordMouseMoves;
     [ObservableProperty] private int _repeatCount = 1;
@@ -81,6 +88,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public string TargetBanner => SelectedGame.Exe is null
         ? "No target game: input goes to whatever window is in front."
         : $"Input goes to {SelectedGame.Name} only, and pauses when it isn't focused.";
+
+    /// <summary>Macros running right now (Home's "Active macros" card).</summary>
+    public int ActiveRunCount => _runs.ActiveRuns.Count;
+
+    /// <summary>Recording or running: the app must not restart for an update by itself.</summary>
+    public bool IsBusy => IsRecording || ActiveRunCount > 0;
 
     public string BlockSummary => $"{Blocks.Count} blocks · {Blocks.Count(b => !b.Enabled)} off";
 

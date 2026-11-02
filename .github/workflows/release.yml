@@ -1,0 +1,89 @@
+name: Release
+
+# Push a tag like v0.2.0 (or run this from the Actions tab with a version) and this builds Night-loop, packs it
+# with Velopack and publishes a GitHub Release with the installer, a portable zip and the update packages.
+# Installed copies find it on their next check (launch, Refresh, Settings → Check now, or every 4 hours) and
+# update themselves. See docs/releasing.md.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, like 0.2.0 (tags the commit you run this on)"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  VPK_VERSION: 1.2.161 # keep in step with the Velopack package in src/NightLoop.Updates
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Version from tag
+        shell: pwsh
+        env:
+          REQUESTED: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: |
+          $raw = $env:REQUESTED
+          $v = $raw.Trim().TrimStart('v')
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Versions must look like 1.2.3 (got $raw)" }
+          "VERSION=$v" >> $env:GITHUB_ENV
+          "TAG=v$v" >> $env:GITHUB_ENV
+          $notes = "docs/releases/v$v.md"
+          if (-not (Test-Path $notes)) {
+            $notes = "$env:RUNNER_TEMP\notes.md"
+            "Night-loop $v. Download **NightLoop-win-Setup.exe** below to install, or update from Settings → Check now." | Set-Content $notes
+          }
+          "NOTES=$notes" >> $env:GITHUB_ENV
+
+      - name: Test
+        run: dotnet test NightLoop.sln --configuration Release
+
+      - name: Publish (self-contained, no .NET install needed)
+        run: dotnet publish src/NightLoop.App/NightLoop.App.csproj -c Release -r win-x64 --self-contained -p:Version=${{ env.VERSION }} -o publish
+
+      - name: UI smoke test on the published build
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $p = Start-Process "$pwd\publish\NightLoop.exe" -ArgumentList '--smoke', "$pwd\smoke" -Wait -PassThru
+          Get-Content smoke\*.error.txt -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { throw "UI smoke test failed (exit $($p.ExitCode))" }
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk --version ${{ env.VPK_VERSION }}
+
+      # The previous release lets vpk build a small delta package, so updates download only what changed.
+      - name: Download previous release
+        continue-on-error: true # the very first release has nothing to download
+        run: vpk download github --repoUrl ${{ github.server_url }}/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }} -o releases
+
+      - name: Pack
+        run: >
+          vpk pack --packId NightLoop --packVersion ${{ env.VERSION }} --packDir publish --mainExe NightLoop.exe
+          --packTitle Night-loop --packAuthors "Night-loop contributors" --icon src/NightLoop.App/Assets/icon.ico
+          --releaseNotes ${{ env.NOTES }} -o releases
+
+      - name: Upload to GitHub Release
+        run: >
+          vpk upload github --repoUrl ${{ github.server_url }}/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
+          -o releases --publish --releaseName "Night-loop ${{ env.VERSION }}" --tag ${{ env.TAG }} --targetCommitish ${{ github.sha }}
+
+      - name: Release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit ${{ env.TAG }} --notes-file ${{ env.NOTES }} --repo ${{ github.repository }}

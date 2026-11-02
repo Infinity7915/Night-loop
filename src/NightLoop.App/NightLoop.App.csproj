@@ -8,6 +8,8 @@
     <AssemblyName>NightLoop</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    <!-- Program.Main runs Velopack's install/update hooks before WPF starts. -->
+    <StartupObject>NightLoop.App.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
@@ -17,6 +19,7 @@
     <ProjectReference Include="..\NightLoop.Contracts\NightLoop.Contracts.csproj" />
     <ProjectReference Include="..\NightLoop.Engine\NightLoop.Engine.csproj" />
     <ProjectReference Include="..\NightLoop.LocalData\NightLoop.LocalData.csproj" />
+    <ProjectReference Include="..\NightLoop.Updates\NightLoop.Updates.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Assets\icon.png" />

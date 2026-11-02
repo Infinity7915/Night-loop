@@ -13,4 +13,6 @@ public static class AppPaths
     public static string Session => Path.Combine(Root, "session.bin");
     /// <summary>Random GUID made on first run; identifies this install to the server.</summary>
     public static string InstallId => Path.Combine(Root, "install.id");
+    /// <summary>Last announcements text fetched from GitHub, so Home still shows it offline.</summary>
+    public static string Announcements => Path.Combine(Root, "announcements.md");
 }

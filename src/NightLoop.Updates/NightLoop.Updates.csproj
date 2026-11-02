@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>NightLoop.Updates</RootNamespace>
+    <Description>App updates (Velopack, from GitHub Releases) and the Home screen's announcements (a file in the GitHub repo). No UI code.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Velopack" Version="1.2.161" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="NightLoop.Updates.Tests" />
+  </ItemGroup>
+</Project>

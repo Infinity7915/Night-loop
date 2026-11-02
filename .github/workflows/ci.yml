@@ -28,6 +28,25 @@ jobs:
       - name: Test
         run: dotnet test NightLoop.sln --configuration Release --no-build --logger "trx;LogFileName=results.trx"
 
+      # Nobody can click through the app on a CI machine, so this loads every screen's XAML and the theme,
+      # draws each one to a PNG and fails if any of them throws. The pictures are uploaded below.
+      - name: UI smoke test
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $exe = Get-ChildItem src/NightLoop.App/bin/Release -Recurse -Filter NightLoop.exe | Select-Object -First 1
+          $p = Start-Process $exe.FullName -ArgumentList '--smoke', "$pwd\smoke" -Wait -PassThru
+          Get-ChildItem smoke | Format-Table Name, Length
+          Get-Content smoke\*.error.txt -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { throw "UI smoke test failed (exit $($p.ExitCode))" }
+
+      - name: Upload screen pictures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screens
+          path: smoke/
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

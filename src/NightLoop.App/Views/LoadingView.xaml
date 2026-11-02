@@ -4,7 +4,7 @@
   <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="420">
     <Image Source="/Assets/icon.png" Width="96" Height="96" />
     <TextBlock Text="Night-loop" FontSize="26" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,16,0,0" />
-    <TextBlock Text="Connecting to your account…" Style="{StaticResource Muted}" HorizontalAlignment="Center" Margin="0,8,0,0"
+    <TextBlock Text="{Binding Status}" Style="{StaticResource Muted}" HorizontalAlignment="Center" Margin="0,8,0,0"
                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisible}}" />
     <ProgressBar IsIndeterminate="True" Height="3" Margin="60,18,60,0" Foreground="{StaticResource Accent}"
                  Background="{StaticResource Panel}" BorderThickness="0"
@@ -13,9 +13,15 @@
             Visibility="{Binding Error, Converter={StaticResource TextToVisible}}">
       <StackPanel>
         <TextBlock Text="{Binding Error}" TextWrapping="Wrap" />
-        <Button Command="{Binding RetryCommand}" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left" Margin="0,12,0,0">
-          <TextBlock Text="Retry" Foreground="{StaticResource AccentText}" />
-        </Button>
+        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+          <Button Command="{Binding UpdateNowCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,6,0"
+                  Visibility="{Binding OfferUpdate, Converter={StaticResource BoolToVisible}}">
+            <TextBlock Text="Update now" Foreground="{StaticResource AccentText}" />
+          </Button>
+          <Button Command="{Binding RetryCommand}" Style="{StaticResource PrimaryButton}" Margin="0">
+            <TextBlock Text="Retry" Foreground="{StaticResource AccentText}" />
+          </Button>
+        </StackPanel>
       </StackPanel>
     </Border>
   </StackPanel>
