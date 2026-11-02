@@ -32,7 +32,7 @@
     </Grid.ColumnDefinitions>
 
     <!-- Sidebar (signed in only) -->
-    <Border Width="220" Background="{StaticResource Sidebar}" BorderBrush="{StaticResource Border}" BorderThickness="0,0,1,0"
+    <Border Width="220" Background="{DynamicResource Sidebar}" BorderBrush="{DynamicResource Border}" BorderThickness="0,0,1,0"
             Visibility="{Binding ShowSidebar, Converter={StaticResource BoolToVisible}}">
       <DockPanel Margin="16,20">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
@@ -48,20 +48,29 @@
           <RadioButton Style="{StaticResource NavTab}" Content="Macros" Tag="&#xE945;" IsChecked="{Binding IsMacrosTab}" />
           <RadioButton Style="{StaticResource NavTab}" Content="Settings" Tag="&#xE713;" IsChecked="{Binding IsSettingsTab}" />
         </StackPanel>
-        <Border DockPanel.Dock="Bottom" Style="{StaticResource Card}" Padding="12" VerticalAlignment="Bottom">
+        <Border DockPanel.Dock="Bottom" Style="{StaticResource Card}" Padding="14,12" VerticalAlignment="Bottom">
           <StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,8"
-                        Visibility="{Binding Updates.CanRestart, Converter={StaticResource BoolToVisible}}">
-              <Ellipse Width="7" Height="7" Fill="{StaticResource Accent}" VerticalAlignment="Center" />
-              <Button Style="{StaticResource LinkButton}" Content="Update ready · Restart" Margin="6,0,0,0"
-                      Command="{Binding Updates.RestartCommand}" />
+            <StackPanel Orientation="Horizontal">
+              <Ellipse Width="7" Height="7" VerticalAlignment="Center">
+                <Ellipse.Style>
+                  <Style TargetType="Ellipse">
+                    <Setter Property="Fill" Value="{DynamicResource Success}" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding IsOffline}" Value="True">
+                        <Setter Property="Fill" Value="{DynamicResource Warning}" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Ellipse.Style>
+              </Ellipse>
+              <TextBlock Text="{Binding ConnectionText}" Style="{StaticResource Eyebrow}" Margin="8,0,0,0" />
             </StackPanel>
-            <TextBlock Text="SIGNED IN AS" Style="{StaticResource Eyebrow}" />
-            <TextBlock Text="{Binding Username}" FontWeight="SemiBold" Margin="0,4,0,0"
+            <TextBlock Text="Signed in as" Style="{StaticResource Muted}" Margin="0,10,0,0" />
+            <TextBlock Text="{Binding Username}" FontWeight="SemiBold" Margin="0,2,0,0"
                        TextTrimming="CharacterEllipsis" ToolTip="{Binding Username}" />
-            <TextBlock Text="Offline — reconnecting…" Foreground="{StaticResource Warning}" FontSize="12" Margin="0,4,0,0"
-                       Visibility="{Binding IsOffline, Converter={StaticResource BoolToVisible}}" />
-            <Button Content="Sign out" Command="{Binding SignOutCommand}" Margin="0,10,0,0" HorizontalAlignment="Left" />
+            <Button Style="{StaticResource LinkButton}" Content="Update ready · Restart" Margin="0,8,0,0" HorizontalAlignment="Left"
+                    Command="{Binding Updates.RestartCommand}"
+                    Visibility="{Binding Updates.CanRestart, Converter={StaticResource BoolToVisible}}" />
           </StackPanel>
         </Border>
         <Grid />

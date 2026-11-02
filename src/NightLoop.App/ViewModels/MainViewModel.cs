@@ -33,6 +33,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly HotkeyManager _hotkeys = new();
     private readonly List<IDisposable> _hotkeyRegistrations = [];
     private readonly ApiClient _api;
+    private readonly TargetGamesViewModel _games;
     private MacroDoc _doc = NewDoc();
     private MacroRun? _run;
     private DraftAutosaver? _autosaver;
@@ -40,11 +41,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private bool _loading;
     private bool _creating;
 
-    public MainViewModel(ApiClient api)
+    public MainViewModel(ApiClient api, TargetGamesViewModel games)
     {
         _api = api;
-        Games = new ObservableCollection<GameTarget>(new GamesStore().Load());
-        _selectedGame = Games[0];
+        _games = games;
+        _games.TargetChanged += OnTargetChanged;
         _runs = new RunManager(new Win32InputSender(), new Win32WindowService());
         _runs.RunStepChanged += (_, index) => OnUi(() => Highlight(index));
         _runs.RunStateChanged += (run, state) => OnUi(() =>
@@ -60,7 +61,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         TryRegister(Hotkey.Panic, () => OnUi(StopAll));
     }
 
-    public ObservableCollection<GameTarget> Games { get; }
+    /// <summary>The target game picked in Settings.</summary>
+    public TargetGamesViewModel Games => _games;
+    private GameTarget SelectedGame => _games.Target;
     public ObservableCollection<BlockRow> Blocks { get; } = [];
     public ObservableCollection<SavedMacroRow> SavedMacros { get; } = [];
 
@@ -68,7 +71,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public string PlayHotkeyText => PlayHotkey.ToString();
     public string PanicHotkeyText => Hotkey.Panic.ToString();
 
-    [ObservableProperty] private GameTarget _selectedGame;
     [ObservableProperty] private string _macroName = "New macro";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBusy))]
@@ -85,10 +87,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _usedText = "";
     [ObservableProperty] private SavedMacroRow? _selectedSaved;
 
-    public string TargetBanner => SelectedGame.Exe is null
-        ? "No target game: input goes to whatever window is in front."
-        : $"Input goes to {SelectedGame.Name} only, and pauses when it isn't focused.";
-
     /// <summary>Macros running right now (Home's "Active macros" card).</summary>
     public int ActiveRunCount => _runs.ActiveRuns.Count;
 
@@ -97,11 +95,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public string BlockSummary => $"{Blocks.Count} blocks · {Blocks.Count(b => !b.Enabled)} off";
 
-    partial void OnSelectedGameChanged(GameTarget value)
-    {
-        OnPropertyChanged(nameof(TargetBanner));
-        MarkChanged();
-    }
+    private void OnTargetChanged(GameTarget value) => MarkChanged();
 
     // Every editor field that ends up in the document autosaves.
     partial void OnMacroNameChanged(string value) => MarkChanged();
@@ -169,6 +163,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         IsPlaying = true;
         Status = $"Playing… press {PlayHotkey} to stop, {Hotkey.Panic} stops everything.";
     }
+
+    /// <summary>Set by the shell: opens Settings, where the target game is picked.</summary>
+    public Action? OpenSettings { get; set; }
+
+    [RelayCommand]
+    private void ChangeTarget() => OpenSettings?.Invoke();
 
     [RelayCommand]
     private void StopAll()
@@ -447,7 +447,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             Humanize = doc.Options.Humanize.Enabled;
             TimingJitterPct = doc.Options.Humanize.TimingJitterPct;
             MouseJitterPx = doc.Options.Humanize.MousePx;
-            SelectedGame = Games.FirstOrDefault(g => g.Name == doc.TargetGame) ?? Games[0];
+            // A macro remembers the game it was made for; opening it switches the target to that game.
+            if (doc.TargetGame is not null) _games.SelectByName(doc.TargetGame);
             ShowBlocks();
         }
         finally
@@ -525,6 +526,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        _games.TargetChanged -= OnTargetChanged;
         _ = DisposeAutosaverAsync();
         _recorder.Dispose();
         _ = _runs.StopAllAsync();

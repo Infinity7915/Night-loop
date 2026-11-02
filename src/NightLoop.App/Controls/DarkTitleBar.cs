@@ -6,8 +6,8 @@ using System.Windows.Media;
 namespace NightLoop.App.Controls;
 
 /// <summary>
-/// Makes the Windows title bar dark and the same purple as the window, instead of the white or accent-colored
-/// bar Windows draws by default. Dark mode works on Windows 10 20H1+; the exact color needs Windows 11.
+/// Colors the Windows title bar to match the window (dark purple, or light in light mode), instead of the white or
+/// accent-colored bar Windows draws by default. Dark mode works on Windows 10 20H1+; the exact color needs Windows 11.
 /// Older versions ignore it.
 /// </summary>
 public static class DarkTitleBar
@@ -16,11 +16,11 @@ public static class DarkTitleBar
     private const int CaptionColor = 35;         // DWMWA_CAPTION_COLOR
     private const int TextColor = 36;            // DWMWA_TEXT_COLOR
 
-    public static void Apply(Window window, Color caption, Color text)
+    public static void Apply(Window window, Color caption, Color text, bool dark = true)
     {
         var hwnd = new WindowInteropHelper(window).Handle;
         if (hwnd == IntPtr.Zero) return;
-        var on = 1;
+        var on = dark ? 1 : 0;
         _ = DwmSetWindowAttribute(hwnd, UseImmersiveDarkMode, ref on, sizeof(int));
         var captionRef = ToColorRef(caption);
         _ = DwmSetWindowAttribute(hwnd, CaptionColor, ref captionRef, sizeof(int));

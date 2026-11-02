@@ -11,7 +11,7 @@
       </StackPanel>
       <Button HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource DangerButton}"
               Command="{Binding StopAllCommand}">
-        <TextBlock Foreground="{StaticResource Record}">
+        <TextBlock Foreground="{DynamicResource Record}">
           <Run Text="Stop all · " /><Run Text="{Binding PanicHotkeyText, Mode=OneWay}" />
         </TextBlock>
       </Button>
@@ -19,14 +19,13 @@
 
     <!-- Target game banner -->
     <Border DockPanel.Dock="Top" Margin="0,18,0,0" Padding="16,10" CornerRadius="10"
-            Background="#0F1C26" BorderBrush="#1D3A4A" BorderThickness="1">
+            Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentSoftBorder}" BorderThickness="1">
       <DockPanel>
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-          <TextBlock Text="Target" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,8,0" />
-          <ComboBox Width="190" ItemsSource="{Binding Games}" SelectedItem="{Binding SelectedGame}"
-                    DisplayMemberPath="Name" IsEnabled="{Binding IsRecording, Converter={StaticResource Not}}" />
-        </StackPanel>
-        <TextBlock Text="{Binding TargetBanner}" VerticalAlignment="Center" />
+        <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Change target" VerticalAlignment="Center"
+                Command="{Binding ChangeTargetCommand}" IsEnabled="{Binding IsRecording, Converter={StaticResource Not}}" />
+        <TextBlock DockPanel.Dock="Left" Text="&#xE7B3;" FontFamily="{StaticResource Icons}" Foreground="{DynamicResource AccentLink}"
+                   VerticalAlignment="Center" Margin="0,0,10,0" />
+        <TextBlock Text="{Binding Games.Banner}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
       </DockPanel>
     </Border>
 
@@ -58,10 +57,10 @@
                       </Border>
                       <ControlTemplate.Triggers>
                         <Trigger Property="IsSelected" Value="True">
-                          <Setter TargetName="Row" Property="Background" Value="{StaticResource Current}" />
+                          <Setter TargetName="Row" Property="Background" Value="{DynamicResource Current}" />
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                          <Setter TargetName="Row" Property="Background" Value="{StaticResource PanelRaised}" />
+                          <Setter TargetName="Row" Property="Background" Value="{DynamicResource PanelRaised}" />
                         </Trigger>
                       </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -95,7 +94,7 @@
           <StackPanel>
             <StackPanel Orientation="Horizontal">
               <TextBlock Text="LOADED MACRO" Style="{StaticResource Eyebrow}" VerticalAlignment="Center" />
-              <Border Style="{StaticResource Chip}" Width="Auto" Margin="10,0,0,0" BorderBrush="{StaticResource Border}">
+              <Border Style="{StaticResource Chip}" Width="Auto" Margin="10,0,0,0" BorderBrush="{DynamicResource Border}">
                 <TextBlock Text="{Binding SyncText}" Style="{StaticResource Eyebrow}" />
               </Border>
             </StackPanel>
@@ -109,7 +108,7 @@
             <Button Command="{Binding SaveCommand}" Content="Save" />
             <Button Command="{Binding ToggleRecordCommand}" Margin="18,0,0,0">
               <StackPanel Orientation="Horizontal">
-                <Ellipse Width="10" Height="10" Fill="{StaticResource Record}" Margin="0,0,8,0" />
+                <Ellipse Width="10" Height="10" Fill="{DynamicResource Record}" Margin="0,0,8,0" />
                 <TextBlock>
                   <TextBlock.Style>
                     <Style TargetType="TextBlock">
@@ -127,7 +126,7 @@
             </Button>
             <Button Command="{Binding TogglePlayCommand}" Style="{StaticResource PrimaryButton}" MinWidth="96">
               <StackPanel Orientation="Horizontal">
-                <TextBlock Foreground="{StaticResource AccentText}">
+                <TextBlock Foreground="{DynamicResource AccentText}">
                   <TextBlock.Style>
                     <Style TargetType="TextBlock">
                       <Setter Property="Text" Value="Play" />
@@ -140,14 +139,14 @@
                   </TextBlock.Style>
                 </TextBlock>
                 <TextBlock Text="{Binding PlayHotkeyText}" FontFamily="{StaticResource Mono}" FontSize="11"
-                           Foreground="{StaticResource AccentText}" Opacity="0.7" Margin="8,2,0,0" />
+                           Foreground="{DynamicResource AccentText}" Opacity="0.7" Margin="8,2,0,0" />
               </StackPanel>
             </Button>
           </StackPanel>
         </Grid>
 
         <!-- Options row -->
-        <Border DockPanel.Dock="Top" BorderBrush="{StaticResource Border}" BorderThickness="0,1" Padding="20,10">
+        <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Border}" BorderThickness="0,1" Padding="20,10">
           <DockPanel>
             <TextBlock DockPanel.Dock="Right" Text="{Binding BlockSummary}" Style="{StaticResource Eyebrow}" VerticalAlignment="Center" />
             <StackPanel Orientation="Horizontal">
@@ -181,8 +180,8 @@
                       </Border>
                       <ControlTemplate.Triggers>
                         <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                          <Setter TargetName="Row" Property="Background" Value="{StaticResource Current}" />
-                          <Setter TargetName="Row" Property="BorderBrush" Value="{StaticResource Accent}" />
+                          <Setter TargetName="Row" Property="Background" Value="{DynamicResource Current}" />
+                          <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource Accent}" />
                         </DataTrigger>
                         <DataTrigger Binding="{Binding Enabled}" Value="False">
                           <Setter TargetName="Row" Property="Opacity" Value="0.45" />
@@ -202,7 +201,7 @@
                                Foreground="{Binding Category, Converter={StaticResource CategoryBrush}}" />
                   </Border>
                   <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="12,0,10,0" VerticalAlignment="Center" />
-                  <TextBlock Text="{Binding Detail}" FontFamily="{StaticResource Mono}" FontSize="12" Foreground="{StaticResource TextMuted}"
+                  <TextBlock Text="{Binding Detail}" FontFamily="{StaticResource Mono}" FontSize="12" Foreground="{DynamicResource TextMuted}"
                              VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="600" />
                 </StackPanel>
               </DataTemplate>

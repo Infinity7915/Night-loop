@@ -17,6 +17,7 @@ public static class Program
 
         var app = new App();
         app.InitializeComponent();
+        Themes.ThemeManager.Load(new LocalData.LocalSettings());
         return app.Run();
     }
 

@@ -45,12 +45,26 @@ public static class SmokeTest
             ("window", MainWindowContent),
         };
 
-        foreach (var (name, make) in screens)
+        // Every screen in both palettes, with the accent each one is most often seen with.
+        foreach (var (mode, accent) in new[] { (Themes.ThemeManager.Dark, Themes.ThemeManager.DefaultAccent), (Themes.ThemeManager.Light, Themes.ThemeManager.DefaultAccent) })
         {
+            Themes.ThemeManager.Preview(mode, accent);
+            failures += Draw(app, folder, mode, screens);
+        }
+        return failures == 0 ? 0 : 1;
+    }
+
+    private static int Draw(Application app, string folder, string mode, (string Name, Func<FrameworkElement> Make)[] screens)
+    {
+        var failures = 0;
+        foreach (var (screen, make) in screens)
+        {
+            var name = $"{screen}-{mode}";
             try
             {
                 var view = make();
                 var host = new System.Windows.Controls.Border { Background = (Brush)app.FindResource("Bg"), Child = view };
+                System.Windows.Documents.TextElement.SetForeground(host, (Brush)app.FindResource("Text"));
                 host.Measure(new Size(1280, 800));
                 host.Arrange(new Rect(0, 0, 1280, 800));
                 host.UpdateLayout();
@@ -69,6 +83,6 @@ public static class SmokeTest
                 File.WriteAllText(Path.Combine(folder, name + ".error.txt"), ex.ToString());
             }
         }
-        return failures == 0 ? 0 : 1;
+        return failures;
     }
 }
