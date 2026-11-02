@@ -88,7 +88,8 @@ Loading ──► GET /health, saved token? ──► GET /me ──► Macros p
   autosave the draft; **Save** makes it the saved copy. If another PC changed it meanwhile, the app asks
   whether to keep this version or load the server copy.
 - The server URL comes from `serverUrl` in `settings.json` or the `NIGHTLOOP_SERVER` environment variable,
-  and defaults to `http://localhost:5080/v1/` until a public server exists.
+  and defaults to the public server, `https://api.night-loop.win/v1/`. For a local dev server set
+  `NIGHTLOOP_SERVER=http://localhost:5080/v1/`.
 
 ## Not built yet
 

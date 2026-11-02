@@ -9,8 +9,8 @@ namespace NightLoop.LocalData;
 /// </summary>
 public sealed class LocalSettings(string path)
 {
-    /// <summary>Where the app looks for the server until a public one exists. Override with "serverUrl" or NIGHTLOOP_SERVER.</summary>
-    public const string DefaultServerUrl = "http://localhost:5080/v1/";
+    /// <summary>The public Night-loop server. Override with "serverUrl" or NIGHTLOOP_SERVER (e.g. a local dev server).</summary>
+    public const string DefaultServerUrl = "https://api.night-loop.win/v1/";
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 
