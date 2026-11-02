@@ -141,11 +141,14 @@ public sealed class MacroRun
             var once = Macro.Options.TriggerMode == TriggerModes.Once;
             var clock = Stopwatch.StartNew();
             var start = Math.Clamp(_settings.StartIndex, 0, Math.Max(0, Macro.Steps.Length - 1));
+            // Starting in the middle of a hold (Ctrl down … Ctrl up): hold what the blocks before it left held.
+            var holdFirst = start > 0 ? InputBlocks.HeldAfter(Macro.Steps.Take(start).Where(s => s.Kind == StepKind.Action).Select(s => s.Block)) : default;
 
             while (true)
             {
-                var end = await RunPassAsync(ctx, start);
+                var end = await RunPassAsync(ctx, start, holdFirst);
                 start = 0;
+                holdFirst = default;
                 if (end == PassEnd.Restart) continue;
                 CompletedPasses++;
                 if (end == PassEnd.Stopped || once) break;
@@ -193,7 +196,7 @@ public sealed class MacroRun
     private enum PassEnd { Finished, Stopped, Restart }
 
     /// <summary>Runs the program once from <paramref name="pc"/>.</summary>
-    private async Task<PassEnd> RunPassAsync(RunContext ctx, int pc)
+    private async Task<PassEnd> RunPassAsync(RunContext ctx, int pc, InputBlocks.Held holdFirst = default)
     {
         var steps = Macro.Steps;
         var loopCounters = new Dictionary<int, int>();
@@ -205,6 +208,11 @@ public sealed class MacroRun
             var step = steps[pc];
             await GateAsync(step);
             if (TakeRestart()) return PassEnd.Restart;
+            if (holdFirst.Any)
+            {
+                Press(holdFirst);
+                holdFirst = default;
+            }
 
             CurrentIndex = pc;
             StepChanged?.Invoke(this, pc);
@@ -354,12 +362,21 @@ public sealed class MacroRun
         }
         if (wait is null) return;
 
+        // Let go while paused so nothing stays stuck down, and press it all again before carrying on.
+        var held = new InputBlocks.Held([.. _input.HeldKeys], [.. _input.HeldButtons]);
         _input.ReleaseAll();
         CurrentIndex = step.Index;
         StepChanged?.Invoke(this, step.Index);
         SetState(state);
         await wait.WaitAsync(_cts.Token);
         SetState(RunState.Running);
+        Press(held);
+    }
+
+    private void Press(InputBlocks.Held held)
+    {
+        foreach (var vk in held.Keys ?? []) _input.KeyDown(vk);
+        foreach (var button in held.Buttons ?? []) _input.MouseDown(button);
     }
 
     private static Task<bool> EvaluateAsync(Block block, RunContext ctx)

@@ -55,6 +55,18 @@ public static partial class AccountRules
         return null;
     }
 
+    /// <summary>
+    /// Whether a two-factor change needs the current password. Making sign-in stricter (turning codes on, or asking
+    /// on every start instead of only on new PCs) doesn't: only someone who already has the account open can do it,
+    /// and it can only lock a thief out. Making it looser (codes off, or new PCs only) does.
+    /// </summary>
+    public static bool SecurityChangeNeedsPassword(bool wasEnabled, string wasMode, bool enabled, string mode)
+    {
+        if (!enabled) return wasEnabled; // turning codes off (or leaving them off)
+        if (!wasEnabled) return false;   // turning codes on
+        return wasMode == TwofaModes.EverySignin && mode == TwofaModes.NewDevices;
+    }
+
     public static bool IsValidColor(string? color) => color is not null && ColorPattern().IsMatch(color);
 
     public static bool IsValidCode(string? code) => code is { Length: CodeLength } && code.All(char.IsAsciiDigit);

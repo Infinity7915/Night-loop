@@ -156,7 +156,7 @@ public static class MacroValidator
         bool Text(string name, int max, bool required = true) => b.GetString(name) is { } s ? s.Length <= max && (!required || s.Length > 0) : !required;
         bool OptBool(string name) => !b.Params.ContainsKey(name) || b.GetBool(name) is not null;
         void Region() => Need(IsRegion(b.Params["region"]), "Region must be x, y, width and height (or left as the full window).");
-        void Process() => Need(Text("process", 260, required: false), "Process name is too long.");
+        void Process() => Need(Text("process", MacroLimits.PathMaxLength, required: false), "Process name is too long.");
         void Image() => Need(Text("imageData", MacroLimits.ImageDataMaxLength, required: false) && Text("image", 120, required: false),
             "The saved picture is too large. Capture a smaller area.");
         void OnFail() => Need(OneOf("onFail", FailActions, "continue"), "On fail must be continue, retry, go to label or stop.");
@@ -280,6 +280,14 @@ public static class MacroValidator
                 break;
             case BlockTypes.WaitForWindow:
                 Process();
+                Need(OneOf("until", ["front", "open"], "front"), "Wait until must be \"in front\" or \"open\".");
+                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
+                break;
+            case BlockTypes.WindowOpen:
+                Need(Text("path", MacroLimits.PathMaxLength), "Pick the program to open.");
+                Need(Text("args", MacroLimits.PathMaxLength, required: false), "Arguments must be at most 260 characters.");
+                Need(OneOf("ifRunning", ["focus", "new"], "focus"), "If it's already running must be focus or open another.");
+                Need(OptBool("wait"), "Wait for its window must be yes or no.");
                 Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
                 break;
             case BlockTypes.Screenshot:

@@ -124,11 +124,16 @@ public sealed class RunContext
         if (Settings.TargetExe is not { } exe || Environment.Windows is not { } windows) return;
         if (windows.IsForeground(exe)) return;
 
+        // Let go so nothing stays stuck down in the other app, and press it again once the game is back.
+        var keys = Input.HeldKeys;
+        var buttons = Input.HeldButtons;
         Input.ReleaseAll();
         Run.SetState(RunState.WaitingForWindow);
         while (!windows.IsForeground(exe))
             await Environment.Delay.DelayAsync(Settings.WindowPollMs, Token);
         Run.SetState(RunState.Running);
+        foreach (var vk in keys) Input.KeyDown(vk);
+        foreach (var button in buttons) Input.MouseDown(button);
     }
 
     internal static MacroFaultException NoScreen() => new("Reading the screen isn't available here.");

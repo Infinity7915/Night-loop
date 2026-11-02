@@ -56,6 +56,41 @@ public sealed class Win32WindowService : IWindowService
         return PInvoke.SetForegroundWindow(hwnd);
     }
 
+    public string? Launch(string path, string? arguments)
+    {
+        var full = Environment.ExpandEnvironmentVariables(path.Trim().Trim('"'));
+        var start = new ProcessStartInfo(full) { UseShellExecute = true, Arguments = arguments ?? "" };
+        // Programs often look for their files next to themselves.
+        if (Path.GetDirectoryName(full) is { Length: > 0 } dir && Directory.Exists(dir)) start.WorkingDirectory = dir;
+        Process? process;
+        try
+        {
+            process = Process.Start(start);
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            throw new InvalidOperationException(ex.NativeErrorCode switch
+            {
+                2 or 3 => $"{Path.GetFileName(full)} wasn't found at {full}.",
+                1223 => $"Opening {Path.GetFileName(full)} was cancelled.",
+                _ => $"Windows couldn't open {Path.GetFileName(full)}: {ex.Message}",
+            });
+        }
+        using (process)
+        {
+            var fallback = full.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? Path.GetFileName(full) : null;
+            if (process is null) return fallback;
+            try
+            {
+                return ExeNameOf((uint)process.Id) ?? fallback;
+            }
+            catch (InvalidOperationException)
+            {
+                return fallback; // it already exited (a launcher that handed off to the real program)
+            }
+        }
+    }
+
     public ClientArea? GetWindowBounds(string exeName)
     {
         var hwnd = FindMainWindow(exeName);

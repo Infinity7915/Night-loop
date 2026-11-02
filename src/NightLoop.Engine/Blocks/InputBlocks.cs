@@ -385,6 +385,36 @@ internal static class InputBlocks
         return list.Count > 0 ? list : null;
     }
 
+    /// <summary>Keys and mouse buttons held down.</summary>
+    internal readonly record struct Held(IReadOnlyList<int>? Keys, IReadOnlyList<MouseButton>? Buttons)
+    {
+        public bool Any => Keys is { Count: > 0 } || Buttons is { Count: > 0 };
+    }
+
+    /// <summary>What's still held after these blocks run: keys and buttons with a "down" block and no "up" after it.</summary>
+    internal static Held HeldAfter(IEnumerable<Block> blocks)
+    {
+        var keys = new List<int>();
+        var buttons = new List<MouseButton>();
+        foreach (var b in blocks)
+        {
+            if (!b.Enabled) continue;
+            var action = b.GetString("action");
+            if (action is not ("down" or "up")) continue;
+            if (b.Type == BlockTypes.Key && KeyCatalog.TryGetVirtualKey(b.GetString("key") ?? "", out var vk))
+            {
+                keys.Remove(vk);
+                if (action == "down") keys.Add(vk);
+            }
+            else if (b.Type == BlockTypes.Click && MouseButtons.TryParse(b.GetString("button"), out var button))
+            {
+                buttons.Remove(button);
+                if (action == "down") buttons.Add(button);
+            }
+        }
+        return new Held(keys, buttons);
+    }
+
     private static int Vk(string? name) =>
         name is not null && KeyCatalog.TryGetVirtualKey(name, out var vk) ? vk : throw new MacroFaultException($"Unknown key \"{name}\".");
 }

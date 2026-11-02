@@ -45,7 +45,10 @@ internal static class WindowBlocks
         return w.MoveTo(exe, x, y);
     });
 
-    /// <summary>window.waitFor: waits until the window is open and in front. Faults when the timeout passes.</summary>
+    /// <summary>
+    /// window.waitFor: waits until the window is open (until "open") or open and in front (until "front", the default).
+    /// Faults when the timeout passes.
+    /// </summary>
     public static async Task WaitForAsync(Block b, RunContext ctx)
     {
         var exe = ctx.ProcessFor(b);
@@ -55,15 +58,63 @@ internal static class WindowBlocks
             ctx.Environment.Log?.Invoke("Wait for window: no process or target game, so there's nothing to wait for.");
             return;
         }
-        var timeout = b.GetInt("timeoutMs", 30_000);
+        var front = b.GetString("until", "front") != "open";
+        await WaitForWindowAsync(ctx, windows, exe, front, b.GetInt("timeoutMs", 30_000),
+            s => front ? $"{exe} didn't open (or come to the front) within {s}." : $"{exe} didn't open a window within {s}.");
+    }
+
+    /// <summary>
+    /// window.open: starts a program (or focuses it when it's already running), then waits for its window and brings
+    /// it to the front. The path may use variables like %LOCALAPPDATA%, so a macro works on every PC.
+    /// </summary>
+    public static async Task OpenAsync(Block b, RunContext ctx)
+    {
+        var windows = ctx.Environment.Windows ?? throw new MacroFaultException("Opening programs isn't available here.");
+        var path = (b.GetString("path") ?? "").Trim();
+        if (path.Length == 0) throw new MacroFaultException("Pick the program to open.");
+        var name = FileName(path);
+        // The window to wait for: the one picked on the block, else the program itself.
+        var waitFor = b.GetString("process") is { Length: > 0 } p ? p.Trim() : name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name : null;
+        ctx.DidWork = true;
+
+        if (b.GetString("ifRunning", "focus") == "focus" && waitFor is not null && windows.IsProcessRunning(waitFor) && windows.GetClientArea(waitFor) is not null)
+        {
+            windows.Focus(waitFor);
+            return;
+        }
+
+        string? started;
+        try
+        {
+            started = windows.Launch(path, b.GetString("args"));
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new MacroFaultException(ex.Message);
+        }
+        if (b.GetBool("wait") == false) return;
+        waitFor ??= started;
+        if (waitFor is null)
+        {
+            ctx.Environment.Log?.Invoke($"Opened {name}. Night-loop can't tell which window it opens, so it didn't wait for one.");
+            return;
+        }
+        await WaitForWindowAsync(ctx, windows, waitFor, front: false, b.GetInt("timeoutMs", 30_000),
+            s => $"{name} didn't open a window within {s}.");
+        windows.Focus(waitFor);
+    }
+
+    private static async Task WaitForWindowAsync(RunContext ctx, IWindowService windows, string exe, bool front, int timeoutMs,
+        Func<string, string> timeoutMessage)
+    {
         var waited = 0;
         ctx.Run.SetState(RunState.WaitingForWindow);
         try
         {
-            while (!(windows.GetClientArea(exe) is not null && windows.IsForeground(exe)))
+            while (!(windows.GetClientArea(exe) is not null && (!front || windows.IsForeground(exe))))
             {
-                if (timeout > 0 && waited >= timeout)
-                    throw new MacroFaultException($"{exe} didn't open (or come to the front) within {timeout / 1000.0:0.#} s.");
+                if (timeoutMs > 0 && waited >= timeoutMs)
+                    throw new MacroFaultException(timeoutMessage($"{timeoutMs / 1000.0:0.#} s"));
                 await ctx.Environment.Delay.DelayAsync(PollMs, ctx.Token);
                 waited += PollMs;
                 ctx.DidWork = true;
@@ -73,6 +124,14 @@ internal static class WindowBlocks
         {
             ctx.Run.SetState(RunState.Running);
         }
+    }
+
+    /// <summary>"C:\Games\Game.exe" → "Game.exe" (works for Windows paths on any OS, for the tests).</summary>
+    internal static string FileName(string path)
+    {
+        var trimmed = path.Trim().Trim('"').TrimEnd('\\', '/');
+        var cut = trimmed.LastIndexOfAny(['\\', '/']);
+        return cut >= 0 ? trimmed[(cut + 1)..] : trimmed;
     }
 
     private static void With(Block b, RunContext ctx, string verb, Func<IWindowService, string, bool> action)

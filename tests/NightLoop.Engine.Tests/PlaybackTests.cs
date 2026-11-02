@@ -324,6 +324,48 @@ public class PlaybackTests
     }
 
     [Fact]
+    public async Task Test_look_finds_the_picture_without_clicking()
+    {
+        var pattern = new byte[24 * 24 * 4];
+        var rng = new Random(7);
+        for (var i = 0; i < 24 * 24; i++) pattern[i * 4] = pattern[i * 4 + 1] = pattern[i * 4 + 2] = (byte)rng.Next(256);
+        var template = ImageTemplate.FromImage(new ScreenImage(0, 0, 24, 24, pattern));
+        var screen = new FakeScreen(320, 240);
+        screen.Show(150, 90, template);
+        var input = new FakeInput();
+        var env = new RunEnvironment { Input = input, Delay = new FakeDelay(), Screen = screen };
+        var block = Block.Create("b1", BlockTypes.FindClick, new() { ["target"] = "image", ["imageData"] = template.Encode() });
+
+        var found = await Blocks.DetectProbe.LookOnceAsync(block, env, null);
+        Assert.True(found.Found);
+        Assert.Equal((162, 102), found.Point);
+        Assert.Empty(input.Log);
+
+        screen.Clear();
+        var missing = await Blocks.DetectProbe.LookOnceAsync(block, env, null);
+        Assert.False(missing.Found);
+        Assert.Equal("Didn't find the picture on screen right now.", missing.Message);
+    }
+
+    [Fact]
+    public async Task Test_look_checks_a_condition_and_explains_problems()
+    {
+        var screen = new FakeScreen(200, 200);
+        screen.Paint(10, 10, 5, 5, new Rgb(255, 0, 0));
+        var env = new RunEnvironment { Input = new FakeInput(), Delay = new FakeDelay(), Screen = screen };
+        var red = Block.Create("b1", BlockTypes.If, new()
+        {
+            ["condition"] = new JsonObject { ["kind"] = "pixelColor", ["x"] = 12, ["y"] = 12, ["color"] = "#FF0000" },
+        });
+        Assert.True((await Blocks.DetectProbe.LookOnceAsync(red, env, null)).Found);
+
+        var noPicture = Block.Create("b2", BlockTypes.WaitForImage, new());
+        var r = await Blocks.DetectProbe.LookOnceAsync(noPicture, env, null);
+        Assert.False(r.Found);
+        Assert.StartsWith("Pick a picture first", r.Message);
+    }
+
+    [Fact]
     public async Task Pause_right_away_interrupts_and_resume_from_start_restarts()
     {
         var input = new FakeInput();
