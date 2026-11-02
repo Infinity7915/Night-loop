@@ -1,220 +1,585 @@
 <UserControl x:Class="NightLoop.App.Views.MacrosView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:NightLoop.App.ViewModels">
-  <DockPanel Margin="32,24,32,20">
-    <Grid DockPanel.Dock="Top">
-      <StackPanel>
-        <TextBlock Text="MACROS" Style="{StaticResource Eyebrow}" />
-        <TextBlock Text="Macros" FontSize="30" FontWeight="Bold" Margin="0,4,0,2" />
-        <TextBlock Text="Record what you do, then replay it." Style="{StaticResource Muted}" FontSize="14" />
-      </StackPanel>
-      <Button HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource DangerButton}"
-              Command="{Binding StopAllCommand}">
-        <TextBlock Foreground="{DynamicResource Record}">
-          <Run Text="Stop all · " /><Run Text="{Binding PanicHotkeyText, Mode=OneWay}" />
-        </TextBlock>
-      </Button>
-    </Grid>
+             xmlns:vm="clr-namespace:NightLoop.App.ViewModels"
+             x:Name="Root">
+  <UserControl.Resources>
+    <Style x:Key="SmallLabel" TargetType="TextBlock" BasedOn="{StaticResource Muted}">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="SmallBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+      <Setter Property="FontFamily" Value="{StaticResource Mono}" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Width" Value="60" />
+      <Setter Property="Margin" Value="6,0" />
+    </Style>
+    <!-- Key chip, e.g. "Ctrl+F5". -->
+    <Style x:Key="KeyChip" TargetType="Border">
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="8,3" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+  </UserControl.Resources>
 
-    <!-- Target game banner -->
-    <Border DockPanel.Dock="Top" Margin="0,18,0,0" Padding="16,10" CornerRadius="10"
-            Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentSoftBorder}" BorderThickness="1">
-      <DockPanel>
-        <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Change target" VerticalAlignment="Center"
-                Command="{Binding ChangeTargetCommand}" IsEnabled="{Binding IsRecording, Converter={StaticResource Not}}" />
-        <TextBlock DockPanel.Dock="Left" Text="&#xE7B3;" FontFamily="{StaticResource Icons}" Foreground="{DynamicResource AccentLink}"
-                   VerticalAlignment="Center" Margin="0,0,10,0" />
-        <TextBlock Text="{Binding Games.Banner}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-      </DockPanel>
-    </Border>
-
+  <DockPanel>
     <!-- Status bar -->
-    <Border DockPanel.Dock="Bottom" Margin="0,12,0,0" Style="{StaticResource Card}" Padding="14,8">
-      <TextBlock Text="{Binding Status}" Style="{StaticResource Muted}" TextTrimming="CharacterEllipsis" />
+    <Border DockPanel.Dock="Bottom" Margin="32,0,32,16" Style="{StaticResource Card}" Padding="14,8">
+      <TextBlock Text="{Binding Status}" Style="{StaticResource Muted}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Status}" />
     </Border>
 
-    <!-- Saved macros on the account -->
-    <Border DockPanel.Dock="Left" Width="260" Margin="0,16,16,0" Style="{StaticResource Card}">
-      <DockPanel>
-        <Grid DockPanel.Dock="Top" Margin="16,14,12,10">
-          <StackPanel>
-            <TextBlock Text="SAVED MACROS" Style="{StaticResource Eyebrow}" />
-            <TextBlock Text="{Binding UsedText}" Style="{StaticResource Muted}" Margin="0,4,0,0" />
-          </StackPanel>
-          <Button HorizontalAlignment="Right" VerticalAlignment="Center" Content="+ New" Command="{Binding NewMacroCommand}" />
-        </Grid>
+    <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto">
+      <StackPanel Margin="32,24,32,20">
+        <!-- Header -->
         <Grid>
-          <ListBox ItemsSource="{Binding SavedMacros}" SelectedItem="{Binding SelectedSaved}" Background="Transparent"
-                   BorderThickness="0" Padding="8,0,8,8" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-            <ListBox.ItemContainerStyle>
-              <Style TargetType="ListBoxItem">
-                <Setter Property="Template">
-                  <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                      <Border x:Name="Row" CornerRadius="8" Padding="10,8" Margin="0,1" Background="Transparent" Cursor="Hand">
-                        <ContentPresenter />
-                      </Border>
-                      <ControlTemplate.Triggers>
-                        <Trigger Property="IsSelected" Value="True">
-                          <Setter TargetName="Row" Property="Background" Value="{DynamicResource Current}" />
-                        </Trigger>
-                        <Trigger Property="IsMouseOver" Value="True">
-                          <Setter TargetName="Row" Property="Background" Value="{DynamicResource PanelRaised}" />
-                        </Trigger>
-                      </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                  </Setter.Value>
-                </Setter>
-              </Style>
-            </ListBox.ItemContainerStyle>
-            <ListBox.ItemTemplate>
-              <DataTemplate DataType="{x:Type vm:SavedMacroRow}">
-                <StackPanel ToolTip="{Binding Name}">
-                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                  <TextBlock Text="{Binding Detail}" Style="{StaticResource Eyebrow}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
-                </StackPanel>
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
-          <TextBlock Text="Nothing saved yet. Your first recording lands here." Style="{StaticResource Muted}"
-                     TextWrapping="Wrap" Margin="16,0" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center">
-            <TextBlock.Visibility>
-              <Binding Path="SavedMacros.Count" Converter="{StaticResource ZeroToVisible}" />
-            </TextBlock.Visibility>
-          </TextBlock>
-        </Grid>
-      </DockPanel>
-    </Border>
-
-    <!-- Loaded macro card -->
-    <Border Margin="0,16,0,0" Style="{StaticResource Card}">
-      <DockPanel>
-        <Grid DockPanel.Dock="Top" Margin="20,16">
-          <StackPanel>
-            <StackPanel Orientation="Horizontal">
-              <TextBlock Text="LOADED MACRO" Style="{StaticResource Eyebrow}" VerticalAlignment="Center" />
-              <Border Style="{StaticResource Chip}" Width="Auto" Margin="10,0,0,0" BorderBrush="{DynamicResource Border}">
-                <TextBlock Text="{Binding SyncText}" Style="{StaticResource Eyebrow}" />
-              </Border>
-            </StackPanel>
-            <TextBox Text="{Binding MacroName, UpdateSourceTrigger=PropertyChanged}" FontSize="18" FontWeight="SemiBold"
-                     Width="320" HorizontalAlignment="Left" Margin="0,6,0,0" MaxLength="60" />
+          <StackPanel Margin="0,0,220,0">
+            <TextBlock Text="MACROS" Style="{StaticResource Eyebrow}" />
+            <TextBlock Text="Macros" Style="{StaticResource PageTitle}" />
+            <TextBlock Text="Build macros from blocks. Run several at once." Style="{StaticResource Muted}" FontSize="14" />
           </StackPanel>
-          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-            <Button Command="{Binding ImportCommand}" Content="Import" />
-            <Button Command="{Binding ExportCommand}" Content="Export" />
-            <Button Command="{Binding DeleteCommand}" Content="Delete" />
-            <Button Command="{Binding SaveCommand}" Content="Save" />
-            <Button Command="{Binding ToggleRecordCommand}" Margin="18,0,0,0">
-              <StackPanel Orientation="Horizontal">
-                <Ellipse Width="10" Height="10" Fill="{DynamicResource Record}" Margin="0,0,8,0" />
-                <TextBlock>
-                  <TextBlock.Style>
-                    <Style TargetType="TextBlock">
-                      <Setter Property="Text" Value="Record" />
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsRecording}" Value="True">
-                          <Setter Property="Text" Value="Stop recording" />
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </TextBlock.Style>
-                </TextBlock>
-                <TextBlock Text="{Binding RecordHotkeyText}" Style="{StaticResource Eyebrow}" Margin="8,2,0,0" />
-              </StackPanel>
-            </Button>
-            <Button Command="{Binding TogglePlayCommand}" Style="{StaticResource PrimaryButton}" MinWidth="96">
-              <StackPanel Orientation="Horizontal">
-                <TextBlock Foreground="{DynamicResource AccentText}">
-                  <TextBlock.Style>
-                    <Style TargetType="TextBlock">
-                      <Setter Property="Text" Value="Play" />
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsPlaying}" Value="True">
-                          <Setter Property="Text" Value="Stop" />
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </TextBlock.Style>
-                </TextBlock>
-                <TextBlock Text="{Binding PlayHotkeyText}" FontFamily="{StaticResource Mono}" FontSize="11"
-                           Foreground="{DynamicResource AccentText}" Opacity="0.7" Margin="8,2,0,0" />
-              </StackPanel>
-            </Button>
-          </StackPanel>
+          <Button HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource DangerButton}"
+                  Command="{Binding StopAllCommand}" ToolTip="{Binding PanicHotkeyText}" Content="{Binding StopAllText}" />
         </Grid>
 
-        <!-- Options row -->
-        <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Border}" BorderThickness="0,1" Padding="20,10">
+        <!-- Target game banner -->
+        <Border Margin="0,18,0,0" Padding="16,10" CornerRadius="10" BorderThickness="1"
+                Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentSoftBorder}">
           <DockPanel>
-            <TextBlock DockPanel.Dock="Right" Text="{Binding BlockSummary}" Style="{StaticResource Eyebrow}" VerticalAlignment="Center" />
-            <StackPanel Orientation="Horizontal">
-              <CheckBox Content="Record mouse movement" IsChecked="{Binding RecordMouseMoves}" Margin="0,0,20,0" />
-              <TextBlock Text="Repeat" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,6,0" />
-              <TextBox Text="{Binding RepeatCount}" Width="64" IsEnabled="{Binding RepeatForever, Converter={StaticResource Not}}" />
-              <CheckBox Content="Forever" IsChecked="{Binding RepeatForever}" Margin="8,0,20,0" />
-              <CheckBox Content="Humanize" IsChecked="{Binding Humanize}" FontWeight="SemiBold" />
-              <TextBlock Text="Timing ±" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="12,0,6,0" />
-              <TextBox Text="{Binding TimingJitterPct}" Width="48" />
-              <TextBlock Text="%" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="4,0,12,0" />
-              <TextBlock Text="Mouse ±" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,6,0" />
-              <TextBox Text="{Binding MouseJitterPx}" Width="48" />
-              <TextBlock Text="px" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="4,0,0,0" />
-            </StackPanel>
+            <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Change target" VerticalAlignment="Center"
+                    Command="{Binding ChangeTargetCommand}" IsEnabled="{Binding IsRecording, Converter={StaticResource Not}}" />
+            <TextBlock DockPanel.Dock="Left" Text="&#xE7FC;" FontFamily="{StaticResource Icons}" Foreground="{DynamicResource AccentLink}"
+                       VerticalAlignment="Center" Margin="0,0,10,0" />
+            <TextBlock Text="{Binding Games.Banner}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
           </DockPanel>
         </Border>
 
-        <!-- Timeline -->
-        <Grid>
-          <ListBox ItemsSource="{Binding Blocks}" Background="Transparent" BorderThickness="0" Padding="12,8"
-                   ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizing="True">
-            <ListBox.ItemContainerStyle>
-              <Style TargetType="ListBoxItem">
-                <Setter Property="Template">
-                  <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                      <Border x:Name="Row" CornerRadius="8" Padding="10,7" Margin="0,1" Background="Transparent"
-                              BorderThickness="3,0,0,0" BorderBrush="Transparent">
-                        <ContentPresenter />
+        <!-- ================= Loaded macro ================= -->
+        <Border Margin="0,16,0,0" Style="{StaticResource Card}" Padding="0">
+          <StackPanel>
+            <!-- Name, sync chip and run buttons -->
+            <DockPanel Margin="20,16">
+              <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center" HorizontalAlignment="Right" MaxWidth="560">
+                <Button Command="{Binding ToggleRecordCommand}" Margin="6,4,0,4">
+                  <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="10" Height="10" Fill="{DynamicResource Record}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                    <TextBlock>
+                      <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                          <Setter Property="Text" Value="Record" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsRecording}" Value="True">
+                              <Setter Property="Text" Value="Stop recording" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Text="{Binding RecordHotkeyText}" Style="{StaticResource Eyebrow}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <Button Content="Step" Command="{Binding StepCommand}" Margin="6,4,0,4"
+                        ToolTip="Run one block at a time, starting at the selected block" />
+                <Button Content="{Binding RunFromText}" Command="{Binding RunFromCommand}" Margin="6,4,0,4"
+                        IsEnabled="{Binding HasSelection}" ToolTip="Play from the selected block" />
+                <Button Command="{Binding TogglePlayCommand}" Style="{StaticResource PrimaryButton}" MinWidth="96" Margin="6,4,0,4"
+                        Content="{Binding PlayText}" />
+                <Border Style="{StaticResource KeyChip}" Margin="8,0,0,0" ToolTip="Start / stop key">
+                  <TextBlock Text="{Binding PlayHotkeyText}" Style="{StaticResource Eyebrow}" />
+                </Border>
+                <Button Style="{StaticResource IconButton}" Content="&#xE713;" Margin="6,0,0,0" ToolTip="Macro options"
+                        Command="{Binding ToggleEditorOptionsCommand}" VerticalAlignment="Center" />
+              </WrapPanel>
+              <StackPanel Margin="0,0,16,0">
+                <TextBlock Text="LOADED MACRO" Style="{StaticResource Eyebrow}" />
+                <TextBox Text="{Binding MacroName, UpdateSourceTrigger=PropertyChanged}" FontSize="18" FontWeight="SemiBold"
+                         MaxWidth="360" MinWidth="220" HorizontalAlignment="Left" Margin="0,6,0,0" MaxLength="60" />
+                <Border Style="{StaticResource Pill}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                        BorderBrush="{DynamicResource WarningBorder}" Background="{DynamicResource WarningSoft}">
+                  <TextBlock Text="{Binding SyncText}" Style="{StaticResource Eyebrow}" Foreground="{DynamicResource Warning}" />
+                </Border>
+              </StackPanel>
+            </DockPanel>
+
+            <!-- Loaded macro options (gear) -->
+            <Border BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Padding="20,14"
+                    Visibility="{Binding ShowEditorOptions, Converter={StaticResource BoolToVisible}}">
+              <StackPanel>
+                <DockPanel>
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="Import" Command="{Binding ImportCommand}" />
+                    <Button Content="Export" Command="{Binding ExportCommand}" />
+                    <Button Content="Delete" Style="{StaticResource DangerButton}" Command="{Binding DeleteCommand}" />
+                  </StackPanel>
+                  <WrapPanel VerticalAlignment="Center">
+                    <TextBlock Text="Start / stop key" Style="{StaticResource SmallLabel}" Margin="0,0,8,0" />
+                    <Button Content="{Binding EditorHotkeyLabel}" Command="{Binding CaptureEditorHotkeyCommand}" Margin="0,4,20,4"
+                            FontFamily="{StaticResource Mono}" ToolTip="Click, then press a key. Backspace clears it." />
+                    <TextBlock Text="Trigger" Style="{StaticResource SmallLabel}" Margin="0,0,8,0" />
+                    <Border Style="{StaticResource SegmentBar}" HorizontalAlignment="Left" Margin="0,4,20,4">
+                      <StackPanel Orientation="Horizontal">
+                        <RadioButton Style="{StaticResource Segment}" GroupName="EditorTrigger" Content="Toggle"
+                                     IsChecked="{Binding EditorTriggerMode, Converter={StaticResource EqualsParam}, ConverterParameter=toggle}" />
+                        <RadioButton Style="{StaticResource Segment}" GroupName="EditorTrigger" Content="Hold"
+                                     IsChecked="{Binding EditorTriggerMode, Converter={StaticResource EqualsParam}, ConverterParameter=hold}" />
+                        <RadioButton Style="{StaticResource Segment}" GroupName="EditorTrigger" Content="Once"
+                                     IsChecked="{Binding EditorTriggerMode, Converter={StaticResource EqualsParam}, ConverterParameter=once}" />
+                      </StackPanel>
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Margin="0,4">
+                      <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding EditorRunAlongside}" VerticalAlignment="Center" />
+                      <TextBlock Text="Run alongside other macros" Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </WrapPanel>
+                </DockPanel>
+                <TextBlock Text="{Binding EditorHotkeyError}" Style="{StaticResource FieldError}"
+                           Visibility="{Binding EditorHotkeyError, Converter={StaticResource TextToVisible}}" />
+              </StackPanel>
+            </Border>
+
+            <!-- Add block: category chips, then the open category's blocks -->
+            <Border BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0" Padding="20,14">
+              <StackPanel>
+                <DockPanel>
+                  <TextBlock Text="Add block" Style="{StaticResource SmallLabel}" Margin="0,0,12,0" />
+                  <ItemsControl ItemsSource="{Binding Categories}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="{x:Type vm:PaletteCategory}">
+                        <Button Command="{Binding DataContext.ToggleCategoryCommand, ElementName=Root}" CommandParameter="{Binding}"
+                                Margin="0,3,8,3" Padding="12,5" MinHeight="30">
+                          <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                              <Setter Property="Background" Value="Transparent" />
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsOpen}" Value="True">
+                                  <Setter Property="Background" Value="{DynamicResource PanelRaised}" />
+                                  <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Button.Style>
+                          <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="8" Height="8" Fill="{Binding Color, Converter={StaticResource HexToBrush}}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Name}" Margin="7,0,0,0" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding Count}" Style="{StaticResource Eyebrow}" Margin="7,0,0,0" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </DockPanel>
+                <ItemsControl ItemsSource="{Binding PaletteItems}" Margin="0,6,0,0">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <WrapPanel ItemWidth="232" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:BlockDef}">
+                      <Button Command="{Binding DataContext.AddBlockCommand, ElementName=Root}" CommandParameter="{Binding}"
+                              Margin="0,4,8,4" Cursor="Hand" ToolTip="{Binding Description}" Foreground="{DynamicResource Text}">
+                        <Button.Template>
+                          <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" CornerRadius="8" BorderThickness="3,1,1,1" Padding="12,10" Height="80"
+                                    BorderBrush="{DynamicResource Border}" Background="{DynamicResource Bg}">
+                              <ContentPresenter />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                              <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PanelRaised}" />
+                              </Trigger>
+                            </ControlTemplate.Triggers>
+                          </ControlTemplate>
+                        </Button.Template>
+                        <StackPanel>
+                          <DockPanel>
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding Badge}" Style="{StaticResource Eyebrow}"
+                                       Foreground="{DynamicResource Warning}" FontSize="10" VerticalAlignment="Center" />
+                            <TextBlock FontWeight="SemiBold" TextTrimming="CharacterEllipsis">
+                              <Run Text="+ " /><Run Text="{Binding Label, Mode=OneWay}" />
+                            </TextBlock>
+                          </DockPanel>
+                          <TextBlock Text="{Binding Description}" Style="{StaticResource Muted}" FontSize="12"
+                                     TextWrapping="Wrap" Margin="0,4,0,0" MaxHeight="34" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </Border>
+
+            <!-- Options row -->
+            <Border BorderBrush="{DynamicResource Border}" BorderThickness="0,1" Padding="20,10">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Text="{Binding BlockSummary}" Style="{StaticResource Eyebrow}" VerticalAlignment="Center"
+                           Margin="12,0,0,0" />
+                <WrapPanel>
+                  <CheckBox Content="Humanize" IsChecked="{Binding Humanize}" FontWeight="SemiBold" Margin="0,6" VerticalAlignment="Center" />
+                  <TextBlock Text="Timing ±" Style="{StaticResource SmallLabel}" Margin="12,0,0,0" />
+                  <TextBox Text="{Binding TimingJitterPct}" Style="{StaticResource SmallBox}" IsEnabled="{Binding Humanize}" />
+                  <TextBlock Text="%" Style="{StaticResource SmallLabel}" Margin="0,0,14,0" />
+                  <TextBlock Text="Mouse ±" Style="{StaticResource SmallLabel}" />
+                  <TextBox Text="{Binding MouseJitterPx}" Style="{StaticResource SmallBox}" IsEnabled="{Binding Humanize}" />
+                  <TextBlock Text="px" Style="{StaticResource SmallLabel}" Margin="0,0,20,0" />
+                  <TextBlock Text="Repeat" Style="{StaticResource SmallLabel}" />
+                  <TextBox Text="{Binding RepeatCount}" Style="{StaticResource SmallBox}" Width="70"
+                           IsEnabled="{Binding RepeatForever, Converter={StaticResource Not}}" />
+                  <CheckBox Content="Forever" IsChecked="{Binding RepeatForever}" Margin="2,6,20,6" VerticalAlignment="Center" />
+                  <CheckBox Content="Record mouse movement" IsChecked="{Binding RecordMouseMoves}" Margin="0,6" VerticalAlignment="Center" />
+                </WrapPanel>
+              </DockPanel>
+            </Border>
+
+            <!-- Timeline + block editor. When the screen is narrow the editor moves under the timeline (code-behind). -->
+            <Grid x:Name="EditorBody" SizeChanged="OnEditorBodySizeChanged">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="InspectorColumn" Width="320" />
+              </Grid.ColumnDefinitions>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+
+              <!-- Timeline -->
+              <Grid MinHeight="220" Margin="12,8">
+                <ItemsControl ItemsSource="{Binding Blocks}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:BlockRow}">
+                      <Border x:Name="Row" CornerRadius="8" Padding="8,5" Margin="0,1" Background="Transparent" Cursor="Hand"
+                              BorderThickness="3,0,0,0" BorderBrush="Transparent" MouseLeftButtonUp="OnRowClick">
+                        <DockPanel>
+                          <!-- Row actions -->
+                          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Style="{StaticResource IconButton}" Content="&#xE8C8;" ToolTip="Duplicate"
+                                    Command="{Binding DataContext.DuplicateBlockCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                            <Button Style="{StaticResource IconButton}" Content="&#xE70E;" ToolTip="Move up"
+                                    Command="{Binding DataContext.MoveBlockUpCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                            <Button Style="{StaticResource IconButton}" Content="&#xE70D;" ToolTip="Move down"
+                                    Command="{Binding DataContext.MoveBlockDownCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                            <Button Style="{StaticResource IconButton}" Content="&#xE74D;" ToolTip="Delete"
+                                    Command="{Binding DataContext.DeleteBlockCommand, ElementName=Root}" CommandParameter="{Binding}" />
+                          </StackPanel>
+                          <!-- Breakpoint dot, on/off, number -->
+                          <Button DockPanel.Dock="Left" Width="22" Height="22" Cursor="Hand" VerticalAlignment="Center"
+                                  ToolTip="Breakpoint: Play pauses before this block"
+                                  Command="{Binding DataContext.ToggleBreakpointCommand, ElementName=Root}" CommandParameter="{Binding}">
+                            <Button.Template>
+                              <ControlTemplate TargetType="Button">
+                                <Grid Background="Transparent">
+                                  <Ellipse x:Name="Dot" Width="12" Height="12" Stroke="{DynamicResource BorderStrong}" StrokeThickness="1.5" />
+                                </Grid>
+                                <ControlTemplate.Triggers>
+                                  <DataTrigger Binding="{Binding Breakpoint}" Value="True">
+                                    <Setter TargetName="Dot" Property="Fill" Value="{DynamicResource Record}" />
+                                    <Setter TargetName="Dot" Property="Stroke" Value="{DynamicResource Record}" />
+                                  </DataTrigger>
+                                </ControlTemplate.Triggers>
+                              </ControlTemplate>
+                            </Button.Template>
+                          </Button>
+                          <CheckBox DockPanel.Dock="Left" IsChecked="{Binding Enabled}" Margin="8,0,0,0" ToolTip="On / off"
+                                    VerticalAlignment="Center" />
+                          <TextBlock DockPanel.Dock="Left" Text="{Binding Number}" Style="{StaticResource Eyebrow}" Width="28"
+                                     Margin="8,0,0,0" VerticalAlignment="Center" />
+                          <!-- Nesting indent, chip, text -->
+                          <Border DockPanel.Dock="Left" Width="{Binding Indent}" />
+                          <Border DockPanel.Dock="Left" Style="{StaticResource Chip}" VerticalAlignment="Center"
+                                  BorderBrush="{Binding Color, Converter={StaticResource HexToBrush}}">
+                            <TextBlock Text="{Binding Tag}" FontFamily="{StaticResource Mono}" FontSize="10" HorizontalAlignment="Center"
+                                       Foreground="{Binding Color, Converter={StaticResource HexToBrush}}" />
+                          </Border>
+                          <StackPanel Margin="12,0,10,0" VerticalAlignment="Center">
+                            <TextBlock TextTrimming="CharacterEllipsis">
+                              <Run Text="{Binding Title, Mode=OneWay}" FontWeight="SemiBold" /><Run Text="  " /><Run
+                                   Text="{Binding InlineDetail, Mode=OneWay}" FontFamily="{StaticResource Mono}" FontSize="12"
+                                   Foreground="{DynamicResource TextMuted}" />
+                            </TextBlock>
+                            <TextBlock x:Name="LongText" Text="{Binding Detail}" TextWrapping="Wrap" FontSize="13"
+                                       Foreground="{DynamicResource TextSoft}" Margin="0,2,0,0" Visibility="Collapsed" />
+                            <TextBlock Text="{Binding Note}" FontSize="12" FontStyle="Italic" Foreground="{DynamicResource TextMuted}"
+                                       TextTrimming="CharacterEllipsis" Visibility="{Binding Note, Converter={StaticResource TextToVisible}}" />
+                          </StackPanel>
+                        </DockPanel>
                       </Border>
-                      <ControlTemplate.Triggers>
+                      <DataTemplate.Triggers>
+                        <DataTrigger Binding="{Binding IsDescription}" Value="True">
+                          <Setter TargetName="LongText" Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                          <Setter TargetName="Row" Property="Background" Value="{DynamicResource PanelRaised}" />
+                          <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                        </DataTrigger>
                         <DataTrigger Binding="{Binding IsCurrent}" Value="True">
                           <Setter TargetName="Row" Property="Background" Value="{DynamicResource Current}" />
                           <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource Accent}" />
                         </DataTrigger>
+                        <DataTrigger Binding="{Binding IsFault}" Value="True">
+                          <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource Record}" />
+                        </DataTrigger>
                         <DataTrigger Binding="{Binding Enabled}" Value="False">
                           <Setter TargetName="Row" Property="Opacity" Value="0.45" />
                         </DataTrigger>
-                      </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                  </Setter.Value>
-                </Setter>
-              </Style>
-            </ListBox.ItemContainerStyle>
-            <ListBox.ItemTemplate>
-              <DataTemplate DataType="{x:Type vm:BlockRow}">
-                <StackPanel Orientation="Horizontal">
-                  <TextBlock Text="{Binding Number}" Style="{StaticResource Eyebrow}" Width="34" VerticalAlignment="Center" />
-                  <Border Style="{StaticResource Chip}" BorderBrush="{Binding Category, Converter={StaticResource CategoryBrush}}">
-                    <TextBlock Text="{Binding Tag}" FontFamily="{StaticResource Mono}" FontSize="10" HorizontalAlignment="Center"
-                               Foreground="{Binding Category, Converter={StaticResource CategoryBrush}}" />
-                  </Border>
-                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="12,0,10,0" VerticalAlignment="Center" />
-                  <TextBlock Text="{Binding Detail}" FontFamily="{StaticResource Mono}" FontSize="12" Foreground="{DynamicResource TextMuted}"
-                             VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="600" />
+                      </DataTemplate.Triggers>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="No blocks yet. Press Record to capture keyboard and mouse input, or pick a category above to add blocks."
+                           Style="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap"
+                           TextAlignment="Center" MaxWidth="360"
+                           Visibility="{Binding Blocks.Count, Converter={StaticResource ZeroToVisible}}" />
+              </Grid>
+
+              <!-- Block editor (inspector) -->
+              <Border x:Name="Inspector" Grid.Column="1" BorderBrush="{DynamicResource Border}" BorderThickness="1,0,0,0" Padding="18,16">
+                <StackPanel>
+                  <TextBlock Text="{Binding InspectorEyebrow}" Style="{StaticResource Eyebrow}" />
+                  <TextBlock Text="{Binding InspectorTitle}" Style="{StaticResource CardTitle}" Margin="0,6,0,0" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding InspectorDescription}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                  <ItemsControl ItemsSource="{Binding InspectorFields}" Margin="0,4,0,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="{x:Type vm:BlockField}">
+                        <StackPanel>
+                          <TextBlock Text="{Binding Label}" Style="{StaticResource FieldLabel}" Margin="0,12,0,5" />
+                          <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" MaxLength="{Binding MaxLength}"
+                                   Visibility="{Binding IsText, Converter={StaticResource BoolToVisible}}" />
+                          <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" MaxLength="{Binding MaxLength}"
+                                   AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90" VerticalContentAlignment="Top"
+                                   Visibility="{Binding IsMultiLine, Converter={StaticResource BoolToVisible}}" />
+                          <ComboBox ItemsSource="{Binding Choices}" SelectedItem="{Binding SelectedChoice}"
+                                    Visibility="{Binding IsChoice, Converter={StaticResource BoolToVisible}}" />
+                          <ComboBox ItemsSource="{Binding MacroNames}" SelectedItem="{Binding Value}"
+                                    Visibility="{Binding IsMacroName, Converter={StaticResource BoolToVisible}}" />
+                          <TextBlock Text="{Binding Hint}" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                                     Visibility="{Binding HasHint, Converter={StaticResource BoolToVisible}}" />
+                          <TextBlock Text="{Binding Error}" Style="{StaticResource FieldError}"
+                                     Visibility="{Binding Error, Converter={StaticResource TextToVisible}}" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Button Content="Save to account" Style="{StaticResource PrimaryButton}" Margin="0,20,0,0" HorizontalAlignment="Stretch"
+                          Command="{Binding SaveCommand}" />
                 </StackPanel>
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
-          <TextBlock Text="No blocks yet. Press Record to capture keyboard and mouse input."
-                     Style="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <TextBlock.Visibility>
-              <Binding Path="Blocks.Count" Converter="{StaticResource ZeroToVisible}" />
-            </TextBlock.Visibility>
-          </TextBlock>
-        </Grid>
-      </DockPanel>
-    </Border>
+              </Border>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- ================= Saved macros ================= -->
+        <DockPanel Margin="0,28,0,0">
+          <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center">
+            <Grid Width="240" Margin="0,4,4,4">
+              <TextBox x:Name="SearchBox" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+              <TextBlock Text="Search saved macros" Style="{StaticResource Muted}" Margin="13,0,0,0" VerticalAlignment="Center"
+                         IsHitTestVisible="False"
+                         Visibility="{Binding Text, ElementName=SearchBox, Converter={StaticResource TextToVisible}, ConverterParameter=invert}" />
+            </Grid>
+            <Button Content="+ New group" Command="{Binding NewGroupCommand}" Margin="6,4,0,4" />
+            <Button Content="+ New macro" Style="{StaticResource PrimaryButton}" Command="{Binding NewMacroCommand}" Margin="6,4,0,4" />
+          </WrapPanel>
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="Saved macros" FontSize="20" FontWeight="Bold" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding UsedText}" Style="{StaticResource Eyebrow}" Margin="12,0,10,0" VerticalAlignment="Center" />
+            <ProgressBar Width="80" Value="{Binding UsedPercent, Mode=OneWay}" VerticalAlignment="Center" />
+          </StackPanel>
+        </DockPanel>
+
+        <!-- New / rename group form -->
+        <Border Style="{StaticResource Card}" Padding="18,14" Margin="0,14,0,0"
+                Visibility="{Binding IsGroupFormOpen, Converter={StaticResource BoolToVisible}}">
+          <StackPanel>
+            <TextBlock Text="{Binding GroupFormTitle}" FontWeight="SemiBold" />
+            <TextBox Text="{Binding GroupFormName, UpdateSourceTrigger=PropertyChanged}" MaxLength="40" Margin="0,10,0,0" MaxWidth="420"
+                     HorizontalAlignment="Left" MinWidth="300" />
+            <DockPanel Margin="0,10,0,0">
+              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Content="Cancel" Command="{Binding CancelGroupFormCommand}" />
+                <Button Content="Save group" Style="{StaticResource PrimaryButton}" Command="{Binding SubmitGroupFormCommand}" />
+              </StackPanel>
+              <ItemsControl ItemsSource="{x:Static vm:MainViewModel.GroupColors}" Margin="-10,0,0,0">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <RadioButton Style="{StaticResource Swatch}" GroupName="GroupColor" ToolTip="{Binding}"
+                                 Background="{Binding Converter={StaticResource HexToBrush}}"
+                                 Command="{Binding DataContext.PickGroupColorCommand, ElementName=Root}" CommandParameter="{Binding}">
+                      <RadioButton.IsChecked>
+                        <MultiBinding Converter="{StaticResource StringsEqual}" Mode="OneWay">
+                          <Binding />
+                          <Binding Path="DataContext.GroupFormColor" ElementName="Root" />
+                        </MultiBinding>
+                      </RadioButton.IsChecked>
+                    </RadioButton>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </DockPanel>
+            <TextBlock Text="{Binding GroupFormError}" Style="{StaticResource FieldError}"
+                       Visibility="{Binding GroupFormError, Converter={StaticResource TextToVisible}}" />
+          </StackPanel>
+        </Border>
+
+        <!-- Drafts banner -->
+        <Border Margin="0,14,0,0" Padding="16,10" CornerRadius="10" BorderThickness="1"
+                Background="{DynamicResource WarningSoft}" BorderBrush="{DynamicResource WarningBorder}"
+                Visibility="{Binding DraftBanner, Converter={StaticResource TextToVisible}}">
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Content="Save all" Command="{Binding SaveAllCommand}" />
+            <TextBlock Text="{Binding DraftBanner}" Foreground="{DynamicResource Warning}" TextWrapping="Wrap" VerticalAlignment="Center" />
+          </DockPanel>
+        </Border>
+
+        <!-- Groups and their macros -->
+        <Border Style="{StaticResource Card}" Margin="0,14,0,0" Padding="0" ClipToBounds="True">
+          <StackPanel>
+            <ItemsControl ItemsSource="{Binding Sections}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:GroupSection}">
+                  <StackPanel>
+                    <!-- Group header -->
+                    <Border BorderThickness="4,0,0,1" BorderBrush="{Binding Color, Converter={StaticResource HexToBrush}}"
+                            Background="{DynamicResource PanelRaised}" Padding="10,8">
+                      <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                                    Visibility="{Binding IsGroup, Converter={StaticResource BoolToVisible}}">
+                          <Button Style="{StaticResource IconButton}" Content="&#xE70F;" ToolTip="Rename group" Command="{Binding RenameCommand}" />
+                          <Button Style="{StaticResource IconButton}" Content="&#xE74D;" ToolTip="Delete group (its macros become ungrouped)"
+                                  Command="{Binding DeleteCommand}" />
+                        </StackPanel>
+                        <Button DockPanel.Dock="Left" Command="{Binding ToggleCommand}" Margin="0,0,6,0" ToolTip="Show or hide">
+                          <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
+                              <Setter Property="Content" Value="&#xE70D;" />
+                              <Setter Property="FontSize" Value="11" />
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsCollapsed}" Value="True">
+                                  <Setter Property="Content" Value="&#xE76C;" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Button.Style>
+                        </Button>
+                        <Border DockPanel.Dock="Left" Width="12" Height="12" CornerRadius="3" VerticalAlignment="Center"
+                                Background="{Binding Color, Converter={StaticResource HexToBrush}}" />
+                        <TextBlock DockPanel.Dock="Left" Text="{Binding Name}" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" MaxWidth="400" />
+                        <TextBlock Text="{Binding CountText}" Style="{StaticResource Eyebrow}" Margin="10,0,0,0" VerticalAlignment="Center" />
+                      </DockPanel>
+                    </Border>
+
+                    <StackPanel Visibility="{Binding IsCollapsed, Converter={StaticResource BoolToVisible}, ConverterParameter=invert}">
+                      <TextBlock Text="No macros here yet. Open a macro's options and pick this group." Style="{StaticResource Muted}"
+                                 Margin="36,14,20,14" Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisible}}" />
+                      <ItemsControl ItemsSource="{Binding Rows}" Tag="{Binding Color}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate DataType="{x:Type vm:SavedMacroRow}">
+                            <Border BorderThickness="4,0,0,1" Padding="16,12"
+                                    BorderBrush="{Binding Tag, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource HexToBrush}}">
+                              <StackPanel>
+                                <DockPanel>
+                                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Content="Save" Command="{Binding SaveCommand}"
+                                            Visibility="{Binding HasDraft, Converter={StaticResource BoolToVisible}}" />
+                                    <Button Content="Open" Command="{Binding OpenCommand}"
+                                            Visibility="{Binding IsInEditor, Converter={StaticResource BoolToVisible}, ConverterParameter=invert}" />
+                                    <Button Style="{StaticResource IconButton}" Content="&#xE74D;" ToolTip="Delete" Margin="8,0,0,0"
+                                            Command="{Binding DeleteCommand}" />
+                                    <Border Style="{StaticResource KeyChip}" Margin="8,0,0,0" ToolTip="Start / stop key"
+                                            Visibility="{Binding HasHotkey, Converter={StaticResource BoolToVisible}}">
+                                      <TextBlock Text="{Binding Hotkey}" Style="{StaticResource Eyebrow}" />
+                                    </Border>
+                                    <Button Style="{StaticResource IconButton}" Content="&#xE713;" ToolTip="Options" Margin="8,0,0,0"
+                                            Command="{Binding ToggleOptionsCommand}" />
+                                    <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding IsRunning}" Margin="10,0,0,0"
+                                              ToolTip="Run this macro" VerticalAlignment="Center" />
+                                  </StackPanel>
+                                  <StackPanel Margin="0,0,12,0">
+                                    <WrapPanel>
+                                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="15" TextTrimming="CharacterEllipsis"
+                                                 MaxWidth="360" ToolTip="{Binding Name}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                      <Border Style="{StaticResource Pill}" Background="{DynamicResource Accent}" BorderBrush="{DynamicResource Accent}"
+                                              Margin="0,0,6,0" Visibility="{Binding IsInEditor, Converter={StaticResource BoolToVisible}}">
+                                        <TextBlock Text="in editor" Style="{StaticResource Eyebrow}" Foreground="{DynamicResource AccentText}" />
+                                      </Border>
+                                      <Border Style="{StaticResource Pill}" Background="{DynamicResource WarningSoft}" BorderBrush="{DynamicResource WarningBorder}"
+                                              Margin="0,0,6,0" Visibility="{Binding HasDraft, Converter={StaticResource BoolToVisible}}">
+                                        <TextBlock Text="draft · autosaved" Style="{StaticResource Eyebrow}" Foreground="{DynamicResource Warning}" />
+                                      </Border>
+                                      <Border Style="{StaticResource Pill}">
+                                        <TextBlock Text="{Binding StateText}" Style="{StaticResource Eyebrow}" />
+                                      </Border>
+                                    </WrapPanel>
+                                    <TextBlock Text="{Binding Detail}" Style="{StaticResource Muted}" Margin="0,3,0,0" />
+                                    <TextBlock Text="{Binding HotkeyError}" Style="{StaticResource FieldError}"
+                                               Visibility="{Binding HotkeyError, Converter={StaticResource TextToVisible}}" />
+                                  </StackPanel>
+                                </DockPanel>
+
+                                <!-- Per-macro options -->
+                                <Border Margin="0,12,0,0" Padding="16,12" CornerRadius="8" Background="{DynamicResource Bg}"
+                                        Visibility="{Binding ShowOptions, Converter={StaticResource BoolToVisible}}">
+                                  <StackPanel>
+                                    <DockPanel>
+                                      <Button DockPanel.Dock="Right" Content="{Binding HotkeyLabel}" Command="{Binding CaptureHotkeyCommand}"
+                                              FontFamily="{StaticResource Mono}" ToolTip="Click, then press a key. Backspace clears it." />
+                                      <TextBlock Text="Start / stop key" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <DockPanel Margin="0,10,0,0">
+                                      <Border DockPanel.Dock="Right" Style="{StaticResource SegmentBar}">
+                                        <StackPanel Orientation="Horizontal">
+                                          <RadioButton Style="{StaticResource Segment}" Content="Toggle" GroupName="{Binding Id}"
+                                                       IsChecked="{Binding TriggerMode, Converter={StaticResource EqualsParam}, ConverterParameter=toggle}" />
+                                          <RadioButton Style="{StaticResource Segment}" Content="Hold" GroupName="{Binding Id}"
+                                                       IsChecked="{Binding TriggerMode, Converter={StaticResource EqualsParam}, ConverterParameter=hold}" />
+                                          <RadioButton Style="{StaticResource Segment}" Content="Once" GroupName="{Binding Id}"
+                                                       IsChecked="{Binding TriggerMode, Converter={StaticResource EqualsParam}, ConverterParameter=once}" />
+                                        </StackPanel>
+                                      </Border>
+                                      <TextBlock Text="Trigger" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <DockPanel Margin="0,10,0,0">
+                                      <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding RunAlongside}" />
+                                      <TextBlock Text="Run alongside other macros" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                    <DockPanel Margin="0,10,0,0">
+                                      <ComboBox DockPanel.Dock="Right" Width="220" ItemsSource="{Binding GroupChoices}" SelectedItem="{Binding SelectedGroup}" />
+                                      <TextBlock Text="Group" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                  </StackPanel>
+                                </Border>
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="Nothing saved yet. Add blocks or record something, then press Save to account." Style="{StaticResource Muted}"
+                       Margin="20,28" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                       Visibility="{Binding IsLibraryEmpty, Converter={StaticResource BoolToVisible}}" />
+            <TextBlock Style="{StaticResource Muted}" Margin="20,28" HorizontalAlignment="Center" TextWrapping="Wrap"
+                       Visibility="{Binding HasNoMatch, Converter={StaticResource BoolToVisible}}">
+              <Run Text="No saved macros match &#x201C;" /><Run Text="{Binding SearchText, Mode=OneWay}" /><Run Text="&#x201D;." />
+            </TextBlock>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
   </DockPanel>
 </UserControl>

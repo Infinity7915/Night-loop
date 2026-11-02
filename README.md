@@ -20,6 +20,14 @@ Night-loop never touches game memory. It only sends ordinary input through Windo
   **Ctrl+Alt+End** stops every macro at once. A target lock waits instead of typing into another window.
 - **Engine**: loops, repeat-until, if/else, labels and go-to, repeat count or forever, humanize
   (random timing and mouse jitter), breakpoints and single-step, several macros at once.
+- **Editor**: build macros from blocks in seven categories (Input, Camera, Timing, Detect, Logic, Window,
+  Utility). Reorder, duplicate, switch off or add notes to blocks, edit each block's settings in the side
+  panel, and debug with breakpoints, **Step** and **Run from**.
+- **Saved macros**: groups with colors, search, a drafts banner with **Save all**, and per-macro start/stop
+  keys (toggle, hold or once) with an on/off switch, so several macros can run side by side.
+- **Settings**: dark (deep purple), light or system theme with four accent colors, target games (add any
+  running app), account changes (username, email, password with email codes), two-factor sign-in, download
+  my data, delete account.
 - **Accounts**: sign up with an emailed code, sign in (optionally trusting a PC for 30 days), forgot
   password. One PC is signed in at a time; signing in elsewhere signs this PC out and stops its macros.
 - **Sync**: macros live on your account (up to 15). Edits autosave as a draft within a couple of seconds;
@@ -92,9 +100,9 @@ More in [docs/architecture.md](docs/architecture.md) and [docs/macro-format.md](
 | M1 Accounts | Server: register, verify, sign in, sessions | Done (server repo) |
 | M2 Client shell | Sign-in screens, DPAPI session, Home | Done |
 | M3 Macros API | Server macro storage, drafts, 15-macro limit | Done (server repo); app syncs macros |
-| M4 Editor UI | Block palette, inspector, saved list | |
+| M4 Editor UI | Block palette, inspector, saved list | Done |
 | M6 Vision | Capture, OCR, image and pixel detection | |
-| M8 Settings | Appearance, target games, account changes, 2FA | Updates and sign out done |
+| M8 Settings | Appearance, target games, account changes, 2FA | Done |
 | M9 Ship | Velopack updates, release workflow, deployment | Updates and releases done; server deployment to come |
 | M10 | Public 1.0 | |
 

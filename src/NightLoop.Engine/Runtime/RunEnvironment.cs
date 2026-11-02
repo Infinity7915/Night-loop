@@ -38,6 +38,8 @@ public sealed class RunSettings
     public int StartIndex { get; init; }
     /// <summary>When true the runner pauses before blocks marked breakpoint.</summary>
     public bool Debug { get; init; }
+    /// <summary>Step: hold before the first block, as if at a breakpoint. StepOnce runs one block at a time.</summary>
+    public bool StartPaused { get; init; }
     /// <summary>Faults when this many steps run with no wait or input in between.</summary>
     public int RunawayStepLimit { get; init; } = 10_000;
     /// <summary>How often to re-check for the game window while waiting for it.</summary>

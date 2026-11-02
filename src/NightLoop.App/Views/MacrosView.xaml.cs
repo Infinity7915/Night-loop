@@ -1,12 +1,83 @@
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using NightLoop.App.ViewModels;
+using NightLoop.Contracts.MacroDocument;
 
 namespace NightLoop.App.Views;
 
-/// <summary>Record, replay and the account's saved macros. DataContext is a MainViewModel.</summary>
+/// <summary>The block editor and the account's saved macros. DataContext is a MainViewModel.</summary>
 public partial class MacrosView : UserControl
 {
+    /// <summary>Below this width the block editor panel moves under the timeline.</summary>
+    private const double SideBySideWidth = 760;
+
     public MacrosView()
     {
         InitializeComponent();
+        PreviewKeyDown += OnPreviewKeyDown;
+    }
+
+    private MainViewModel? Vm => DataContext as MainViewModel;
+
+    private void OnRowClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: BlockRow row } && Vm is { } vm)
+            vm.SelectBlockCommand.Execute(row);
+    }
+
+    private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (Vm is not { } vm) return;
+
+        // Capturing a start/stop key for the loaded macro or a saved one.
+        if (vm.IsCapturingEditorHotkey || vm.CapturingRow is not null)
+        {
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+            var vk = KeyInterop.VirtualKeyFromKey(key);
+            if (KeyCatalog.IsModifier(vk) || key is Key.None or Key.ImeProcessed) return; // wait for the real key
+            e.Handled = true;
+
+            Hotkey? hotkey = null;
+            var clear = false;
+            if (key is Key.Back or Key.Delete) clear = true;
+            else if (key != Key.Escape && KeyCatalog.NameOf(vk) is not null) hotkey = new Hotkey(CurrentModifiers(), vk);
+
+            if (vm.IsCapturingEditorHotkey) vm.OnEditorHotkeyCaptured(hotkey, clear);
+            else vm.CapturingRow?.OnCaptured(hotkey, clear);
+            return;
+        }
+
+        // Delete removes the selected block, unless you're typing in a field.
+        if (e.Key == Key.Delete && !IsTyping(e.OriginalSource))
+        {
+            vm.DeleteSelected();
+            e.Handled = true;
+        }
+    }
+
+    private static HotkeyModifiers CurrentModifiers()
+    {
+        var mods = HotkeyModifiers.None;
+        var m = Keyboard.Modifiers;
+        if (m.HasFlag(ModifierKeys.Control)) mods |= HotkeyModifiers.Ctrl;
+        if (m.HasFlag(ModifierKeys.Alt)) mods |= HotkeyModifiers.Alt;
+        if (m.HasFlag(ModifierKeys.Shift)) mods |= HotkeyModifiers.Shift;
+        if (m.HasFlag(ModifierKeys.Windows)) mods |= HotkeyModifiers.Win;
+        return mods;
+    }
+
+    private static bool IsTyping(object source) => source is TextBoxBase or PasswordBox or ComboBox { IsEditable: true };
+
+    private void OnEditorBodySizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var sideBySide = e.NewSize.Width >= SideBySideWidth;
+        if (sideBySide == (Grid.GetColumn(Inspector) == 1)) return;
+
+        InspectorColumn.Width = sideBySide ? new GridLength(320) : new GridLength(0);
+        Grid.SetColumn(Inspector, sideBySide ? 1 : 0);
+        Grid.SetRow(Inspector, sideBySide ? 0 : 1);
+        Inspector.BorderThickness = sideBySide ? new Thickness(1, 0, 0, 0) : new Thickness(0, 1, 0, 0);
     }
 }

@@ -19,6 +19,10 @@ public sealed class RunManager(IInputSender input, IWindowService? windows = nul
     public event Action<MacroRun, int>? RunStepChanged;
     public Action<string>? Log { get; set; }
     public Action<string>? Notify { get; set; }
+    /// <summary>utility.playSound.</summary>
+    public Action<string>? PlaySound { get; set; }
+    /// <summary>utility.runMacro: the app finds the macro by name, runs it and completes when it ends.</summary>
+    public Func<string, CancellationToken, Task>? RunMacro { get; set; }
 
     public IReadOnlyList<MacroRun> ActiveRuns
     {
@@ -42,6 +46,8 @@ public sealed class RunManager(IInputSender input, IWindowService? windows = nul
             FindRun = Find,
             Log = Log,
             Notify = Notify,
+            PlaySound = PlaySound,
+            RunMacro = RunMacro,
         };
         var run = new MacroRun(macro, env, settings);
         run.StateChanged += (r, s) => RunStateChanged?.Invoke(r, s);

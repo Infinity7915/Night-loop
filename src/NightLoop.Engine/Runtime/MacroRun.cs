@@ -29,6 +29,7 @@ public sealed class MacroRun
         _env = environment;
         _settings = settings ?? new RunSettings();
         _input = new TrackingInputSender(environment.Input);
+        _stepMode = _settings.StartPaused;
     }
 
     public CompiledMacro Macro { get; }
