@@ -55,6 +55,13 @@ public sealed class LocalSettings(string path)
         set => Write("activeGame", value);
     }
 
+    /// <summary>New macros start with a short ready-made block sequence (Settings › Macros). On unless turned off.</summary>
+    public bool StarterSequence
+    {
+        get => Read()?["starterSequence"] is not JsonValue v || !v.TryGetValue(out bool on) || on;
+        set => WriteNode("starterSequence", value);
+    }
+
     public static bool IsHexColor(string s) =>
         s.Length == 7 && s[0] == '#' && s.Skip(1).All(Uri.IsHexDigit);
 
@@ -83,7 +90,9 @@ public sealed class LocalSettings(string path)
         }
     }
 
-    private void Write(string key, string? value)
+    private void Write(string key, string? value) => WriteNode(key, value);
+
+    private void WriteNode(string key, JsonNode? value)
     {
         try
         {

@@ -80,14 +80,21 @@ public sealed class EqualsConverter : IValueConverter
         value is true ? parameter : Binding.DoNothing;
 }
 
-/// <summary>"#RRGGBB" to a brush (group colors, accent swatches).</summary>
+/// <summary>
+/// "#RRGGBB" to a brush (group colors, accent swatches). ConverterParameter is an optional alpha in hex, e.g. "1A" for a
+/// faint tint; then a missing color gives a transparent brush instead of gray.
+/// </summary>
 public sealed class HexToBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
+        var alpha = parameter is string a && byte.TryParse(a, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var parsed) ? parsed : (byte?)null;
+        if (value is not string { Length: > 0 } hex) return alpha is null ? Brushes.Gray : Brushes.Transparent;
         try
         {
-            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(value as string ?? "#808080"));
+            var color = (Color)ColorConverter.ConvertFromString(hex);
+            if (alpha is { } al) color.A = al;
+            var brush = new SolidColorBrush(color);
             brush.Freeze();
             return brush;
         }

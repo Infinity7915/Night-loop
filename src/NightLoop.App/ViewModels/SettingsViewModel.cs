@@ -28,6 +28,18 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     public AccountViewModel Account { get; }
     public IReadOnlyList<AccentOption> Accents { get; }
 
+    /// <summary>New macros start with the ready-made blocks (focus, resize, a loop, a notification). Kept on this PC.</summary>
+    public bool StarterSequence
+    {
+        get => _shell.Local.StarterSequence;
+        set
+        {
+            if (_shell.Local.StarterSequence == value) return;
+            _shell.Local.StarterSequence = value;
+            OnPropertyChanged();
+        }
+    }
+
     public string ThemeMode
     {
         get => ThemeManager.Mode;

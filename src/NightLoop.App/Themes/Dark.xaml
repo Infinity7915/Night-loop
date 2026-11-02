@@ -18,6 +18,11 @@
   <SolidColorBrush x:Key="WarningBorder" Color="#5A4320" />
   <SolidColorBrush x:Key="Success" Color="#3DD68C" />
   <SolidColorBrush x:Key="Overlay" Color="#B30A0712" />
+  <SolidColorBrush x:Key="Inset" Color="#150F21" />
+  <SolidColorBrush x:Key="TextFaint" Color="#6F6789" />
+  <SolidColorBrush x:Key="SuccessSoft" Color="#13291F" />
+  <SolidColorBrush x:Key="RecordSoft" Color="#38182A" />
+  <SolidColorBrush x:Key="Structural" Color="#1E1830" />
   <!-- Accent defaults; ThemeManager replaces these with the accent picked in Settings. -->
   <SolidColorBrush x:Key="Accent" Color="#A78BFA" />
   <SolidColorBrush x:Key="AccentText" Color="#140B2E" />

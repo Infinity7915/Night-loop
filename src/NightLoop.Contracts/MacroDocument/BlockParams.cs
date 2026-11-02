@@ -11,10 +11,13 @@ public static class BlockParams
 
     public static string GetString(this Block block, string name, string fallback) => block.GetString(name) ?? fallback;
 
-    public static int? GetInt(this Block block, string name)
+    public static int? GetInt(this Block block, string name) =>
+        block.Params.TryGetPropertyValue(name, out var node) ? AsInt(node) : null;
+
+    /// <summary>A whole number from any JSON number node (parsed or built in code), else null.</summary>
+    public static int? AsInt(JsonNode? node)
     {
-        if (!block.Params.TryGetPropertyValue(name, out var node) || node is not JsonValue v)
-            return null;
+        if (node is not JsonValue v) return null;
         if (v.TryGetValue(out int i)) return i;
         if (v.TryGetValue(out long l) && l is >= int.MinValue and <= int.MaxValue) return (int)l;
         if (v.TryGetValue(out double d) && d is >= int.MinValue and <= int.MaxValue && Math.Abs(d % 1) < double.Epsilon) return (int)d;
@@ -31,6 +34,14 @@ public static class BlockParams
         if (v.TryGetValue(out double d)) return d;
         if (v.TryGetValue(out int i)) return i;
         if (v.TryGetValue(out JsonElement e) && e.ValueKind == JsonValueKind.Number) return e.GetDouble();
+        return null;
+    }
+
+    public static bool? GetBool(this Block block, string name)
+    {
+        if (!block.Params.TryGetPropertyValue(name, out var node) || node is not JsonValue v) return null;
+        if (v.TryGetValue(out bool b)) return b;
+        if (v.TryGetValue(out JsonElement e) && e.ValueKind is JsonValueKind.True or JsonValueKind.False) return e.GetBoolean();
         return null;
     }
 

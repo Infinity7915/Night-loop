@@ -93,11 +93,11 @@
   <!-- ===== Buttons ===== -->
   <Style TargetType="Button">
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
-    <Setter Property="Background" Value="{DynamicResource Panel}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
     <Setter Property="Padding" Value="14,8" />
     <Setter Property="Margin" Value="6,0,0,0" />
-    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="MinHeight" Value="40" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -269,7 +269,7 @@
     </Setter>
   </Style>
 
-  <!-- On/off switch (a CheckBox): two-factor, per-macro enable. -->
+  <!-- On/off switch (a CheckBox), as in the mockups: 52×30 track, white knob. -->
   <Style x:Key="Switch" TargetType="CheckBox">
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -277,20 +277,17 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="CheckBox">
-          <Border x:Name="Track" Width="44" Height="24" CornerRadius="12" Background="{DynamicResource PanelRaised}"
-                  BorderBrush="{DynamicResource BorderStrong}" BorderThickness="1">
-            <Ellipse x:Name="Knob" Width="16" Height="16" Margin="4,0" HorizontalAlignment="Left"
-                     Fill="{DynamicResource TextMuted}" />
+          <Border x:Name="Track" Width="52" Height="30" CornerRadius="15" Background="{DynamicResource BorderStrong}"
+                  BorderBrush="Transparent" BorderThickness="1">
+            <Ellipse x:Name="Knob" Width="22" Height="22" Margin="3,0" HorizontalAlignment="Left" Fill="#FFFFFF" />
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsChecked" Value="True">
               <Setter TargetName="Track" Property="Background" Value="{DynamicResource Accent}" />
-              <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource Accent}" />
               <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
-              <Setter TargetName="Knob" Property="Fill" Value="{DynamicResource AccentText}" />
             </Trigger>
             <Trigger Property="IsKeyboardFocused" Value="True">
-              <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource Accent}" />
+              <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource Text}" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter Property="Opacity" Value="0.45" />
@@ -314,13 +311,15 @@
 
   <Style x:Key="Segment" TargetType="RadioButton">
     <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+    <Setter Property="MinWidth" Value="72" />
+    <Setter Property="FontSize" Value="13" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="FocusVisualStyle" Value="{x:Null}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="RadioButton">
-          <Border x:Name="Bd" CornerRadius="7" Padding="14,7" Background="Transparent">
+          <Border x:Name="Bd" CornerRadius="7" Padding="12,0" MinHeight="36" Background="Transparent">
             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Border>
           <ControlTemplate.Triggers>
@@ -341,6 +340,7 @@
   </Style>
 
   <!-- Accent color circle. Set Background to the color. -->
+  <!-- A round color swatch (accent color): a white ring when picked. -->
   <Style x:Key="Swatch" TargetType="RadioButton">
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -348,13 +348,13 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="RadioButton">
-          <Grid Width="40" Height="40" Background="Transparent">
-            <Ellipse x:Name="Ring" Stroke="{DynamicResource Text}" StrokeThickness="2" Visibility="Hidden" />
-            <Ellipse Margin="5" Fill="{TemplateBinding Background}" />
+          <Grid Width="44" Height="44" Background="Transparent">
+            <Ellipse Fill="{TemplateBinding Background}" Stroke="{DynamicResource BorderStrong}" StrokeThickness="1" />
+            <Ellipse x:Name="Ring" Margin="1" Stroke="{DynamicResource Panel}" StrokeThickness="3" />
           </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsChecked" Value="True">
-              <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
+              <Setter TargetName="Ring" Property="Stroke" Value="#FFFFFF" />
             </Trigger>
             <Trigger Property="IsMouseOver" Value="True">
               <Setter Property="Opacity" Value="0.85" />
@@ -366,22 +366,20 @@
   </Style>
 
   <!-- A whole row you pick, with a radio dot (target game list). -->
+  <!-- A choice row, like Settings › Target game: a radio dot, the content, accent border when picked. -->
   <Style x:Key="OptionRow" TargetType="RadioButton">
     <Setter Property="Foreground" Value="{DynamicResource Text}" />
     <Setter Property="Cursor" Value="Hand" />
     <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-    <Setter Property="Margin" Value="0,0,0,8" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="RadioButton">
           <Border x:Name="Bd" CornerRadius="10" BorderThickness="1" BorderBrush="{DynamicResource Border}"
-                  Background="Transparent" Padding="14,10">
+                  Background="Transparent" Padding="16,10" MinHeight="56">
             <DockPanel>
-              <Grid Width="18" Height="18" VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,14,0">
-                <Ellipse x:Name="Outer" Stroke="{DynamicResource BorderStrong}" StrokeThickness="1.5" />
-                <Ellipse x:Name="Dot" Width="8" Height="8" Fill="{DynamicResource AccentText}" Visibility="Collapsed" />
-              </Grid>
+              <Ellipse x:Name="Dot" Width="16" Height="16" VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,14,0"
+                       Stroke="{DynamicResource TextFaint}" StrokeThickness="2" />
               <ContentPresenter VerticalAlignment="Center" />
             </DockPanel>
           </Border>
@@ -391,10 +389,9 @@
             </Trigger>
             <Trigger Property="IsChecked" Value="True">
               <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}" />
-              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentSoft}" />
-              <Setter TargetName="Outer" Property="Fill" Value="{DynamicResource Accent}" />
-              <Setter TargetName="Outer" Property="Stroke" Value="{DynamicResource Accent}" />
-              <Setter TargetName="Dot" Property="Visibility" Value="Visible" />
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PanelRaised}" />
+              <Setter TargetName="Dot" Property="Stroke" Value="{DynamicResource Accent}" />
+              <Setter TargetName="Dot" Property="StrokeThickness" Value="5" />
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>

@@ -22,8 +22,11 @@ public sealed partial class BlockRow : ObservableObject
     public Block Block { get; }
     /// <summary>How many If / Loop / Repeat until blocks this one sits inside (indents the row).</summary>
     public int Depth { get; }
-    public double Indent => Depth * 20;
+    /// <summary>22 px per level, with a guide line in each (as in the mockup).</summary>
+    public double Indent => Depth * 22;
     public bool IsDescription => Block.Type == BlockTypes.Description;
+    /// <summary>Loop / If / Repeat until / Else / End: their tag chip gets a tinted background.</summary>
+    public bool IsStructural => BlockTypes.IsOpener(Block.Type) || Block.Type is BlockTypes.Else or BlockTypes.End;
 
     [ObservableProperty] private string _tag = "";
     [ObservableProperty] private string _title = "";
@@ -33,6 +36,8 @@ public sealed partial class BlockRow : ObservableObject
     /// <summary>The detail shown after the title. Descriptions show theirs on its own lines instead.</summary>
     public string InlineDetail => IsDescription ? "" : Detail;
     [ObservableProperty] private string _note = "";
+    /// <summary>A Description block's text, shown under its title.</summary>
+    [ObservableProperty] private string _descriptionText = "";
     /// <summary>Input, Camera, Timing, Detect, Logic, Window or Utility. Picks the chip color.</summary>
     [ObservableProperty] private string _category = "";
     [ObservableProperty] private string _color = "#C9D1D9";
@@ -73,5 +78,6 @@ public sealed partial class BlockRow : ObservableObject
         Category = category;
         Color = BlockCatalog.ColorOf(category);
         Note = Block.GetString("note") is { Length: > 0 } n ? "// " + n : "";
+        DescriptionText = IsDescription ? (Block.GetString("text") is { Length: > 0 } t ? t : "Empty description") : "";
     }
 }

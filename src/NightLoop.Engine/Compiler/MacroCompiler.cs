@@ -38,7 +38,7 @@ public static class MacroCompiler
                 BlockTypes.Goto => new Step(i, b, StepKind.Goto, s.Labels[b.GetString("name")!]),
                 BlockTypes.Stop => new Step(i, b, StepKind.Stop, -1),
                 BlockTypes.Loop or BlockTypes.RepeatUntil or BlockTypes.Label or BlockTypes.Comment or BlockTypes.Description
-                    or BlockTypes.DetectText or BlockTypes.DetectImage or BlockTypes.DetectPixelColor => new Step(i, b, StepKind.NoOp, -1),
+                    or BlockTypes.DetectText or BlockTypes.DetectImage => new Step(i, b, StepKind.NoOp, -1),
                 _ => new Step(i, b, StepKind.Action, -1),
             });
         }
@@ -49,6 +49,7 @@ public static class MacroCompiler
             TargetGame = doc.TargetGame,
             Options = doc.Options,
             Steps = steps.MoveToImmutable(),
+            Labels = s.Labels.ToImmutableDictionary(StringComparer.Ordinal),
         };
     }
 

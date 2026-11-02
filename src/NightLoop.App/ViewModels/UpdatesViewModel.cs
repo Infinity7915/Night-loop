@@ -37,6 +37,8 @@ public sealed partial class UpdatesViewModel : ObservableObject
     [ObservableProperty] private bool _isWorking;
     [ObservableProperty] private bool _canRestart;
     [ObservableProperty] private string _notes = "";
+    /// <summary>False until there's something to say beyond the card's own line (checking, up to date, a download…).</summary>
+    [ObservableProperty] private bool _hasStatus;
 
     /// <summary>
     /// Checks GitHub and downloads a newer release. With <paramref name="restartWhenReady"/> the app then restarts
@@ -82,6 +84,7 @@ public sealed partial class UpdatesViewModel : ObservableObject
         Progress = s.Progress;
         IsWorking = s.Stage is UpdateStage.Checking or UpdateStage.Downloading;
         CanRestart = s.Stage == UpdateStage.ReadyToRestart;
+        HasStatus = s.Stage is not UpdateStage.Idle;
         Notes = s.Stage is UpdateStage.Downloading or UpdateStage.ReadyToRestart ? s.Notes?.Trim() ?? "" : "";
         var checkedAt = s.CheckedAt is { } at ? $"Checked {at.ToLocalTime():t}" : "Checked at launch";
         (Title, Detail) = s.Stage switch

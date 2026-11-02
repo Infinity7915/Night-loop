@@ -11,9 +11,9 @@ namespace NightLoop.App.ViewModels;
 /// <summary>Saved macros: the n / 15 meter, search, groups, the drafts banner and each macro's options.</summary>
 public sealed partial class MainViewModel
 {
-    /// <summary>Colors offered for groups (the server accepts any #RRGGBB).</summary>
+    /// <summary>Colors offered for groups, as in the mockup (the server accepts any #RRGGBB).</summary>
     public static readonly IReadOnlyList<string> GroupColors =
-        ["#A78BFA", "#34D399", "#4CC9F0", "#F59E0B", "#F472B6", "#58A6FF", "#F26B6B", "#9AA4B2"];
+        ["#A78BFA", "#F472B6", "#F87171", "#F59E0B", "#34D399", "#4CC9F0", "#58A6FF", "#E5E7EB"];
 
     private readonly List<SavedMacroRow> _rows = [];
     private readonly HashSet<Guid> _collapsed = [];
@@ -78,6 +78,10 @@ public sealed partial class MainViewModel
         }
         UsedText = $"{list.Macros.Count} / {list.Limit} used";
         UsedPercent = list.Limit == 0 ? 0 : 100.0 * list.Macros.Count / list.Limit;
+        OnPropertyChanged(nameof(IsAtLimit));
+        OnPropertyChanged(nameof(LimitText));
+        OnPropertyChanged(nameof(MeterLevel));
+        if (!IsAtLimit) ShowLimit = false;
 
         RefreshRows();
         BuildSections();
@@ -109,6 +113,9 @@ public sealed partial class MainViewModel
         DraftCount = _rows.Count(r => r.HasDraft);
     }
 
+    /// <summary>The n / 15 meter's color: accent, amber from 12, red when full.</summary>
+    public string MeterLevel => _rows.Count >= _limit ? "full" : _rows.Count >= _limit - 3 ? "high" : "ok";
+
     private IReadOnlyList<string> LibraryNames() =>
         _rows.Where(r => r.Id != _macroId).Select(r => r.Name).OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase).ToList();
 
@@ -131,6 +138,8 @@ public sealed partial class MainViewModel
         if (loose.Count > 0 || (Sections.Count > 0 && query.Length == 0))
             Sections.Add(new GroupSection(this, null, loose, false));
     }
+
+    internal string? GroupColorOf(Guid? id) => id is { } g ? _groups.FirstOrDefault(x => x.Id == g)?.Color : null;
 
     internal void SetCollapsed(GroupSection section, bool collapsed)
     {
@@ -189,9 +198,6 @@ public sealed partial class MainViewModel
     private async Task DeleteMacroAsync(Guid id, string name)
     {
         if (id == _macroId && (IsRecording || IsPlaying)) return;
-        var answer = MessageBox.Show($"Delete \"{name}\" from your account? This can't be undone.", "Night-loop",
-            MessageBoxButton.OKCancel, MessageBoxImage.Warning);
-        if (answer != MessageBoxResult.OK) return;
         try
         {
             if (_runsById.TryGetValue(id, out var run)) run.Stop();
@@ -200,7 +206,7 @@ public sealed partial class MainViewModel
                 await DisposeAutosaverAsync();
                 await _api.DeleteMacroAsync(id);
                 _macroId = null;
-                ApplyDoc(NewDoc());
+                ApplyDoc(NewDoc(), starter: true);
                 SyncText = "Not on your account yet";
             }
             else
@@ -249,23 +255,47 @@ public sealed partial class MainViewModel
         _editingGroup = null;
         GroupFormTitle = "New group";
         GroupFormName = "";
-        GroupFormColor = GroupColors[_groups.Count % GroupColors.Count];
+        GroupFormColor = "#F472B6";
         GroupFormError = "";
         IsGroupFormOpen = true;
+        OnPropertyChanged(nameof(GroupFormSaveText));
     }
 
     internal void EditGroup(GroupDto group)
     {
         _editingGroup = group;
-        GroupFormTitle = "Rename group";
+        GroupFormTitle = "Edit group";
         GroupFormName = group.Name;
         GroupFormColor = group.Color;
         GroupFormError = "";
         IsGroupFormOpen = true;
+        OnPropertyChanged(nameof(GroupFormSaveText));
     }
 
     [RelayCommand]
     private void PickGroupColor(string color) => GroupFormColor = color;
+
+    /// <summary>"Custom" color box under the swatches: any #RRGGBB.</summary>
+    public string GroupFormCustomColor
+    {
+        get => GroupFormColor;
+        set
+        {
+            var v = (value ?? "").Trim();
+            if (!v.StartsWith('#')) v = "#" + v;
+            if (LocalData.LocalSettings.IsHexColor(v)) GroupFormColor = v.ToUpperInvariant();
+        }
+    }
+
+    public string GroupFormSaveText => _editingGroup is null ? "Create group" : "Save group";
+    public string GroupPreviewName => GroupFormName.Trim().Length > 0 ? GroupFormName.Trim() : "Group name";
+
+    partial void OnGroupFormColorChanged(string value) => OnPropertyChanged(nameof(GroupFormCustomColor));
+    partial void OnGroupFormNameChanged(string value)
+    {
+        OnPropertyChanged(nameof(GroupPreviewName));
+        GroupFormError = "";
+    }
 
     [RelayCommand]
     private void CancelGroupForm() => IsGroupFormOpen = false;
@@ -274,9 +304,14 @@ public sealed partial class MainViewModel
     private async Task SubmitGroupFormAsync()
     {
         var name = GroupFormName.Trim();
-        if (name.Length is 0 or > AccountRules.GroupNameMaxLength)
+        if (name.Length == 0)
         {
-            GroupFormError = $"Use 1–{AccountRules.GroupNameMaxLength} characters.";
+            GroupFormError = "Give the group a name.";
+            return;
+        }
+        if (name.Length > AccountRules.GroupNameMaxLength)
+        {
+            GroupFormError = $"Use at most {AccountRules.GroupNameMaxLength} characters.";
             return;
         }
         try
@@ -294,9 +329,6 @@ public sealed partial class MainViewModel
 
     internal async Task DeleteGroupAsync(GroupDto group)
     {
-        var answer = MessageBox.Show($"Delete the group \"{group.Name}\"? Its macros stay, ungrouped.", "Night-loop",
-            MessageBoxButton.OKCancel, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.OK) return;
         try
         {
             await _api.DeleteGroupAsync(group.Id);
@@ -331,6 +363,8 @@ public sealed partial class GroupSection : ObservableObject
     public bool IsEmpty => Rows.Count == 0;
 
     [ObservableProperty] private bool _isCollapsed;
+    /// <summary>First press of delete turns the button into "Delete group?"; the second deletes.</summary>
+    [ObservableProperty] private bool _confirmingDelete;
 
     partial void OnIsCollapsedChanged(bool value) => _owner.SetCollapsed(this, value);
 
@@ -344,7 +378,17 @@ public sealed partial class GroupSection : ObservableObject
     }
 
     [RelayCommand]
-    private Task DeleteAsync() => Group is { } g ? _owner.DeleteGroupAsync(g) : Task.CompletedTask;
+    private Task DeleteAsync()
+    {
+        if (Group is not { } g) return Task.CompletedTask;
+        if (!ConfirmingDelete)
+        {
+            ConfirmingDelete = true;
+            return Task.CompletedTask;
+        }
+        ConfirmingDelete = false;
+        return _owner.DeleteGroupAsync(g);
+    }
 }
 
 /// <summary>A choice in a macro's Group dropdown. Id is null for Ungrouped.</summary>
@@ -392,11 +436,20 @@ public sealed partial class SavedMacroRow : ObservableObject
     private bool _isCapturing;
     [ObservableProperty] private string _hotkeyError = "";
     [ObservableProperty] private GroupChoice? _selectedGroup;
+    /// <summary>First press of delete turns the button into "Delete?"; the second deletes.</summary>
+    [ObservableProperty] private bool _confirmingDelete;
 
     public string Detail => $"{BlockCount} blocks · edited {Edited(UpdatedAt)}";
     public bool HasHotkey => Hotkey.Length > 0;
-    public string HotkeyLabel => IsCapturing ? "Press a key…" : HasHotkey ? Hotkey : "None";
-    public string StateText => IsRunningState ? "running" : "off";
+    /// <summary>The key chip, e.g. "Ctrl + F5".</summary>
+    public string HotkeyChip => HasHotkey ? MainViewModel.KeyText(Hotkey) : "No key";
+    public string HotkeyLabel => IsCapturing ? "Press a key combo… (Esc cancels)" : HasHotkey ? $"{MainViewModel.KeyText(Hotkey)}  ·  Change" : "None  ·  Change";
+    public string StateText => IsRunningState ? "Running" : "Off";
+    /// <summary>Group color for the row's left bar and tint (Ungrouped rows have none).</summary>
+    public string? GroupColor => _owner.GroupColorOf(GroupId);
+
+    partial void OnHotkeyChanged(string value) => OnPropertyChanged(nameof(HotkeyChip));
+    partial void OnGroupIdChanged(Guid? value) => OnPropertyChanged(nameof(GroupColor));
     public IReadOnlyList<GroupChoice> GroupChoices => _owner.GroupChoices;
 
     /// <summary>The on/off switch: starts or stops this macro.</summary>
@@ -432,6 +485,7 @@ public sealed partial class SavedMacroRow : ObservableObject
         TriggerMode = m.TriggerMode;
         RunAlongside = m.RunAlongside;
         SelectedGroup = _owner.GroupChoices.FirstOrDefault(c => c.Id == m.GroupId);
+        OnPropertyChanged(nameof(GroupColor));
         _updating = false;
     }
 
@@ -458,7 +512,16 @@ public sealed partial class SavedMacroRow : ObservableObject
     private Task SaveAsync() => _owner.SaveRowAsync(this);
 
     [RelayCommand]
-    private Task DeleteAsync() => _owner.DeleteRowAsync(this);
+    private Task DeleteAsync()
+    {
+        if (!ConfirmingDelete)
+        {
+            ConfirmingDelete = true;
+            return Task.CompletedTask;
+        }
+        ConfirmingDelete = false;
+        return _owner.DeleteRowAsync(this);
+    }
 
     [RelayCommand]
     private void ToggleOptions() => ShowOptions = !ShowOptions;
@@ -495,9 +558,9 @@ public sealed partial class SavedMacroRow : ObservableObject
     {
         var local = when.ToLocalTime();
         var now = DateTimeOffset.Now;
-        if (now - local < TimeSpan.FromMinutes(1)) return "just now";
-        if (local.Date == now.Date) return $"today, {local:t}";
-        if (local.Date == now.Date.AddDays(-1)) return "yesterday";
+        if (now - local < TimeSpan.FromMinutes(1)) return "Just now";
+        if (local.Date == now.Date) return $"Today, {local:t}";
+        if (local.Date == now.Date.AddDays(-1)) return "Yesterday";
         return local.ToString("MMM d");
     }
 }

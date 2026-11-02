@@ -11,7 +11,9 @@ namespace NightLoop.App.Views;
 public partial class MacrosView : UserControl
 {
     /// <summary>Below this width the block editor panel moves under the timeline.</summary>
-    private const double SideBySideWidth = 760;
+    private const double SideBySideWidth = 740;
+    /// <summary>The block editor panel width when it sits beside the timeline (the mockup's 280 px).</summary>
+    private const double InspectorWidth = 280;
 
     public MacrosView()
     {
@@ -75,7 +77,7 @@ public partial class MacrosView : UserControl
         var sideBySide = e.NewSize.Width >= SideBySideWidth;
         if (sideBySide == (Grid.GetColumn(Inspector) == 1)) return;
 
-        InspectorColumn.Width = sideBySide ? new GridLength(320) : new GridLength(0);
+        InspectorColumn.Width = sideBySide ? new GridLength(InspectorWidth) : new GridLength(0);
         Grid.SetColumn(Inspector, sideBySide ? 1 : 0);
         Grid.SetRow(Inspector, sideBySide ? 0 : 1);
         Inspector.BorderThickness = sideBySide ? new Thickness(1, 0, 0, 0) : new Thickness(0, 1, 0, 0);

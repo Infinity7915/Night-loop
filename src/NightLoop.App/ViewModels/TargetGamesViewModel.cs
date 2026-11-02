@@ -21,7 +21,7 @@ public sealed partial class TargetGamesViewModel : ObservableObject
     {
         _store = store;
         _settings = settings;
-        var saved = settings.ActiveGame;
+        var saved = GamesStore.CurrentName(settings.ActiveGame);
         foreach (var g in store.Load())
             Games.Add(new GameOption(this, g, isUserGame: !GamesStore.BuiltIn.Contains(g)));
         _active = Games.FirstOrDefault(o => o.Game.Name == saved) ?? Games[0];
@@ -34,7 +34,7 @@ public sealed partial class TargetGamesViewModel : ObservableObject
     public ObservableCollection<GameTarget> RunningApps { get; } = [];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Target), nameof(Banner), nameof(BannerGame))]
+    [NotifyPropertyChangedFor(nameof(Target), nameof(Banner), nameof(BannerGame), nameof(BannerLead), nameof(BannerTail), nameof(BannerBold))]
     private GameOption _active;
 
     /// <summary>The game macros lock onto. Exe is null for N/A.</summary>
@@ -46,6 +46,11 @@ public sealed partial class TargetGamesViewModel : ObservableObject
         ? "No target game: input goes to whatever window is in front."
         : $"Input goes to {Target.Name} only, and pauses when it isn't focused.";
 
+    /// <summary>The banner in three parts so the game's name can be bold: "Input goes to **Roblox** only, and…".</summary>
+    public string BannerLead => Target.Exe is null ? "No target game: input goes to whatever window is in front." : "Input goes to ";
+    public string BannerBold => Target.Exe is null ? "" : Target.Name;
+    public string BannerTail => Target.Exe is null ? "" : " only, and pauses when it isn't focused.";
+
     public event Action<GameTarget>? TargetChanged;
 
     // ---- Add a game ----
@@ -54,10 +59,13 @@ public sealed partial class TargetGamesViewModel : ObservableObject
     [ObservableProperty] private string _newExe = "";
     [ObservableProperty] private string _addError = "";
     [ObservableProperty] private GameTarget? _pickedApp;
+    /// <summary>The "Pick from running apps" list is open.</summary>
+    [ObservableProperty] private bool _isPickingApp;
 
     partial void OnPickedAppChanged(GameTarget? value)
     {
         if (value is null) return;
+        IsPickingApp = false;
         NewName = value.Name;
         NewExe = value.Exe ?? "";
     }
@@ -75,6 +83,7 @@ public sealed partial class TargetGamesViewModel : ObservableObject
     /// <summary>Selects a game by name (used when a macro remembers its game). Unknown names are ignored.</summary>
     public void SelectByName(string? name)
     {
+        name = GamesStore.CurrentName(name);
         var option = name is null ? Games[0] : Games.FirstOrDefault(o => o.Game.Name == name);
         if (option is not null) Select(option);
     }
@@ -86,9 +95,15 @@ public sealed partial class TargetGamesViewModel : ObservableObject
         NewExe = "";
         AddError = "";
         PickedApp = null;
+        IsPickingApp = false;
+        IsAdding = true;
+    }
+
+    partial void OnIsPickingAppChanged(bool value)
+    {
+        if (!value) return;
         RunningApps.Clear();
         foreach (var app in FindRunningApps()) RunningApps.Add(app);
-        IsAdding = true;
     }
 
     [RelayCommand]
@@ -100,6 +115,11 @@ public sealed partial class TargetGamesViewModel : ObservableObject
         var exe = NewExe.Trim();
         if (exe.Length > 0 && !exe.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) exe += ".exe";
         var game = new GameTarget(NewName.Trim(), exe);
+        if (game.Name.Length == 0 || exe.Length == 0)
+        {
+            AddError = "Enter both a game name and a process name.";
+            return;
+        }
         if (!GamesStore.IsValid(game))
         {
             AddError = "Give it a name (up to 40 characters) and the program's file name, like VALORANT-Win64-Shipping.exe.";
@@ -194,9 +214,9 @@ public sealed partial class GameOption : ObservableObject
         _owner = owner;
         Game = game;
         IsUserGame = isUserGame;
-        Detail = game.Exe is null
+        Detail = game.Hint ?? (game.Exe is null
             ? "No target — macros can send input to any window"
-            : $"Matches the {game.Exe} process";
+            : $"Matches the {game.Exe} process");
     }
 
     public GameTarget Game { get; }
@@ -224,5 +244,5 @@ public sealed partial class GameOption : ObservableObject
     private void Remove() => _owner.Remove(this);
 
     public void RefreshStatus() =>
-        Status = Game.Exe is null ? "" : TargetGamesViewModel.IsRunning(Game.Exe) ? "Detected" : "Not running";
+        Status = Game.Exe is null ? "" : Game.Exes.Any(TargetGamesViewModel.IsRunning) ? "Detected" : "Not running";
 }

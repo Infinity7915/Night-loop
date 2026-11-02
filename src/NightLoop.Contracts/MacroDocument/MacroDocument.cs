@@ -24,6 +24,8 @@ public sealed class MacroOptions
     public bool RunAlongside { get; set; } = true;
     public RepeatOptions Repeat { get; set; } = new();
     public HumanizeOptions Humanize { get; set; } = new();
+    /// <summary>Playback speed in percent: 200 runs twice as fast (waits and moves take half the time).</summary>
+    public int SpeedPct { get; set; } = 100;
 }
 
 public static class TriggerModes

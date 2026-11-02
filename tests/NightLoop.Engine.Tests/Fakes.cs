@@ -1,5 +1,6 @@
 using NightLoop.Engine.Input;
 using NightLoop.Engine.Runtime;
+using NightLoop.Engine.Screen;
 using NightLoop.Engine.Window;
 
 namespace NightLoop.Engine.Tests;
@@ -56,9 +57,90 @@ internal sealed class FakeWindows : IWindowService
         return Foreground;
     }
 
-    public bool IsProcessRunning(string exeName) => true;
-    public ClientArea? GetClientArea(string exeName) => Area;
-    public bool Resize(string exeName, int width, int height) => true;
-    public bool MoveTo(string exeName, int x, int y) => true;
-    public bool Focus(string exeName) => true;
+    public bool Running { get; set; } = true;
+    public ClientArea Bounds { get; set; } = new(92, 170, 816, 638);
+    public List<ClientArea> Monitors { get; } = [new(0, 0, 1920, 1040), new(1920, 0, 2560, 1400)];
+    public List<string> Calls { get; } = [];
+
+    public bool IsProcessRunning(string exeName) => Running;
+    public ClientArea? GetClientArea(string exeName) => Running ? Area : null;
+    public bool Resize(string exeName, int width, int height) { Calls.Add($"resize {exeName} {width}x{height}"); return true; }
+    public bool MoveTo(string exeName, int x, int y) { Calls.Add($"moveto {exeName} {x},{y}"); return true; }
+    public bool Focus(string exeName) { Calls.Add($"focus {exeName}"); return true; }
+    public ClientArea? GetWindowBounds(string exeName) => Bounds;
+    public IReadOnlyList<ClientArea> GetMonitors() => Monitors;
+}
+
+/// <summary>A fake desktop: one solid color plus painted rectangles. Thread-safe enough for one run.</summary>
+internal sealed class FakeScreen(int width = 1920, int height = 1080) : IScreenCapture
+{
+    private readonly List<(int X, int Y, int W, int H, Rgb Color)> _rects = [];
+    private readonly List<(int X, int Y, ImageTemplate T)> _pictures = [];
+    public Rgb Background { get; set; } = new(20, 20, 30);
+    public int Captures;
+    /// <summary>Runs before each capture, so a test can change the screen as the macro runs.</summary>
+    public Action<FakeScreen>? OnCapture { get; set; }
+
+    public (int Left, int Top, int Width, int Height) Desktop => (0, 0, width, height);
+
+    public void Paint(int x, int y, int w, int h, Rgb color) { lock (_rects) _rects.Add((x, y, w, h, color)); }
+    public void Clear() { lock (_rects) { _rects.Clear(); _pictures.Clear(); } }
+    public void Show(int x, int y, ImageTemplate t) { lock (_rects) _pictures.Add((x, y, t)); }
+
+    public ScreenImage Capture(int left, int top, int w, int h)
+    {
+        Interlocked.Increment(ref Captures);
+        OnCapture?.Invoke(this);
+        var px = new byte[w * h * 4];
+        lock (_rects)
+        {
+            for (var y = 0; y < h; y++)
+            for (var x = 0; x < w; x++)
+            {
+                var sx = left + x;
+                var sy = top + y;
+                var c = Background;
+                foreach (var r in _rects)
+                    if (sx >= r.X && sx < r.X + r.W && sy >= r.Y && sy < r.Y + r.H) c = r.Color;
+                byte? gray = null;
+                foreach (var p in _pictures)
+                    if (sx >= p.X && sx < p.X + p.T.Width && sy >= p.Y && sy < p.Y + p.T.Height) gray = p.T.Gray[(sy - p.Y) * p.T.Width + (sx - p.X)];
+                var i = (y * w + x) * 4;
+                if (gray is { } g) { px[i] = px[i + 1] = px[i + 2] = g; }
+                else { px[i] = c.B; px[i + 1] = c.G; px[i + 2] = c.R; }
+                px[i + 3] = 255;
+            }
+        }
+        return new ScreenImage(left, top, w, h, px);
+    }
+}
+
+/// <summary>Returns whatever lines the test set, clipped to the captured area.</summary>
+internal sealed class FakeText : ITextReader
+{
+    public List<TextLine> Lines { get; } = [];
+    public int Reads;
+
+    public void Say(string text, int x, int y)
+    {
+        var words = new List<TextWord>();
+        foreach (var w in text.Split(' '))
+        {
+            words.Add(new TextWord(w, new ScreenRect(x, y, w.Length * 10, 16)));
+            x += w.Length * 10 + 6;
+        }
+        lock (Lines) Lines.Add(new TextLine(words));
+    }
+
+    public Task<IReadOnlyList<TextLine>> ReadAsync(ScreenImage image, CancellationToken cancellationToken)
+    {
+        Interlocked.Increment(ref Reads);
+        lock (Lines)
+        {
+            IReadOnlyList<TextLine> inside = Lines.Where(l => l.Words.All(w =>
+                w.Bounds.Left >= image.Left && w.Bounds.Top >= image.Top
+                && w.Bounds.Right <= image.Left + image.Width && w.Bounds.Bottom <= image.Top + image.Height)).ToList();
+            return Task.FromResult(inside);
+        }
+    }
 }

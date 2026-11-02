@@ -99,10 +99,6 @@ public sealed class ApiClient
     public async Task<UserDto> UpdateSecurityAsync(SecurityRequest req, CancellationToken ct = default) =>
         (await SendAsync<MeResponse>(HttpMethod.Patch, "me/security", req, ct)).User;
 
-    /// <summary>Everything the server stores about this account, as a JSON document (GET /me/export).</summary>
-    public async Task<string> ExportMyDataAsync(CancellationToken ct = default) =>
-        (await SendAsync<System.Text.Json.JsonElement>(HttpMethod.Get, "me/export", null, ct)).GetRawText();
-
     public Task DeleteAccountAsync(string currentPassword, CancellationToken ct = default) =>
         SendAsync<object>(HttpMethod.Delete, "me", new DeleteAccountRequest(currentPassword), ct);
 

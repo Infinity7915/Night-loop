@@ -9,42 +9,93 @@
       <Setter Property="FontSize" Value="14" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
+    <Style x:Key="SectionCard" TargetType="Border" BasedOn="{StaticResource Card}">
+      <Setter Property="Padding" Value="24" />
+      <Setter Property="Margin" Value="0,24,0,0" />
+    </Style>
     <Style x:Key="AccountRow" TargetType="Border">
       <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
       <Setter Property="BorderThickness" Value="0,1,0,0" />
       <Setter Property="Padding" Value="24,16" />
     </Style>
+    <Style x:Key="Tall" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="Padding" Value="16,0" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Margin" Value="0" />
+    </Style>
+    <Style x:Key="TallPrimary" TargetType="Button" BasedOn="{StaticResource Tall}">
+      <Setter Property="Background" Value="{DynamicResource Accent}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+      <Setter Property="Padding" Value="18,0" />
+    </Style>
+    <!-- Dashed button: "+ Add a game", "Pick from running apps". -->
+    <Style x:Key="DashedButton" TargetType="ButtonBase">
+      <Setter Property="Foreground" Value="{DynamicResource TextSoft}" />
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="Padding" Value="16,0" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ButtonBase">
+            <Grid Background="Transparent">
+              <Rectangle x:Name="Dash" RadiusX="8" RadiusY="8" Stroke="{DynamicResource BorderStrong}" StrokeThickness="1"
+                         StrokeDashArray="4 3" SnapsToDevicePixels="True" />
+              <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Dash" Property="Stroke" Value="{DynamicResource Accent}" />
+                <Setter Property="Foreground" Value="{DynamicResource Text}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <!-- Text box with a grey hint while empty. The hint is the Tag. -->
+    <Style x:Key="HintBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="Background" Value="{DynamicResource Bg}" />
+    </Style>
   </UserControl.Resources>
 
   <Grid>
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-      <StackPanel Margin="40,32,40,40" MaxWidth="900" HorizontalAlignment="Stretch">
-        <TextBlock Text="SETTINGS" Style="{StaticResource Eyebrow}" />
-        <TextBlock Text="Settings" Style="{StaticResource PageTitle}" />
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Margin="40" MaxWidth="880" HorizontalAlignment="Stretch">
+        <TextBlock Text="SETTINGS" Style="{StaticResource Eyebrow}" FontSize="12" />
+        <TextBlock Text="Settings" Style="{StaticResource PageTitle}" FontSize="34" Margin="0,8,0,0" />
 
         <!-- Appearance: theme mode and accent, saved in settings.json on this PC -->
-        <Border Style="{StaticResource Card}" Padding="24,20" Margin="0,20,0,0">
+        <Border Style="{StaticResource SectionCard}">
           <StackPanel>
             <TextBlock Text="Appearance" Style="{StaticResource CardTitle}" />
-            <TextBlock Text="Theme mode and accent color. Saved locally on this PC." Style="{StaticResource Muted}" Margin="0,4,0,0" />
-            <DockPanel Margin="0,18,0,0">
-              <Border DockPanel.Dock="Right" Style="{StaticResource SegmentBar}">
+            <TextBlock Text="Theme mode and accent color. Saved locally on this PC." Style="{StaticResource Muted}" Margin="0,4,0,0"
+                       TextWrapping="Wrap" />
+            <controls:SplitRow Margin="0,20,0,0">
+              <TextBlock Text="Mode" Style="{StaticResource RowLabel}" />
+              <Border Style="{StaticResource SegmentBar}" HorizontalAlignment="Left">
                 <StackPanel Orientation="Horizontal">
                   <RadioButton Style="{StaticResource Segment}" GroupName="ThemeMode" Content="Dark"
                                IsChecked="{Binding ThemeMode, Converter={StaticResource EqualsParam}, ConverterParameter=dark}" />
-                  <RadioButton Style="{StaticResource Segment}" GroupName="ThemeMode" Content="Light"
+                  <RadioButton Style="{StaticResource Segment}" GroupName="ThemeMode" Content="Light" Margin="4,0,0,0"
                                IsChecked="{Binding ThemeMode, Converter={StaticResource EqualsParam}, ConverterParameter=light}" />
-                  <RadioButton Style="{StaticResource Segment}" GroupName="ThemeMode" Content="System"
+                  <RadioButton Style="{StaticResource Segment}" GroupName="ThemeMode" Content="System" Margin="4,0,0,0"
                                IsChecked="{Binding ThemeMode, Converter={StaticResource EqualsParam}, ConverterParameter=system}" />
                 </StackPanel>
               </Border>
-              <TextBlock Text="Mode" Style="{StaticResource RowLabel}" />
-            </DockPanel>
-            <DockPanel Margin="0,16,0,0">
-              <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Accents}">
+            </controls:SplitRow>
+            <controls:SplitRow Margin="0,20,0,0">
+              <TextBlock Text="Accent color" Style="{StaticResource RowLabel}" />
+              <ItemsControl ItemsSource="{Binding Accents}" HorizontalAlignment="Left">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
-                    <StackPanel Orientation="Horizontal" />
+                    <WrapPanel />
                   </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
@@ -55,13 +106,12 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <TextBlock Text="Accent color" Style="{StaticResource RowLabel}" />
-            </DockPanel>
+            </controls:SplitRow>
           </StackPanel>
         </Border>
 
         <!-- Target game: built-ins in code, added games in games.json -->
-        <Border Style="{StaticResource Card}" Padding="24,20" Margin="0,20,0,0">
+        <Border Style="{StaticResource SectionCard}">
           <StackPanel>
             <TextBlock Text="Target game" Style="{StaticResource CardTitle}" />
             <TextBlock Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,16"
@@ -69,91 +119,135 @@
             <ItemsControl ItemsSource="{Binding Games.Games}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="{x:Type vm:GameOption}">
-                  <RadioButton Style="{StaticResource OptionRow}" GroupName="TargetGame" IsChecked="{Binding IsActive}">
-                    <DockPanel>
-                      <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE74D;" ToolTip="Remove this game"
-                              Command="{Binding RemoveCommand}" Margin="10,0,0,0"
-                              Visibility="{Binding IsUserGame, Converter={StaticResource BoolToVisible}}" />
-                      <TextBlock DockPanel.Dock="Right" Text="{Binding Status}" Style="{StaticResource Eyebrow}" VerticalAlignment="Center" />
-                      <StackPanel Margin="0,0,12,0">
-                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
-                        <TextBlock Text="{Binding Detail}" Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
-                      </StackPanel>
-                    </DockPanel>
-                  </RadioButton>
+                  <DockPanel Margin="0,0,0,8">
+                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE74D;" ToolTip="Remove this game"
+                            Width="44" Height="44" Margin="8,0,0,0" Command="{Binding RemoveCommand}"
+                            Visibility="{Binding IsUserGame, Converter={StaticResource BoolToVisible}}" />
+                    <RadioButton Style="{StaticResource OptionRow}" GroupName="TargetGame" IsChecked="{Binding IsActive}">
+                      <DockPanel>
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding Status}" Style="{StaticResource Eyebrow}" VerticalAlignment="Center"
+                                   Margin="14,0,0,0" />
+                        <Border DockPanel.Dock="Right" CornerRadius="999" Padding="8,2" Background="{DynamicResource PanelRaised}"
+                                VerticalAlignment="Center" Margin="14,0,0,0"
+                                Visibility="{Binding IsUserGame, Converter={StaticResource BoolToVisible}}">
+                          <TextBlock Text="Saved on this PC" FontFamily="{StaticResource Mono}" FontSize="11" Foreground="{DynamicResource TextSoft}" />
+                        </Border>
+                        <StackPanel>
+                          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
+                          <TextBlock Text="{Binding Detail}" Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0"
+                                     TextTrimming="CharacterEllipsis" ToolTip="{Binding Detail}" />
+                        </StackPanel>
+                      </DockPanel>
+                    </RadioButton>
+                  </DockPanel>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <Button Content="+ Add a game" HorizontalAlignment="Left" Margin="0,4,0,0" Command="{Binding Games.StartAddCommand}"
+            <Button Content="+ Add a game" Style="{StaticResource DashedButton}" Margin="0,8,0,0" Command="{Binding Games.StartAddCommand}"
                     Visibility="{Binding Games.IsAdding, Converter={StaticResource BoolToVisible}, ConverterParameter=invert}" />
 
-            <!-- Add a game form -->
-            <Border Margin="0,4,0,0" Padding="16" CornerRadius="10" BorderThickness="1" BorderBrush="{DynamicResource Border}"
-                    Background="{DynamicResource Bg}"
-                    Visibility="{Binding Games.IsAdding, Converter={StaticResource BoolToVisible}}">
-              <StackPanel>
-                <TextBlock Text="Add a game" FontWeight="SemiBold" />
-                <TextBlock Text="Pick a running app, or type the program's file name." Style="{StaticResource Muted}" Margin="0,4,0,0" />
-                <TextBlock Text="Running apps" Style="{StaticResource FieldLabel}" />
-                <ComboBox ItemsSource="{Binding Games.RunningApps}" SelectedItem="{Binding Games.PickedApp}">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                      <TextBlock TextTrimming="CharacterEllipsis">
-                        <Run Text="{Binding Name, Mode=OneWay}" /><Run Text="  " /><Run Text="{Binding Exe, Mode=OneWay}" Foreground="{DynamicResource TextMuted}" />
-                      </TextBlock>
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-                <Grid Margin="0,4,0,0">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="16" />
-                    <ColumnDefinition Width="*" />
-                  </Grid.ColumnDefinitions>
+            <!-- Add a game -->
+            <Grid Margin="0,8,0,0" Visibility="{Binding Games.IsAdding, Converter={StaticResource BoolToVisible}}">
+              <Rectangle RadiusX="10" RadiusY="10" Fill="{DynamicResource Inset}" Stroke="{DynamicResource BorderStrong}" StrokeThickness="1"
+                         StrokeDashArray="4 3" SnapsToDevicePixels="True" />
+              <StackPanel Margin="16">
+                <controls:AutoGrid MinItemWidth="200" Gap="12" Fit="True">
                   <StackPanel>
-                    <TextBlock Text="Name" Style="{StaticResource FieldLabel}" />
-                    <TextBox Text="{Binding Games.NewName, UpdateSourceTrigger=PropertyChanged}" MaxLength="40" />
+                    <TextBlock Text="Game name" Style="{StaticResource Muted}" FontSize="12" Margin="0,0,0,6" />
+                    <Grid>
+                      <TextBox x:Name="GameNameBox" Text="{Binding Games.NewName, UpdateSourceTrigger=PropertyChanged}" MaxLength="40"
+                               Style="{StaticResource HintBox}" MinHeight="40" Padding="10,0" />
+                      <TextBlock Text="e.g. Valorant" Style="{StaticResource Muted}" FontSize="14" Margin="11,0,0,0" VerticalAlignment="Center"
+                                 IsHitTestVisible="False"
+                                 Visibility="{Binding Text, ElementName=GameNameBox, Converter={StaticResource TextToVisible}, ConverterParameter=invert}" />
+                    </Grid>
                   </StackPanel>
-                  <StackPanel Grid.Column="2">
-                    <TextBlock Text="Program (.exe)" Style="{StaticResource FieldLabel}" />
-                    <TextBox Text="{Binding Games.NewExe, UpdateSourceTrigger=PropertyChanged}" FontFamily="{StaticResource Mono}" MaxLength="120" />
+                  <StackPanel>
+                    <TextBlock Text="Process name" Style="{StaticResource Muted}" FontSize="12" Margin="0,0,0,6" />
+                    <Grid>
+                      <TextBox x:Name="GameExeBox" Text="{Binding Games.NewExe, UpdateSourceTrigger=PropertyChanged}" MaxLength="120"
+                               Style="{StaticResource HintBox}" MinHeight="40" Padding="10,0" FontFamily="{StaticResource Mono}" />
+                      <TextBlock Text="e.g. Game.exe" Style="{StaticResource Muted}" FontSize="14" FontFamily="{StaticResource Mono}" Margin="11,0,0,0"
+                                 VerticalAlignment="Center" IsHitTestVisible="False"
+                                 Visibility="{Binding Text, ElementName=GameExeBox, Converter={StaticResource TextToVisible}, ConverterParameter=invert}" />
+                    </Grid>
                   </StackPanel>
+                </controls:AutoGrid>
+                <Grid HorizontalAlignment="Left" Margin="0,12,0,0">
+                  <ToggleButton x:Name="PickApp" Content="Pick from running apps" Style="{StaticResource DashedButton}" MinHeight="40"
+                                Padding="14,0" FontSize="13" IsChecked="{Binding Games.IsPickingApp}" />
+                  <Popup IsOpen="{Binding Games.IsPickingApp}" PlacementTarget="{Binding ElementName=PickApp}" Placement="Bottom"
+                         StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                    <Border Background="{DynamicResource PanelRaised}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="8"
+                            Margin="0,4,0,0" Padding="4" MinWidth="280" MaxWidth="460" MaxHeight="320">
+                      <Grid>
+                        <ListBox ItemsSource="{Binding Games.RunningApps}" SelectedItem="{Binding Games.PickedApp}" Background="Transparent"
+                                 BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                          <ListBox.ItemTemplate>
+                            <DataTemplate>
+                              <StackPanel Margin="6,4">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Text="{Binding Exe}" FontFamily="{StaticResource Mono}" FontSize="12" Foreground="{DynamicResource TextMuted}"
+                                           TextTrimming="CharacterEllipsis" />
+                              </StackPanel>
+                            </DataTemplate>
+                          </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock Text="No apps with a window are running." Style="{StaticResource Muted}" Margin="10,8"
+                                   Visibility="{Binding Games.RunningApps.Count, Converter={StaticResource ZeroToVisible}}" />
+                      </Grid>
+                    </Border>
+                  </Popup>
                 </Grid>
-                <TextBlock Text="{Binding Games.AddError}" Style="{StaticResource FieldError}"
+                <TextBlock Text="{Binding Games.AddError}" FontSize="12" Foreground="{DynamicResource Record}" TextWrapping="Wrap" Margin="0,12,0,0"
                            Visibility="{Binding Games.AddError, Converter={StaticResource TextToVisible}}" />
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
-                  <Button Content="Cancel" Command="{Binding Games.CancelAddCommand}" />
-                  <Button Content="Add game" Style="{StaticResource PrimaryButton}" Command="{Binding Games.ConfirmAddCommand}" IsDefault="True" />
-                </StackPanel>
+                <WrapPanel Margin="0,12,0,0">
+                  <Button Content="Add game" Style="{StaticResource TallPrimary}" Command="{Binding Games.ConfirmAddCommand}" IsDefault="True" />
+                  <Button Content="Cancel" Style="{StaticResource Tall}" Margin="8,0,0,0" Command="{Binding Games.CancelAddCommand}" />
+                </WrapPanel>
               </StackPanel>
-            </Border>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- Macros: kept on this PC -->
+        <Border Style="{StaticResource SectionCard}">
+          <StackPanel>
+            <TextBlock Text="Macros" Style="{StaticResource CardTitle}" />
+            <TextBlock Text="How new macros start. Saved locally on this PC." Style="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap" />
+            <DockPanel Margin="0,20,0,0">
+              <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding StarterSequence}" VerticalAlignment="Center"
+                        ToolTip="Starter sequence for new macros" Margin="16,0,0,0" />
+              <StackPanel>
+                <TextBlock Text="Starter sequence for new macros" FontWeight="SemiBold" FontSize="14" />
+                <TextBlock Text="New macros start with Focus, Resize and Position for the target game, a loop to fill in and a notification at the end."
+                           Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+            </DockPanel>
           </StackPanel>
         </Border>
 
         <!-- Account -->
-        <Border Style="{StaticResource Card}" Margin="0,20,0,0" DataContext="{Binding Account}">
+        <Border Style="{StaticResource Card}" Margin="0,24,0,0" DataContext="{Binding Account}" ClipToBounds="True">
           <StackPanel>
-            <StackPanel Margin="24,20,24,16">
+            <StackPanel Margin="24,24,24,16">
               <TextBlock Text="Account" Style="{StaticResource CardTitle}" />
-              <TextBlock Text="Changing your email or password needs a code sent to your email." Style="{StaticResource Muted}" Margin="0,4,0,0" />
-              <TextBlock Text="{Binding Notice}" Foreground="{DynamicResource Success}" FontSize="13" Margin="0,8,0,0" TextWrapping="Wrap"
-                         Visibility="{Binding Notice, Converter={StaticResource TextToVisible}}" />
+              <TextBlock Text="Changing your email or password needs a code sent to your email." Style="{StaticResource Muted}" Margin="0,4,0,0"
+                         TextWrapping="Wrap" />
             </StackPanel>
 
             <Border Style="{StaticResource AccountRow}">
-              <DockPanel>
-                <Button DockPanel.Dock="Right" Content="Change" VerticalAlignment="Center" Command="{Binding ChangeUsernameCommand}"
-                        IsEnabled="{Binding CanChangeUsername}" />
+              <controls:SplitRow>
                 <StackPanel>
                   <TextBlock Text="Username" Style="{StaticResource Muted}" />
                   <TextBlock Text="{Binding Username}" FontWeight="SemiBold" FontSize="15" Margin="0,2,0,0"
                              TextTrimming="CharacterEllipsis" ToolTip="{Binding Username}" />
-                  <TextBlock Text="{Binding UsernameHint}" FontSize="12" Margin="0,2,0,0">
+                  <TextBlock Text="{Binding UsernameHint}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap">
                     <TextBlock.Style>
                       <Style TargetType="TextBlock" BasedOn="{StaticResource Muted}">
                         <Style.Triggers>
-                          <DataTrigger Binding="{Binding UsernameIsDefault}" Value="True">
+                          <DataTrigger Binding="{Binding UsernameHintWarns}" Value="True">
                             <Setter Property="Foreground" Value="{DynamicResource Warning}" />
                           </DataTrigger>
                         </Style.Triggers>
@@ -161,90 +255,169 @@
                     </TextBlock.Style>
                   </TextBlock>
                 </StackPanel>
-              </DockPanel>
+                <Button Content="Change" Style="{StaticResource Tall}" HorizontalAlignment="Left" Command="{Binding ChangeUsernameCommand}"
+                        IsEnabled="{Binding CanChangeUsername}" />
+              </controls:SplitRow>
             </Border>
 
             <Border Style="{StaticResource AccountRow}">
-              <DockPanel>
-                <Button DockPanel.Dock="Right" Content="Change" VerticalAlignment="Center" Command="{Binding ChangeEmailCommand}" />
+              <controls:SplitRow>
                 <StackPanel>
                   <TextBlock Text="Email" Style="{StaticResource Muted}" />
                   <TextBlock Text="{Binding Email}" FontWeight="SemiBold" FontSize="15" Margin="0,2,0,0"
                              TextTrimming="CharacterEllipsis" ToolTip="{Binding Email}" />
                   <TextBlock Text="Verified · two-factor codes go here" Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" />
                 </StackPanel>
-              </DockPanel>
+                <Button Content="Change" Style="{StaticResource Tall}" HorizontalAlignment="Left" Command="{Binding ChangeEmailCommand}" />
+              </controls:SplitRow>
             </Border>
 
             <Border Style="{StaticResource AccountRow}">
-              <DockPanel>
-                <Button DockPanel.Dock="Right" Content="Change" VerticalAlignment="Center" Command="{Binding ChangePasswordCommand}" />
+              <controls:SplitRow>
                 <StackPanel>
                   <TextBlock Text="Password" Style="{StaticResource Muted}" />
                   <TextBlock Text="••••••••••" FontWeight="SemiBold" FontSize="15" Margin="0,2,0,0" />
                   <TextBlock Text="Change it as often as you like" Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" />
                 </StackPanel>
-              </DockPanel>
+                <Button Content="Change" Style="{StaticResource Tall}" HorizontalAlignment="Left" Command="{Binding ChangePasswordCommand}" />
+              </controls:SplitRow>
             </Border>
 
-            <Border Style="{StaticResource AccountRow}">
+            <!-- The change being made, right under the rows -->
+            <Border x:Name="Editor" Padding="24,20" Background="{DynamicResource Inset}" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0"
+                    Visibility="{Binding Dialog, Converter={StaticResource NullToVisible}}">
+              <StackPanel DataContext="{Binding Dialog}">
+                <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="Bold" />
+
+                <StackPanel Visibility="{Binding IsCodeStage, Converter={StaticResource BoolToVisible}, ConverterParameter=invert}">
+                  <controls:AutoGrid MinItemWidth="220" Gap="12" Fit="True" Margin="0,14,0,0">
+                    <StackPanel Visibility="{Binding ShowNewPassword, Converter={StaticResource BoolToVisible}}">
+                      <TextBlock Text="Current password" Style="{StaticResource Muted}" FontSize="12" Margin="0,0,0,6" />
+                      <PasswordBox controls:PasswordBinding.Value="{Binding CurrentPassword, Mode=TwoWay}" MaxLength="128" />
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding ShowNewValue, Converter={StaticResource BoolToVisible}}">
+                      <TextBlock Text="{Binding NewValueLabel}" Style="{StaticResource Muted}" FontSize="12" Margin="0,0,0,6" />
+                      <TextBox Text="{Binding NewValue, UpdateSourceTrigger=PropertyChanged}" MaxLength="254" Style="{StaticResource HintBox}" />
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding ShowNewPassword, Converter={StaticResource BoolToVisible}}">
+                      <TextBlock Text="New password" Style="{StaticResource Muted}" FontSize="12" Margin="0,0,0,6" />
+                      <PasswordBox controls:PasswordBinding.Value="{Binding NewPassword, Mode=TwoWay}" MaxLength="128" />
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding ShowNewPassword, Converter={StaticResource BoolToVisible}}">
+                      <TextBlock Text="Confirm new password" Style="{StaticResource Muted}" FontSize="12" Margin="0,0,0,6" />
+                      <PasswordBox controls:PasswordBinding.Value="{Binding ConfirmPassword, Mode=TwoWay}" MaxLength="128" />
+                    </StackPanel>
+                    <StackPanel Visibility="{Binding ShowNewPassword, Converter={StaticResource BoolToVisible}, ConverterParameter=invert}">
+                      <TextBlock Text="Current password" Style="{StaticResource Muted}" FontSize="12" Margin="0,0,0,6" />
+                      <PasswordBox controls:PasswordBinding.Value="{Binding CurrentPassword, Mode=TwoWay}" MaxLength="128" />
+                    </StackPanel>
+                  </controls:AutoGrid>
+                  <TextBlock Text="{Binding Intro}" Style="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,14,0,0" />
+                </StackPanel>
+
+                <StackPanel MaxWidth="360" HorizontalAlignment="Left" Margin="0,14,0,0"
+                            Visibility="{Binding IsCodeStage, Converter={StaticResource BoolToVisible}}">
+                  <TextBlock Text="{Binding Info}" FontSize="13" Foreground="{DynamicResource TextSoft}" TextWrapping="Wrap" />
+                  <TextBlock Text="Verification code" Style="{StaticResource Muted}" FontSize="12" Margin="0,8,0,6" />
+                  <Grid>
+                    <TextBox x:Name="CodeBox" Text="{Binding Code, UpdateSourceTrigger=PropertyChanged}" MaxLength="6" Style="{StaticResource HintBox}"
+                             FontFamily="{StaticResource Mono}" FontSize="18" />
+                    <TextBlock Text="000000" Style="{StaticResource Muted}" FontFamily="{StaticResource Mono}" FontSize="18" Margin="13,0,0,0"
+                               VerticalAlignment="Center" IsHitTestVisible="False"
+                               Visibility="{Binding Text, ElementName=CodeBox, Converter={StaticResource TextToVisible}, ConverterParameter=invert}" />
+                  </Grid>
+                  <Button Style="{StaticResource LinkButton}" Content="Resend code" HorizontalAlignment="Left" Margin="0,8,0,0" FontSize="13"
+                          Command="{Binding DataContext.ResendCodeCommand, ElementName=Editor}" />
+                </StackPanel>
+
+                <TextBlock Text="{Binding Error}" FontSize="12" Foreground="{DynamicResource Record}" TextWrapping="Wrap" Margin="0,14,0,0"
+                           Visibility="{Binding Error, Converter={StaticResource TextToVisible}}" />
+
+                <WrapPanel Margin="0,14,0,0">
+                  <Button Content="{Binding SubmitText}" IsDefault="True" IsEnabled="{Binding IsBusy, Converter={StaticResource Not}}"
+                          Command="{Binding DataContext.SubmitDialogCommand, ElementName=Editor}">
+                    <Button.Style>
+                      <Style TargetType="Button" BasedOn="{StaticResource TallPrimary}">
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding IsDanger}" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource Record}" />
+                            <Setter Property="BorderBrush" Value="{DynamicResource Record}" />
+                            <Setter Property="Foreground" Value="White" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Button.Style>
+                  </Button>
+                  <Button Content="Cancel" Style="{StaticResource Tall}" Margin="8,0,0,0" IsCancel="True"
+                          Command="{Binding DataContext.CancelDialogCommand, ElementName=Editor}" />
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+
+            <Border Padding="24,12" Background="{DynamicResource SuccessSoft}" BorderBrush="{DynamicResource Border}" BorderThickness="0,1,0,0"
+                    Visibility="{Binding Notice, Converter={StaticResource TextToVisible}}">
+              <TextBlock Text="{Binding Notice}" FontSize="13" Foreground="{DynamicResource Success}" TextWrapping="Wrap" />
+            </Border>
+
+            <Border Style="{StaticResource AccountRow}" Padding="24,18">
               <StackPanel>
                 <DockPanel>
-                  <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding TwofaEnabled}"
-                            ToolTip="Two-factor authentication" />
-                  <StackPanel Margin="0,0,16,0">
-                    <TextBlock Text="Two-factor authentication (email)" FontWeight="SemiBold" />
+                  <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding TwofaEnabled}" VerticalAlignment="Center"
+                            ToolTip="Two-factor authentication" Margin="16,0,0,0" />
+                  <StackPanel>
+                    <TextBlock Text="Two-factor authentication (email)" FontWeight="SemiBold" FontSize="14" />
                     <TextBlock Text="After your password, we email you a 6-digit code to finish signing in."
                                Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
                   </StackPanel>
                 </DockPanel>
-                <DockPanel Margin="0,14,0,0" Visibility="{Binding TwofaEnabled, Converter={StaticResource BoolToVisible}}">
-                  <Border DockPanel.Dock="Right" Style="{StaticResource SegmentBar}">
+                <controls:SplitRow Margin="0,14,0,0" Visibility="{Binding TwofaEnabled, Converter={StaticResource BoolToVisible}}">
+                  <TextBlock Text="Ask for a code" Style="{StaticResource RowLabel}" />
+                  <Border Style="{StaticResource SegmentBar}" HorizontalAlignment="Left">
                     <StackPanel Orientation="Horizontal">
                       <RadioButton Style="{StaticResource Segment}" GroupName="TwofaMode" Content="Every sign-in"
                                    IsChecked="{Binding TwofaMode, Converter={StaticResource EqualsParam}, ConverterParameter=every_signin}" />
-                      <RadioButton Style="{StaticResource Segment}" GroupName="TwofaMode" Content="New devices only"
+                      <RadioButton Style="{StaticResource Segment}" GroupName="TwofaMode" Content="New devices only" Margin="4,0,0,0"
                                    IsChecked="{Binding TwofaMode, Converter={StaticResource EqualsParam}, ConverterParameter=new_devices}" />
                     </StackPanel>
                   </Border>
-                  <TextBlock Text="Ask for a code" Style="{StaticResource RowLabel}" />
-                </DockPanel>
+                </controls:SplitRow>
+                <TextBlock Text="With two-factor off, anyone who has your password can sign in." FontSize="12" Foreground="{DynamicResource Warning}"
+                           TextWrapping="Wrap" Margin="0,14,0,0"
+                           Visibility="{Binding TwofaEnabled, Converter={StaticResource BoolToVisible}, ConverterParameter=invert}" />
               </StackPanel>
             </Border>
 
             <Border Style="{StaticResource AccountRow}">
               <DockPanel>
-                <Button DockPanel.Dock="Right" Content="Sign out" Style="{StaticResource DangerButton}" Command="{Binding SignOutCommand}" />
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                  <Button Style="{StaticResource LinkButton}" Content="Download my data" Command="{Binding ExportDataCommand}" />
-                  <TextBlock Text="·" Style="{StaticResource Muted}" Margin="10,0" />
-                  <Button Style="{StaticResource LinkButton}" Content="Delete account" Foreground="{DynamicResource Record}"
-                          Command="{Binding DeleteAccountCommand}" />
-                </StackPanel>
+                <Button DockPanel.Dock="Right" Content="Sign out" Style="{StaticResource Tall}" Foreground="{DynamicResource Record}"
+                        BorderBrush="{DynamicResource DangerBorder}" Command="{Binding SignOutCommand}" />
+                <Button Style="{StaticResource LinkButton}" Content="Delete account" Foreground="{DynamicResource TextMuted}" FontSize="13"
+                        HorizontalAlignment="Left" VerticalAlignment="Center" Command="{Binding DeleteAccountCommand}" />
               </DockPanel>
             </Border>
           </StackPanel>
         </Border>
 
         <!-- Updates (schema section 9): GitHub Releases, installed with Velopack -->
-        <Border Style="{StaticResource Card}" Padding="24,20" Margin="0,20,0,0">
+        <Border Style="{StaticResource SectionCard}">
           <StackPanel>
-            <DockPanel>
-              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button Content="Check now" Style="{StaticResource PrimaryButton}" Command="{Binding Updates.CheckNowCommand}"
-                        Visibility="{Binding Updates.CanRestart, Converter={StaticResource BoolToVisible}, ConverterParameter=invert}" />
-                <Button Content="Restart to update" Style="{StaticResource PrimaryButton}" Command="{Binding Updates.RestartCommand}"
-                        Visibility="{Binding Updates.CanRestart, Converter={StaticResource BoolToVisible}}" />
-              </StackPanel>
-              <StackPanel Margin="0,0,16,0">
+            <controls:SplitRow>
+              <StackPanel>
                 <TextBlock Text="Updates" Style="{StaticResource CardTitle}" />
                 <TextBlock Style="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap">
-                  <Run Text="{Binding Updates.VersionText, Mode=OneWay}" /><Run Text=" · checks GitHub Releases on launch, on Refresh and every 4 hours" />
+                  <Run Text="{Binding Updates.VersionText, Mode=OneWay}" /><Run Text=" · checks GitHub Releases on launch" />
                 </TextBlock>
               </StackPanel>
-            </DockPanel>
+              <Grid HorizontalAlignment="Left">
+                <Button Content="Check now" Style="{StaticResource TallPrimary}" Command="{Binding Updates.CheckNowCommand}"
+                        Visibility="{Binding Updates.CanRestart, Converter={StaticResource BoolToVisible}, ConverterParameter=invert}" />
+                <Button Content="Restart to update" Style="{StaticResource TallPrimary}" Command="{Binding Updates.RestartCommand}"
+                        Visibility="{Binding Updates.CanRestart, Converter={StaticResource BoolToVisible}}" />
+              </Grid>
+            </controls:SplitRow>
 
-            <Border Background="{DynamicResource Bg}" CornerRadius="8" Padding="14,12" Margin="0,16,0,0">
+            <Border Background="{DynamicResource Inset}" CornerRadius="8" Padding="14,12" Margin="0,16,0,0"
+                    Visibility="{Binding Updates.HasStatus, Converter={StaticResource BoolToVisible}}">
               <StackPanel>
                 <TextBlock Text="{Binding Updates.Title}" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding Updates.Detail}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />
@@ -255,73 +428,13 @@
                            Visibility="{Binding Updates.Notes, Converter={StaticResource TextToVisible}}" />
                 <TextBlock Text="{Binding Updates.Notes}" Style="{StaticResource Muted}" TextWrapping="Wrap"
                            Visibility="{Binding Updates.Notes, Converter={StaticResource TextToVisible}}" />
+                <Button Style="{StaticResource LinkButton}" Content="All releases on GitHub →" HorizontalAlignment="Left" Margin="0,12,0,0"
+                        FontSize="13" Command="{Binding Updates.OpenReleasesCommand}" />
               </StackPanel>
             </Border>
-            <Button Style="{StaticResource LinkButton}" Content="All releases on GitHub →" HorizontalAlignment="Left" Margin="0,12,0,0"
-                    Command="{Binding Updates.OpenReleasesCommand}" />
           </StackPanel>
         </Border>
       </StackPanel>
     </ScrollViewer>
-
-    <!-- Account change sheet -->
-    <Grid x:Name="Sheet" Background="{DynamicResource Overlay}" DataContext="{Binding Account}"
-          Visibility="{Binding Dialog, Converter={StaticResource NullToVisible}}">
-      <Border Style="{StaticResource Card}" Width="440" Padding="24" VerticalAlignment="Center" HorizontalAlignment="Center"
-              DataContext="{Binding Dialog}" Background="{DynamicResource Panel}">
-        <StackPanel>
-          <TextBlock Text="{Binding Title}" Style="{StaticResource CardTitle}" />
-          <TextBlock Text="{Binding Intro}" Style="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,0" />
-
-          <StackPanel Visibility="{Binding ShowNewValue, Converter={StaticResource BoolToVisible}}">
-            <TextBlock Text="{Binding NewValueLabel}" Style="{StaticResource FieldLabel}" />
-            <TextBox Text="{Binding NewValue, UpdateSourceTrigger=PropertyChanged}" MaxLength="254" />
-          </StackPanel>
-
-          <StackPanel Visibility="{Binding ShowNewPassword, Converter={StaticResource BoolToVisible}}">
-            <TextBlock Text="New password" Style="{StaticResource FieldLabel}" />
-            <PasswordBox controls:PasswordBinding.Value="{Binding NewPassword, Mode=TwoWay}" MaxLength="128" />
-            <TextBlock Text="Confirm new password" Style="{StaticResource FieldLabel}" />
-            <PasswordBox controls:PasswordBinding.Value="{Binding ConfirmPassword, Mode=TwoWay}" MaxLength="128" />
-          </StackPanel>
-
-          <StackPanel Visibility="{Binding ShowCurrentPassword, Converter={StaticResource BoolToVisible}}">
-            <TextBlock Text="Current password" Style="{StaticResource FieldLabel}" />
-            <PasswordBox controls:PasswordBinding.Value="{Binding CurrentPassword, Mode=TwoWay}" MaxLength="128" />
-          </StackPanel>
-
-          <StackPanel Visibility="{Binding IsCodeStage, Converter={StaticResource BoolToVisible}}">
-            <TextBlock Text="{Binding Info}" TextWrapping="Wrap" Margin="0,14,0,0" />
-            <TextBlock Text="Code" Style="{StaticResource FieldLabel}" />
-            <TextBox Text="{Binding Code, UpdateSourceTrigger=PropertyChanged}" MaxLength="6" FontFamily="{StaticResource Mono}"
-                     FontSize="20" HorizontalContentAlignment="Center" />
-            <Button Style="{StaticResource LinkButton}" Content="Send a new code" HorizontalAlignment="Left" Margin="0,10,0,0"
-                    Command="{Binding DataContext.ResendCodeCommand, ElementName=Sheet}" />
-          </StackPanel>
-
-          <TextBlock Text="{Binding Error}" Style="{StaticResource FieldError}"
-                     Visibility="{Binding Error, Converter={StaticResource TextToVisible}}" />
-
-          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
-            <Button Content="Cancel" IsCancel="True"
-                    Command="{Binding DataContext.CancelDialogCommand, ElementName=Sheet}" />
-            <Button Content="{Binding SubmitText}" IsDefault="True" IsEnabled="{Binding IsBusy, Converter={StaticResource Not}}"
-                    Command="{Binding DataContext.SubmitDialogCommand, ElementName=Sheet}">
-              <Button.Style>
-                <Style TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-                  <Style.Triggers>
-                    <DataTrigger Binding="{Binding IsDanger}" Value="True">
-                      <Setter Property="Background" Value="{DynamicResource Record}" />
-                      <Setter Property="BorderBrush" Value="{DynamicResource Record}" />
-                      <Setter Property="Foreground" Value="White" />
-                    </DataTrigger>
-                  </Style.Triggers>
-                </Style>
-              </Button.Style>
-            </Button>
-          </StackPanel>
-        </StackPanel>
-      </Border>
-    </Grid>
   </Grid>
 </UserControl>

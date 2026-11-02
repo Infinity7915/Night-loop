@@ -58,6 +58,8 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
         .Split('+')[0];
 
     public ApiClient Api { get; }
+    /// <summary>Settings kept on this PC (settings.json).</summary>
+    public LocalSettings Local => _settings;
     public AccountSession Session { get; }
     public LoadingViewModel Loading { get; }
     /// <summary>The target game, picked in Settings and used by Macros. Lives on this PC, so it survives sign-out.</summary>
@@ -194,7 +196,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
     {
         Username = Session.User?.Username ?? "";
         DisposePages();
-        Macros = new MainViewModel(Api, Games) { OpenSettings = () => IsSettingsTab = true };
+        Macros = new MainViewModel(Api, Games, _settings) { OpenSettings = () => IsSettingsTab = true };
         Macros.PropertyChanged += OnMacrosChanged;
         Home = new HomeViewModel(this, new AnnouncementFeed(_github, AppPaths.Announcements));
         Settings = new SettingsViewModel(this);

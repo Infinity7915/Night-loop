@@ -18,8 +18,12 @@ public sealed class MacroRun
     private readonly TrackingInputSender _input;
     private readonly CancellationTokenSource _cts = new();
     private readonly object _gate = new();
+    private readonly List<MacroRun> _resumeWhenDone = [];
     private TaskCompletionSource? _resume;
+    private CancellationTokenSource? _blockCts;
     private bool _pauseRequested;
+    private bool _interrupted;
+    private bool _restartRequested;
     private bool _stepMode;
     private Task? _task;
 
@@ -62,24 +66,47 @@ public sealed class MacroRun
 
     public void Stop() => _cts.Cancel();
 
-    public void Pause()
+    /// <summary>
+    /// Pauses before the next block. <paramref name="immediate"/> also interrupts the block running now (a long wait,
+    /// a held key); it runs again from its start on resume.
+    /// </summary>
+    public void Pause(bool immediate = false)
     {
+        CancellationTokenSource? interrupt = null;
         lock (_gate)
         {
             if (!IsActive) return;
             _pauseRequested = true;
             _resume ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            if (immediate && _blockCts is { } cts)
+            {
+                _interrupted = true;
+                interrupt = cts;
+            }
         }
+        try { interrupt?.Cancel(); }
+        catch (ObjectDisposedException) { /* the block just finished */ }
     }
 
-    public void Resume()
+    /// <summary>Carries on from where it paused, or from the first block when <paramref name="fromStart"/> is set.</summary>
+    public void Resume(bool fromStart = false)
     {
         lock (_gate)
         {
+            if (fromStart && IsActive) _restartRequested = true;
             _pauseRequested = false;
             _stepMode = false;
             _resume?.TrySetResult();
             _resume = null;
+        }
+    }
+
+    /// <summary>Pause macro's "Resume when this macro ends": resumes <paramref name="other"/> when this run ends.</summary>
+    internal void ResumeWhenDone(MacroRun other)
+    {
+        lock (_gate)
+        {
+            if (!_resumeWhenDone.Contains(other)) _resumeWhenDone.Add(other);
         }
     }
 
@@ -117,10 +144,11 @@ public sealed class MacroRun
 
             while (true)
             {
-                var stopped = await RunPassAsync(ctx, start);
-                CompletedPasses++;
+                var end = await RunPassAsync(ctx, start);
                 start = 0;
-                if (stopped || once) break;
+                if (end == PassEnd.Restart) continue;
+                CompletedPasses++;
+                if (end == PassEnd.Stopped || once) break;
                 var more = repeat.Mode switch
                 {
                     RepeatModes.Forever => true,
@@ -151,10 +179,21 @@ public sealed class MacroRun
         CurrentIndex = -1;
         StepChanged?.Invoke(this, -1);
         SetState(state);
+
+        MacroRun[] paused;
+        lock (_gate)
+        {
+            paused = [.. _resumeWhenDone];
+            _resumeWhenDone.Clear();
+        }
+        foreach (var other in paused)
+            if (other.State == RunState.Paused) other.Resume();
     }
 
-    /// <summary>Runs the program once from <paramref name="pc"/>. Returns true when a logic.stop ended the macro.</summary>
-    private async Task<bool> RunPassAsync(RunContext ctx, int pc)
+    private enum PassEnd { Finished, Stopped, Restart }
+
+    /// <summary>Runs the program once from <paramref name="pc"/>.</summary>
+    private async Task<PassEnd> RunPassAsync(RunContext ctx, int pc)
     {
         var steps = Macro.Steps;
         var loopCounters = new Dictionary<int, int>();
@@ -162,9 +201,10 @@ public sealed class MacroRun
 
         while (pc >= 0 && pc < steps.Length)
         {
-            ctx.Token.ThrowIfCancellationRequested();
+            _cts.Token.ThrowIfCancellationRequested();
             var step = steps[pc];
             await GateAsync(step);
+            if (TakeRestart()) return PassEnd.Restart;
 
             CurrentIndex = pc;
             StepChanged?.Invoke(this, pc);
@@ -174,19 +214,46 @@ public sealed class MacroRun
             switch (step.Kind)
             {
                 case StepKind.Action:
-                    await BlockExecutor.ExecuteAsync(step.Block, ctx);
+                    switch (await RunBlockAsync(step.Block, ctx))
+                    {
+                        case BlockEnd.Interrupted:
+                            next = pc; // paused right away: run this block again on resume
+                            ctx.DidWork = true;
+                            break;
+                        case BlockEnd.Failed:
+                            switch (step.Block.GetString("onFail", "continue"))
+                            {
+                                case "retry":
+                                    await ctx.PauseExactAsync(RetryDelayMs);
+                                    next = pc;
+                                    break;
+                                case "goto" when step.Block.GetString("failLabel") is { } label && Macro.Labels.TryGetValue(label, out var target):
+                                    next = target;
+                                    break;
+                                case "stop":
+                                    _env.Log?.Invoke($"{Name}: \"{step.Block.Type}\" didn't find its target, so the macro stopped (On fail: stop).");
+                                    return PassEnd.Stopped;
+                            }
+                            break;
+                    }
                     break;
                 case StepKind.If:
-                    if (!Evaluate(step.Block, ctx)) next = step.Jump;
+                    if (!await EvaluateAsync(step.Block, ctx)) next = step.Jump;
                     break;
                 case StepKind.Jump or StepKind.Goto:
                     next = step.Jump;
                     break;
                 case StepKind.LoopStart:
-                    loopCounters[pc] = step.Block.GetInt("count", 1);
+                    loopCounters[pc] = step.Block.GetBool("forever") == true ? Forever : step.Block.GetInt("count", 1);
                     break;
                 case StepKind.LoopEnd:
-                    var remaining = loopCounters.GetValueOrDefault(step.Jump, 1) - 1;
+                    var counter = loopCounters.GetValueOrDefault(step.Jump, 1);
+                    if (counter == Forever)
+                    {
+                        next = step.Jump + 1;
+                        break;
+                    }
+                    var remaining = counter - 1;
                     if (remaining > 0)
                     {
                         loopCounters[step.Jump] = remaining;
@@ -201,7 +268,7 @@ public sealed class MacroRun
                     var opener = steps[step.Jump].Block;
                     var passes = loopCounters.GetValueOrDefault(step.Jump) + 1;
                     var max = opener.GetInt("maxIterations", MacroLimits.CountMax);
-                    if (!Evaluate(opener, ctx) && passes < max)
+                    if (!await EvaluateAsync(opener, ctx) && (max <= 0 || passes < max))
                     {
                         loopCounters[step.Jump] = passes;
                         next = step.Jump + 1;
@@ -209,7 +276,7 @@ public sealed class MacroRun
                     else loopCounters.Remove(step.Jump);
                     break;
                 case StepKind.Stop:
-                    return true;
+                    return PassEnd.Stopped;
             }
 
             stepsWithoutWork = ctx.DidWork ? 0 : stepsWithoutWork + 1;
@@ -218,7 +285,55 @@ public sealed class MacroRun
 
             pc = next;
         }
-        return false;
+        return PassEnd.Finished;
+    }
+
+    private const int Forever = -1;
+    /// <summary>"On fail: retry" waits this long before looking again.</summary>
+    private const int RetryDelayMs = 250;
+
+    private enum BlockEnd { Done, Failed, Interrupted }
+
+    /// <summary>Runs one action block with its own cancellation, so a "right away" pause can cut it short.</summary>
+    private async Task<BlockEnd> RunBlockAsync(Block block, RunContext ctx)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+        lock (_gate) _blockCts = cts;
+        ctx.Token = cts.Token;
+        try
+        {
+            return await BlockExecutor.ExecuteAsync(block, ctx) ? BlockEnd.Done : BlockEnd.Failed;
+        }
+        catch (OperationCanceledException) when (!_cts.IsCancellationRequested && TakeInterrupt())
+        {
+            _input.ReleaseAll();
+            return BlockEnd.Interrupted;
+        }
+        finally
+        {
+            lock (_gate) _blockCts = null;
+            ctx.Token = _cts.Token;
+        }
+    }
+
+    private bool TakeInterrupt()
+    {
+        lock (_gate)
+        {
+            var was = _interrupted;
+            _interrupted = false;
+            return was;
+        }
+    }
+
+    private bool TakeRestart()
+    {
+        lock (_gate)
+        {
+            var was = _restartRequested;
+            _restartRequested = false;
+            return was;
+        }
     }
 
     /// <summary>Holds here while paused, at a breakpoint, or in step mode.</summary>
@@ -247,9 +362,9 @@ public sealed class MacroRun
         SetState(RunState.Running);
     }
 
-    private static bool Evaluate(Block block, RunContext ctx)
+    private static Task<bool> EvaluateAsync(Block block, RunContext ctx)
     {
         var condition = block.GetObject("condition") ?? throw new MacroFaultException("This block needs a condition.");
-        return ctx.Environment.Conditions.Evaluate((JsonObject)condition, ctx);
+        return ctx.Environment.Conditions.EvaluateAsync(condition, ctx);
     }
 }

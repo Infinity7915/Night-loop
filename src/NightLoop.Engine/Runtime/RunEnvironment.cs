@@ -1,4 +1,5 @@
 using NightLoop.Engine.Input;
+using NightLoop.Engine.Screen;
 using NightLoop.Engine.Window;
 
 namespace NightLoop.Engine.Runtime;
@@ -18,12 +19,23 @@ public sealed class RunEnvironment
     /// </summary>
     public SemaphoreSlim InputLock { get; init; } = new(1, 1);
 
+    /// <summary>Reads pixels for pixel checks, picture and text finding, and screenshots. Null means those blocks fault.</summary>
+    public IScreenCapture? Screen { get; init; }
+    /// <summary>Reads text for Wait for text, Find &amp; click text and "Text visible". Null means those fault clearly.</summary>
+    public ITextReader? Text { get; init; }
+    /// <summary>Whether a key is held right now (Wait for key, "Key held"). Takes a virtual-key code.</summary>
+    public Func<int, bool>? IsKeyDown { get; init; }
+
     /// <summary>utility.notify. Null means the block does nothing.</summary>
     public Action<string>? Notify { get; init; }
-    /// <summary>utility.playSound.</summary>
+    /// <summary>utility.playSound, and Notify's sound.</summary>
     public Action<string>? PlaySound { get; init; }
-    /// <summary>timing.pause: finds another running macro by name.</summary>
+    /// <summary>utility.screenshot: saves the picture under the given file name (the app picks the folder).</summary>
+    public Action<ScreenImage, string>? SaveScreenshot { get; init; }
+    /// <summary>Pause and Resume macro: finds another running macro by name.</summary>
     public Func<string, MacroRun?>? FindRun { get; init; }
+    /// <summary>Pause and Resume macro with "All other macros".</summary>
+    public Func<IReadOnlyList<MacroRun>>? ActiveRuns { get; init; }
     /// <summary>utility.runMacro: runs another macro by name and completes when it ends.</summary>
     public Func<string, CancellationToken, Task>? RunMacro { get; init; }
     public Action<string>? Log { get; init; }

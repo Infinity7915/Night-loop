@@ -51,12 +51,19 @@ A Loop or Repeat until whose opener or End is disabled runs its body once.
 
 ## Implemented now
 
-Input (key, click, move, drag, scroll, type), camera.turn, wait, random wait, pause/resume another macro,
-if/else, loop, repeat until, label, go to, stop, window resize/position/focus, comment, description,
-notify, play sound, run macro. Conditions: `windowFocused`, `processRunning`, `not`, `all`, `any`.
+Every block in the palette runs:
 
-Text, image and pixel detection (and the blocks that use them) fault with a clear message until the
-Vision milestone.
+- **Input**: key, key combo, hold key, click, mouse move, drag, scroll, type text.
+- **Camera**: turn, zoom, center on a target.
+- **Timing**: wait, random wait, wait for key, pause and resume another macro.
+- **Detect**: wait for text (Windows OCR), wait for image, wait for pixel color, find and click, scan and turn.
+- **Logic**: loop, repeat until, if, else, end, label, go to label, run macro, stop.
+- **Window**: focus, wait for window, resize, position.
+- **Utility**: notify, screenshot (saved to Pictures\Night-loop), comment, description.
+
+Conditions: `textVisible`, `imageVisible`, `pixelColor`, `windowFocused`, `processRunning`, `keyHeld`, `not`,
+`all`, `any`. Regions are `[x, y, width, height]` inside the game window. Points with `relativeTo: "gameWindow"`
+are inside the game window's client area, so they still line up when the window moves.
 
 ## Editing in the app
 
@@ -64,13 +71,16 @@ The Macros screen builds this document block by block:
 
 - **Add block** shows the categories (Input, Camera, Timing, Detect, Logic, Window, Utility). Opening one lists
   its blocks; clicking a block adds it after the selected one. If, Loop and Repeat until get their End added too.
-  Blocks that need screen reading are marked "Coming soon" and fault if run.
+- Under the fields, buttons pick values off the screen: **Pick point**, **Pick color**, **Select region**,
+  **Capture image**, and **Use current window size / position** for the window blocks.
 - Each row has a breakpoint dot, an on/off box, its number, a colored tag and actions (duplicate, move up,
   move down, delete). The Delete key removes the selected block. Rows inside a Loop, If or Repeat until are
   indented.
 - The panel on the right edits the selected block's params, with the limits from `MacroLimits`.
 - **Step** starts paused and runs one block per press. **Run from** starts at the selected block. **Play**
   stops at breakpoints; press it again to continue.
-- The gear sets the macro's start/stop key, trigger mode (toggle, hold, once) and run alongside.
+- The sliders button sets the macro's start/stop key, trigger mode (toggle or hold), run alongside, repeat
+  count and whether Record keeps plain mouse movement.
+- New macros start with a starter sequence (Settings › Macros turns it off; the choice stays on this PC).
 - Saved macros can be put in groups (name and color), searched, given their own start/stop key, and switched
   on and off from the list. F9, F6 and Ctrl+Alt+End are reserved for Record, Play and Stop all.
