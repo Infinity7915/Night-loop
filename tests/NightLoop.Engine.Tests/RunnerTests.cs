@@ -104,7 +104,10 @@ public class RunnerTests
     {
         var doc = new MacroBuilder().Add(BlockTypes.Click, new JsonObject { ["x"] = 10, ["y"] = 20, ["relativeTo"] = "gameWindow" }).Build();
         var (_, input, _) = await RunAsync(doc, new RunSettings { TargetExe = "game.exe" }, new FakeWindows());
-        Assert.Equal(["move 110,220", "mdown Left", "mup Left"], input.Log);
+        var log = input.Log;
+        Assert.Equal(["move 110,220", "mdown Left", "mup Left"], log[^3..]);
+        // It glided there in small steps instead of jumping.
+        Assert.True(log.Count(l => l.StartsWith("move", StringComparison.Ordinal)) > 5);
     }
 
     [Fact]

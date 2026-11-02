@@ -20,4 +20,10 @@ public interface IWindowService
     bool Resize(string exeName, int width, int height);
     bool MoveTo(string exeName, int x, int y);
     bool Focus(string exeName);
+
+    /// <summary>The whole window (frame included) in screen pixels, or null if it isn't open.</summary>
+    ClientArea? GetWindowBounds(string exeName) => null;
+
+    /// <summary>Each monitor's work area (without the taskbar), primary monitor first.</summary>
+    IReadOnlyList<ClientArea> GetMonitors() => [];
 }

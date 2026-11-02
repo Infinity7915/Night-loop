@@ -1,6 +1,7 @@
 using NightLoop.Contracts.MacroDocument;
 using NightLoop.Engine.Compiler;
 using NightLoop.Engine.Input;
+using NightLoop.Engine.Screen;
 using NightLoop.Engine.Window;
 
 namespace NightLoop.Engine.Runtime;
@@ -23,6 +24,14 @@ public sealed class RunManager(IInputSender input, IWindowService? windows = nul
     public Action<string>? PlaySound { get; set; }
     /// <summary>utility.runMacro: the app finds the macro by name, runs it and completes when it ends.</summary>
     public Func<string, CancellationToken, Task>? RunMacro { get; set; }
+    /// <summary>Screen capture for pixel, picture and text blocks and screenshots.</summary>
+    public IScreenCapture? Screen { get; set; }
+    /// <summary>Text recognition for the text blocks.</summary>
+    public ITextReader? Text { get; set; }
+    /// <summary>Key state for Wait for key and "Key held".</summary>
+    public Func<int, bool>? IsKeyDown { get; set; }
+    /// <summary>utility.screenshot.</summary>
+    public Action<ScreenImage, string>? SaveScreenshot { get; set; }
 
     public IReadOnlyList<MacroRun> ActiveRuns
     {
@@ -44,10 +53,15 @@ public sealed class RunManager(IInputSender input, IWindowService? windows = nul
             Delay = delay ?? PreciseDelay.Instance,
             InputLock = _inputLock,
             FindRun = Find,
+            ActiveRuns = () => ActiveRuns,
             Log = Log,
             Notify = Notify,
             PlaySound = PlaySound,
             RunMacro = RunMacro,
+            Screen = Screen,
+            Text = Text,
+            IsKeyDown = IsKeyDown,
+            SaveScreenshot = SaveScreenshot,
         };
         var run = new MacroRun(macro, env, settings);
         run.StateChanged += (r, s) => RunStateChanged?.Invoke(r, s);

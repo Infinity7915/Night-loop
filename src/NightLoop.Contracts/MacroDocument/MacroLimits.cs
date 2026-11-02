@@ -26,4 +26,16 @@ public static class MacroLimits
     public const int HumanizeMouseMaxPx = 10;
     public const int ConditionGroupMaxChildren = 5;
     public const int MaxRunsAtOnce = 8;
+    public const int SpeedMinPct = 10;
+    public const int SpeedMaxPct = 1000;
+    public const int ZoomStepsMax = 50;
+    public const int ScanTurnsMax = 360;
+    /// <summary>File names for the screenshot block (saved under Pictures\Night-loop).</summary>
+    public const int FileNameMaxLength = 80;
+    /// <summary>Recorded mouse paths keep at most this many points per block.</summary>
+    public const int PathMaxPoints = 64;
+    /// <summary>A small picture saved inside an image block (base64 text), about 40 KB.</summary>
+    public const int ImageDataMaxLength = 56_000;
+    /// <summary>Gliding the mouse to a click point takes at most this long.</summary>
+    public const int MoveMaxMs = 10_000;
 }

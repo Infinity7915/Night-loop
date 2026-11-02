@@ -118,7 +118,9 @@ public class RecordingBuilderTests
     {
         var blocks = Build(
             E.KeyDown(0, W), E.MouseDown(100, MouseButton.Left, 1, 1), E.MouseUp(150, MouseButton.Left, 1, 1), E.KeyUp(1000, W));
-        Assert.Equal(["key W down", "wait 100", "click left x1 1,1 screen", "wait 850", "key W up"], Describe(blocks));
+        // The first click glides in for the 100 ms the wait used to take, so the timing is the same.
+        Assert.Equal(["key W down", "click left x1 1,1 screen", "wait 850", "key W up"], Describe(blocks));
+        Assert.Equal(100, blocks[1].GetInt("moveMs"));
     }
 
     [Fact]
@@ -134,7 +136,8 @@ public class RecordingBuilderTests
         var events = new[] { E.Move(0, 1, 1), E.Move(30, 5, 5), E.Move(60, 9, 9) };
         Assert.Empty(Build(events));
         var blocks = Build(new RecordingOptions { RecordMouseMoves = true }, events);
-        Assert.Equal(["move 1,1 0", "move 5,5 30", "move 9,9 30"], Describe(blocks));
+        // One block for the whole movement (with its path), not one per sample.
+        Assert.Equal(["move 9,9 60"], Describe(blocks));
     }
 
     [Fact]
@@ -163,6 +166,7 @@ public class RecordingBuilderTests
     {
         var events = new[]
         {
+            E.Move(0, 10, 20), // the recorder notes where the cursor starts
             E.KeyDown(0, LCtrl), E.KeyDown(100, C), E.KeyUp(160, C), E.KeyUp(300, LCtrl),
             E.MouseDown(800, MouseButton.Left, 10, 20), E.MouseUp(850, MouseButton.Left, 10, 20),
             E.KeyDown(1000, W), E.KeyUp(2000, W),
@@ -178,9 +182,12 @@ public class RecordingBuilderTests
         await run.Completion.WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.Equal(RunState.Stopped, run.State);
+        // The first click glides from wherever the cursor is (moves elided here) and lands exactly on the spot.
+        var log = input.Log;
         Assert.Equal(
             ["down LeftCtrl", "down C", "up C", "up LeftCtrl", "move 10,20", "mdown Left", "mup Left", "down W", "up W", "scroll -1"],
-            input.Log);
+            log.Where((l, i) => !l.StartsWith("move", StringComparison.Ordinal) || log[i + 1] == "mdown Left").ToList());
+        Assert.True(log.Count(l => l.StartsWith("move", StringComparison.Ordinal)) > 3, "the cursor should glide, not jump");
         // Replayed time matches the recording: 2500 ms of events (click hold and multi-click gaps included).
         Assert.InRange(delay.TotalMs, 2450, 2550);
     }

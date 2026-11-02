@@ -6,9 +6,9 @@ namespace NightLoop.Engine.Compiler;
 /// <summary>What a step does when the runner reaches it.</summary>
 public enum StepKind
 {
-    /// <summary>Disabled block, comment, label, detect block, or an End/Else whose partner makes it inert.</summary>
+    /// <summary>Disabled block, comment, label, an older detect block, or an End/Else whose partner makes it inert.</summary>
     NoOp,
-    /// <summary>Any block that does work (input, wait, window, utility).</summary>
+    /// <summary>Any block that does work (input, wait, detect, window, utility).</summary>
     Action,
     /// <summary>logic.if: when the condition is false, jump to <see cref="Step.Jump"/>.</summary>
     If,
@@ -33,6 +33,8 @@ public sealed class CompiledMacro
     public string? TargetGame { get; init; }
     public required MacroOptions Options { get; init; }
     public required ImmutableArray<Step> Steps { get; init; }
+    /// <summary>Label name → its step index, for "On fail: go to label".</summary>
+    public ImmutableDictionary<string, int> Labels { get; init; } = ImmutableDictionary<string, int>.Empty;
 }
 
 public sealed class MacroCompileException(IReadOnlyList<MacroIssue> issues)

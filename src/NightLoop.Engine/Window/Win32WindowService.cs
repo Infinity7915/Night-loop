@@ -1,8 +1,11 @@
 using System.Diagnostics;
 using System.Drawing;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Windows.Win32;
 using Windows.Win32.Foundation;
+using Windows.Win32.Graphics.Gdi;
 using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace NightLoop.Engine.Window;
@@ -51,6 +54,41 @@ public sealed class Win32WindowService : IWindowService
         if (PInvoke.IsIconic(hwnd)) PInvoke.ShowWindow(hwnd, SHOW_WINDOW_CMD.SW_RESTORE);
         PInvoke.AllowSetForegroundWindow(unchecked((uint)-1)); // ASFW_ANY
         return PInvoke.SetForegroundWindow(hwnd);
+    }
+
+    public ClientArea? GetWindowBounds(string exeName)
+    {
+        var hwnd = FindMainWindow(exeName);
+        if (hwnd.IsNull || !PInvoke.GetWindowRect(hwnd, out var r)) return null;
+        return new ClientArea(r.left, r.top, r.right - r.left, r.bottom - r.top);
+    }
+
+    public unsafe IReadOnlyList<ClientArea> GetMonitors()
+    {
+        var list = new List<(ClientArea Area, bool Primary)>();
+        var handle = GCHandle.Alloc(list);
+        try
+        {
+            PInvoke.EnumDisplayMonitors(default, (RECT*)null, &OnMonitor, (LPARAM)GCHandle.ToIntPtr(handle));
+        }
+        finally
+        {
+            handle.Free();
+        }
+        return list.OrderByDescending(m => m.Primary).ThenBy(m => m.Area.Left).Select(m => m.Area).ToList();
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
+    private static unsafe BOOL OnMonitor(HMONITOR monitor, HDC dc, RECT* rect, LPARAM data)
+    {
+        var list = (List<(ClientArea Area, bool Primary)>)GCHandle.FromIntPtr(data).Target!;
+        var info = new MONITORINFO { cbSize = (uint)sizeof(MONITORINFO) };
+        if (PInvoke.GetMonitorInfo(monitor, ref info))
+        {
+            var w = info.rcWork;
+            list.Add((new ClientArea(w.left, w.top, w.right - w.left, w.bottom - w.top), (info.dwFlags & 1) != 0)); // MONITORINFOF_PRIMARY
+        }
+        return true;
     }
 
     /// <summary>The foreground window when it belongs to the game (most accurate), else the process's main window.</summary>
