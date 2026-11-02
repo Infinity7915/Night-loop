@@ -117,4 +117,105 @@ public sealed class AccountSessionTests
         Assert.Null(store.Load().Token);
         Assert.False(session.IsSignedIn);
     }
+
+    private static readonly UserDto Strict = User with { TwofaMode = TwofaModes.EverySignin };
+
+    [Fact]
+    public async Task Every_sign_in_asks_for_a_code_before_opening()
+    {
+        var server = new FakeServer();
+        var challenge = Guid.NewGuid();
+        server.On("GET", "me", HttpStatusCode.OK, new MeResponse(Strict));
+        server.On("POST", "me/unlock", HttpStatusCode.OK, new UnlockResponse(challenge));
+        server.On("POST", "me/unlock/verify", HttpStatusCode.OK, new MeResponse(Strict));
+        var store = new MemorySessionStore();
+        store.Save(new StoredSession { Token = "saved" });
+        using var session = new AccountSession(server.Client(), store, Device);
+        UserDto? signedIn = null;
+        session.SignedIn += u => signedIn = u;
+
+        Assert.True(await session.TryRestoreAsync());
+        Assert.Equal(challenge, session.PendingUnlock);
+        Assert.False(session.IsSignedIn);
+        Assert.Null(signedIn);
+        Assert.Equal("a@b.co", session.PendingUnlockEmail);
+
+        await session.VerifyUnlockAsync(" 123456 ");
+        Assert.Equal(Strict, signedIn);
+        Assert.Null(session.PendingUnlock);
+        var verify = server.Requests.Last(r => r.Request.RequestUri!.AbsolutePath.EndsWith("me/unlock/verify"));
+        Assert.Equal("123456", JsonDocument.Parse(verify.Body!).RootElement.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task New_devices_only_opens_without_a_code()
+    {
+        var server = new FakeServer();
+        server.On("GET", "me", HttpStatusCode.OK, new MeResponse(User));
+        var store = new MemorySessionStore();
+        store.Save(new StoredSession { Token = "saved" });
+        using var session = new AccountSession(server.Client(), store, Device);
+
+        Assert.True(await session.TryRestoreAsync());
+        Assert.True(session.IsSignedIn);
+        Assert.Null(session.PendingUnlock);
+        Assert.DoesNotContain(server.Requests, r => r.Request.RequestUri!.AbsolutePath.EndsWith("me/unlock"));
+    }
+
+    [Fact]
+    public async Task An_older_server_without_launch_codes_opens_as_before()
+    {
+        var server = new FakeServer();
+        server.On("GET", "me", HttpStatusCode.OK, new MeResponse(Strict));
+        // No route for me/unlock: the fake answers 404.
+        var store = new MemorySessionStore();
+        store.Save(new StoredSession { Token = "saved" });
+        using var session = new AccountSession(server.Client(), store, Device);
+
+        Assert.True(await session.TryRestoreAsync());
+        Assert.True(session.IsSignedIn);
+    }
+
+    [Fact]
+    public async Task A_launch_code_that_could_not_be_sent_can_be_sent_again_but_never_skipped()
+    {
+        var server = new FakeServer();
+        var challenge = Guid.NewGuid();
+        server.On("GET", "me", HttpStatusCode.OK, new MeResponse(Strict));
+        server.On("POST", "me/unlock", (_, _) => FakeServer.Error(HttpStatusCode.TooManyRequests, ErrorCodes.RateLimited, "Too many codes today."));
+        var store = new MemorySessionStore();
+        store.Save(new StoredSession { Token = "saved" });
+        using var session = new AccountSession(server.Client(), store, Device);
+
+        Assert.True(await session.TryRestoreAsync());
+        Assert.Equal(Guid.Empty, session.PendingUnlock);
+        Assert.Equal("Too many codes today.", session.PendingUnlockError);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => session.VerifyUnlockAsync("123456"));
+        Assert.False(session.IsSignedIn);
+
+        server.On("POST", "me/unlock", HttpStatusCode.OK, new UnlockResponse(challenge));
+        Assert.Equal(challenge, await session.ResendUnlockAsync());
+        Assert.Null(session.PendingUnlockError);
+    }
+
+    [Fact]
+    public async Task Signing_out_from_the_launch_code_forgets_the_token()
+    {
+        var server = new FakeServer();
+        server.On("GET", "me", HttpStatusCode.OK, new MeResponse(Strict));
+        server.On("POST", "me/unlock", HttpStatusCode.OK, new UnlockResponse(Guid.NewGuid()));
+        server.On("POST", "auth/logout", HttpStatusCode.NoContent);
+        var store = new MemorySessionStore();
+        store.Save(new StoredSession { Token = "saved" });
+        using var session = new AccountSession(server.Client(), store, Device);
+        SessionEndedEventArgs? ended = null;
+        session.SignedOut += e => ended = e;
+
+        await session.TryRestoreAsync();
+        await session.SignOutAsync();
+
+        Assert.Equal(SessionEndReason.SignedOut, ended!.Reason);
+        Assert.Null(store.Load().Token);
+        Assert.Null(session.PendingUnlock);
+    }
 }

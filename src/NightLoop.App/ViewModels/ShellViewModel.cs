@@ -74,6 +74,18 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
     /// <summary>The sidebar (tabs, username, sign out) shows only once signed in.</summary>
     public bool ShowSidebar => CurrentPage is HomeViewModel or MainViewModel or SettingsViewModel;
 
+    /// <summary>Settings › Appearance: the window stays above every other window. The main window binds Topmost to it.</summary>
+    public bool AlwaysOnTop
+    {
+        get => _settings.AlwaysOnTop;
+        set
+        {
+            if (_settings.AlwaysOnTop == value) return;
+            _settings.AlwaysOnTop = value;
+            OnPropertyChanged();
+        }
+    }
+
     [ObservableProperty] private string _username = "";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ConnectionText))]
@@ -130,6 +142,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
             var restored = await Session.TryRestoreAsync();
             await minimum;
             if (!restored) ShowAuth(null);
+            else if (Session.PendingUnlock is not null) CurrentPage = AuthViewModel.ForUnlock(Session, _settings);
         }
         catch (ServerUnreachableException ex)
         {

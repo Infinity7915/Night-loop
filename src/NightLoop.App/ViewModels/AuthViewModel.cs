@@ -19,6 +19,15 @@ public enum AuthMode
     Reset,
 }
 
+/// <summary>What the emailed code on the code screen is for.</summary>
+public enum CodeFor
+{
+    SignIn,
+    SignUp,
+    /// <summary>The account asks for a code every time Night-loop opens (Settings › Ask for a code › Every sign-in).</summary>
+    Unlock,
+}
+
 /// <summary>
 /// Sign in, create account, the emailed code, and forgot password (schema section 8). Errors show under the
 /// field the server named. Passwords come from the PasswordBoxes in code-behind; WPF can't bind them.
@@ -28,7 +37,7 @@ public sealed partial class AuthViewModel : ObservableObject
     private readonly AccountSession _session;
     private readonly LocalSettings _settings;
     private Guid _challengeId;
-    private bool _codeIsForSignUp;
+    private CodeFor _codeFor;
     private DateTimeOffset _resendAllowedAt;
 
     public AuthViewModel(AccountSession session, LocalSettings settings, string? notice)
@@ -40,12 +49,13 @@ public sealed partial class AuthViewModel : ObservableObject
     }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSignIn), nameof(IsSignUp), nameof(IsCode), nameof(IsForgot), nameof(IsReset), nameof(Title), nameof(Subtitle))]
+    [NotifyPropertyChangedFor(nameof(IsSignIn), nameof(IsSignUp), nameof(IsCode), nameof(IsForgot), nameof(IsReset), nameof(IsUnlock), nameof(BackText), nameof(Title), nameof(Subtitle))]
     private AuthMode _mode = AuthMode.SignIn;
 
     [ObservableProperty] private string _email;
     [ObservableProperty] private string _code = "";
-    [ObservableProperty] private bool _trustThisPc;
+    /// <summary>On by default: with "New devices only" (the default) a trusted PC isn't asked for a code again.</summary>
+    [ObservableProperty] private bool _trustThisPc = true;
     [ObservableProperty] private bool _acceptedTerms;
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _notice;
@@ -62,12 +72,35 @@ public sealed partial class AuthViewModel : ObservableObject
     public bool IsCode => Mode == AuthMode.Code;
     public bool IsForgot => Mode == AuthMode.Forgot;
     public bool IsReset => Mode == AuthMode.Reset;
-    public bool CodeIsForSignIn => !_codeIsForSignUp;
+    public bool CodeIsForSignIn => _codeFor == CodeFor.SignIn;
+    public bool IsUnlock => Mode == AuthMode.Code && _codeFor == CodeFor.Unlock;
+    public string BackText => IsUnlock ? "← Sign out" : "← Back to sign in";
+
+    /// <summary>
+    /// Opening Night-loop on an account that asks for a code every time: the code screen, already sent. Back signs
+    /// out.
+    /// </summary>
+    public static AuthViewModel ForUnlock(AccountSession session, LocalSettings settings)
+    {
+        var vm = new AuthViewModel(session, settings, null) { Email = session.PendingUnlockEmail ?? settings.LastEmail ?? "" };
+        vm.GoToCode(session.PendingUnlock ?? Guid.Empty, CodeFor.Unlock);
+        if (session.PendingUnlockError is { } error)
+        {
+            vm.CodeError = error;
+            vm._resendAllowedAt = DateTimeOffset.UtcNow;
+        }
+        return vm;
+    }
 
     public string Title => Mode switch
     {
         AuthMode.SignUp => "Create your account",
-        AuthMode.Code => _codeIsForSignUp ? "Verify your email" : "Check your email",
+        AuthMode.Code => _codeFor switch
+        {
+            CodeFor.SignUp => "Verify your email",
+            CodeFor.Unlock => "Enter your code",
+            _ => "Check your email",
+        },
         AuthMode.Forgot or AuthMode.Reset => "Reset your password",
         _ => "Sign in to Night-loop",
     };
@@ -75,6 +108,10 @@ public sealed partial class AuthViewModel : ObservableObject
     public string Subtitle => Mode switch
     {
         AuthMode.SignUp => $"Your account starts as user#<number>; you can pick a username later. Passwords need {AccountRules.PasswordMinLength}+ characters.",
+        AuthMode.Code when _codeFor == CodeFor.Unlock && _challengeId == Guid.Empty =>
+            $"Your account asks for a code each time Night-loop opens, but one couldn't be sent to {Email}. Send a new code to try again.",
+        AuthMode.Code when _codeFor == CodeFor.Unlock =>
+            $"Your account asks for a code each time Night-loop opens. We sent a {AccountRules.CodeLength}-digit code to {Email}. It expires in {AccountRules.CodeLifetimeMinutes} minutes.",
         AuthMode.Code => $"We sent a {AccountRules.CodeLength}-digit code to {Email}. It expires in {AccountRules.CodeLifetimeMinutes} minutes.",
         AuthMode.Forgot => "Enter your email and we'll send a code.",
         AuthMode.Reset => $"Enter the code sent to {Email} and a new password.",
@@ -94,7 +131,7 @@ public sealed partial class AuthViewModel : ObservableObject
     {
         _settings.LastEmail = Email.Trim();
         var result = await _session.SignInAsync(Email, Password);
-        if (result is SignInResult.NeedsCode needs) GoToCode(needs.ChallengeId, signUp: false);
+        if (result is SignInResult.NeedsCode needs) GoToCode(needs.ChallengeId, CodeFor.SignIn);
         // SignedIn is handled by the shell (it switches to the Macros page).
     });
 
@@ -105,15 +142,25 @@ public sealed partial class AuthViewModel : ObservableObject
         if (Password != ConfirmPassword) { PasswordError = "The passwords don't match."; return; }
         if (!AcceptedTerms) { FormError = "Accept the terms to create an account."; return; }
         _settings.LastEmail = Email.Trim();
-        GoToCode(await _session.SignUpAsync(Email, Password, AcceptedTerms), signUp: true);
+        GoToCode(await _session.SignUpAsync(Email, Password, AcceptedTerms), CodeFor.SignUp);
     });
 
     [RelayCommand]
     private Task VerifyCodeAsync() => RunAsync(async () =>
     {
         if (!AccountRules.IsValidCode(Code.Trim())) { CodeError = $"Enter the {AccountRules.CodeLength}-digit code."; return; }
-        if (_codeIsForSignUp) await _session.VerifySignUpAsync(_challengeId, Code);
-        else await _session.VerifySignInAsync(_challengeId, Code, TrustThisPc);
+        switch (_codeFor)
+        {
+            case CodeFor.SignUp:
+                await _session.VerifySignUpAsync(_challengeId, Code);
+                break;
+            case CodeFor.Unlock:
+                await _session.VerifyUnlockAsync(Code);
+                break;
+            default:
+                await _session.VerifySignInAsync(_challengeId, Code, TrustThisPc);
+                break;
+        }
     });
 
     [RelayCommand]
@@ -121,9 +168,19 @@ public sealed partial class AuthViewModel : ObservableObject
     {
         var wait = _resendAllowedAt - DateTimeOffset.UtcNow;
         if (wait > TimeSpan.Zero) { CodeError = $"You can ask for a new code in {Math.Ceiling(wait.TotalSeconds)} s."; return; }
-        _challengeId = await _session.ResendCodeAsync(_challengeId);
+        var first = _challengeId == Guid.Empty;
+        _challengeId = _codeFor == CodeFor.Unlock ? await _session.ResendUnlockAsync() : await _session.ResendCodeAsync(_challengeId);
         _resendAllowedAt = DateTimeOffset.UtcNow.AddSeconds(AccountRules.ResendCooldownSeconds);
-        Notice = "New code sent. The old one no longer works.";
+        Notice = first ? $"Code sent to {Email}." : "New code sent. The old one no longer works.";
+        OnPropertyChanged(nameof(Subtitle));
+    });
+
+    /// <summary>The link under the form: back to sign in, or sign out from the code asked for at launch.</summary>
+    [RelayCommand]
+    private Task BackAsync() => RunAsync(async () =>
+    {
+        if (IsUnlock) await _session.SignOutAsync(); // the shell shows sign-in
+        else Show(AuthMode.SignIn);
     });
 
     [RelayCommand]
@@ -145,14 +202,16 @@ public sealed partial class AuthViewModel : ObservableObject
         Notice = "Password changed. Sign in with your new password.";
     });
 
-    private void GoToCode(Guid challengeId, bool signUp)
+    private void GoToCode(Guid challengeId, CodeFor codeFor)
     {
         _challengeId = challengeId;
-        _codeIsForSignUp = signUp;
+        _codeFor = codeFor;
         _resendAllowedAt = DateTimeOffset.UtcNow.AddSeconds(AccountRules.ResendCooldownSeconds);
         Code = "";
         Mode = AuthMode.Code;
         OnPropertyChanged(nameof(CodeIsForSignIn));
+        OnPropertyChanged(nameof(IsUnlock));
+        OnPropertyChanged(nameof(BackText));
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(Subtitle));
     }
@@ -173,6 +232,10 @@ public sealed partial class AuthViewModel : ObservableObject
         catch (ServerUnreachableException ex)
         {
             FormError = ex.Message;
+        }
+        catch (InvalidOperationException ex)
+        {
+            CodeError = ex.Message;
         }
         finally
         {
