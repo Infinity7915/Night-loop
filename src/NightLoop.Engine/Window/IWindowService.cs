@@ -26,4 +26,11 @@ public interface IWindowService
 
     /// <summary>Each monitor's work area (without the taskbar), primary monitor first.</summary>
     IReadOnlyList<ClientArea> GetMonitors() => [];
+
+    /// <summary>
+    /// Starts a program (or opens a file or shortcut, like double-clicking it). Returns the exe name of the process it
+    /// started, when Windows says, so its window can be waited for. Throws <see cref="InvalidOperationException"/>
+    /// with a readable message when it can't be started.
+    /// </summary>
+    string? Launch(string path, string? arguments) => throw new InvalidOperationException("Opening programs isn't available here.");
 }

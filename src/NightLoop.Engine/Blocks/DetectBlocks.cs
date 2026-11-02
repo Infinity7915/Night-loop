@@ -140,13 +140,21 @@ internal static class DetectBlocks
         b.GetString("method")
         ?? (ctx.Settings.TargetExe?.Contains("Roblox", StringComparison.OrdinalIgnoreCase) == true ? "rightDrag" : "mouseMove");
 
-    private static LookFor Text(Block b) => new("text", b.GetString("text", ""),
+    private static LookFor Text(Block b) => DetectBlocksLook.Text(b);
+    private static LookFor Picture(Block b) => DetectBlocksLook.Picture(b);
+    private static LookFor Target(Block b) => DetectBlocksLook.Target(b);
+}
+
+/// <summary>What each detect block looks for, shared with the editor's test look.</summary>
+internal static class DetectBlocksLook
+{
+    public static LookFor Text(Block b) => new("text", b.GetString("text", ""),
         Contains: b.GetString("match") == "contains", MatchCase: b.GetBool("matchCase") == true, Region: b.Params["region"]);
 
-    private static LookFor Picture(Block b) => new("image", b.GetString("image", ""), ImageData: b.GetString("imageData"),
+    public static LookFor Picture(Block b) => new("image", b.GetString("image", ""), ImageData: b.GetString("imageData"),
         ConfidencePct: b.GetInt("confidencePct", 90), Region: b.Params["region"]);
 
-    private static LookFor Target(Block b)
+    public static LookFor Target(Block b)
     {
         var kind = b.GetString("target", "text");
         return new LookFor(kind, b.GetString("value", ""), ImageData: b.GetString("imageData"),

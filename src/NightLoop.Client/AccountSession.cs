@@ -27,6 +27,7 @@ public sealed class AccountSession : IDisposable
     private readonly TimeProvider _clock;
     private CancellationTokenSource? _heartbeat;
     private string? _pendingEmail;
+    private UserDto? _pendingUser;
     private bool _offlineGraceRaised;
 
     public AccountSession(ApiClient api, ISessionStore store, DeviceIdentity device, TimeProvider? clock = null)
@@ -54,8 +55,9 @@ public sealed class AccountSession : IDisposable
     public event Action? OfflineGraceExpired;
 
     /// <summary>
-    /// Uses the saved token if there is one. True when signed in. Throws <see cref="ServerUnreachableException"/>
-    /// when offline, so the loading screen can offer Retry.
+    /// Uses the saved token if there is one. True when signed in, or when the account asks for a code every time
+    /// Night-loop opens: then <see cref="PendingUnlock"/> is set and <see cref="VerifyUnlockAsync"/> finishes it.
+    /// Throws <see cref="ServerUnreachableException"/> when offline, so the loading screen can offer Retry.
     /// </summary>
     public async Task<bool> TryRestoreAsync(CancellationToken ct = default)
     {
@@ -66,6 +68,31 @@ public sealed class AccountSession : IDisposable
         {
             var user = await _api.MeAsync(ct);
             MarkOnline();
+            if (user is { TwofaEnabled: true, TwofaMode: TwofaModes.EverySignin })
+            {
+                _pendingUser = user;
+                _pendingEmail = user.Email;
+                try
+                {
+                    var challenge = (await _api.StartUnlockAsync(ct)).ChallengeId;
+                    if (challenge is { } id)
+                    {
+                        PendingUnlock = id;
+                        return true;
+                    }
+                }
+                catch (ApiException ex) when (ex.Status is 404 or 405)
+                {
+                    // An older server without the launch code: carry on as before.
+                }
+                catch (ApiException ex) when (ex.Code is not (ErrorCodes.SessionInvalid or ErrorCodes.SessionReplaced or ErrorCodes.UpdateRequired))
+                {
+                    // No code could be sent (too many today, for one). The code screen says why and offers Resend.
+                    PendingUnlock = Guid.Empty;
+                    PendingUnlockError = ex.Message;
+                    return true;
+                }
+            }
             BecomeSignedIn(user, saved.Token);
             return true;
         }
@@ -74,6 +101,50 @@ public sealed class AccountSession : IDisposable
             ForgetToken();
             return false;
         }
+    }
+
+    /// <summary>The account asks for a code each time Night-loop opens: the challenge for this launch, until it's entered.</summary>
+    public Guid? PendingUnlock { get; private set; }
+    /// <summary>Why no launch code could be sent, when that happened.</summary>
+    public string? PendingUnlockError { get; private set; }
+    /// <summary>Where the launch code went.</summary>
+    public string? PendingUnlockEmail => _pendingUser?.Email;
+
+    /// <summary>Sends a launch code again (or for the first time, when sending failed).</summary>
+    public async Task<Guid> ResendUnlockAsync(CancellationToken ct = default)
+    {
+        if (PendingUnlock is not { } current) throw new InvalidOperationException("Night-loop isn't waiting for a code.");
+        Guid id;
+        if (current != Guid.Empty) id = (await _api.ResendCodeAsync(current, ct)).ChallengeId;
+        else if ((await _api.StartUnlockAsync(ct)).ChallengeId is { } started) id = started;
+        else
+        {
+            // The account no longer asks for a code at launch (changed on another PC): open it.
+            var user = await _api.MeAsync(ct);
+            PendingUnlock = null;
+            PendingUnlockError = null;
+            _pendingUser = null;
+            BecomeSignedIn(user, _api.Token!);
+            return Guid.Empty;
+        }
+        MarkOnline();
+        PendingUnlock = id;
+        PendingUnlockError = null;
+        return id;
+    }
+
+    /// <summary>The launch code was right: Night-loop opens.</summary>
+    public async Task<UserDto> VerifyUnlockAsync(string code, CancellationToken ct = default)
+    {
+        if (PendingUnlock is not { } id || _pendingUser is null) throw new InvalidOperationException("Night-loop isn't waiting for a code.");
+        if (id == Guid.Empty) throw new InvalidOperationException("No code was sent yet. Press Resend code.");
+        var user = await _api.FinishUnlockAsync(id, code.Trim(), ct);
+        MarkOnline();
+        PendingUnlock = null;
+        PendingUnlockError = null;
+        _pendingUser = null;
+        BecomeSignedIn(user, _api.Token!);
+        return user;
     }
 
     public async Task<SignInResult> SignInAsync(string email, string password, CancellationToken ct = default)
@@ -244,9 +315,12 @@ public sealed class AccountSession : IDisposable
 
     private void EndSession(SessionEndedEventArgs e)
     {
-        var wasSignedIn = IsSignedIn;
+        var wasSignedIn = IsSignedIn || PendingUnlock is not null;
         ForgetToken();
         User = null;
+        PendingUnlock = null;
+        PendingUnlockError = null;
+        _pendingUser = null;
         _heartbeat?.Cancel();
         _heartbeat = null;
         if (wasSignedIn || e.Reason == SessionEndReason.SignedOut) SignedOut?.Invoke(e);

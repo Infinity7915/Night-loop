@@ -1,11 +1,14 @@
 using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NightLoop.App.Controls;
 using NightLoop.Contracts.MacroDocument;
+using NightLoop.Engine.Blocks;
+using NightLoop.Engine.Runtime;
 using NightLoop.Engine.Screen;
 
 namespace NightLoop.App.ViewModels;
@@ -22,10 +25,13 @@ public sealed partial class MainViewModel
     private readonly DispatcherTimer _toastTimer;
     /// <summary>A new macro nobody has touched yet: changing the target game rebuilds it instead of saving it.</summary>
     private bool _pristine;
-    /// <summary>Where recorded blocks go: after the block selected when recording started.</summary>
-    private int? _recordAt;
+    /// <summary>Where recorded blocks go: after the block highlighted when recording started (null: at the end).</summary>
+    private Block? _recordAfter;
 
     [ObservableProperty] private bool _isToastVisible;
+    /// <summary>The picture the selected block looks for, as Night-loop compares it (grayscale). Null when it has none.</summary>
+    [ObservableProperty] private ImageSource? _inspectorImage;
+    [ObservableProperty] private string _inspectorImageText = "";
     /// <summary>"You've reached the limit…" after pressing New macro with every slot used.</summary>
     [ObservableProperty] private bool _showLimit;
 
@@ -94,17 +100,44 @@ public sealed partial class MainViewModel
         var target = b.GetString("target", "text");
         var finds = b.Type is BlockTypes.FindClick or BlockTypes.ScanTurn;
         var condition = b.Type is BlockTypes.If or BlockTypes.RepeatUntil
-            ? Conditions.Read(b.GetObject("condition")).Kind
+            ? Conditions.Read(b.GetObject("condition")).Kind.TrimStart('!')
             : "";
+        var hasImage = ImageDataOf(b) is { Length: > 0 };
 
-        if (fields.Any(f => f.Key == "region")) yield return new("Select region on screen", "region");
-        if (b.Type == BlockTypes.WaitForImage || (finds && target == "image") || condition.TrimStart('!') == "imageVisible")
-            yield return new("Capture image from screen", "image");
-        if (fields.Any(f => f.Key == "color") || (finds && target == "pixel") || condition.TrimStart('!') == "pixelColor")
+        if (b.Type == BlockTypes.WaitForImage || (finds && target == "image") || condition == "imageVisible")
+            yield return new(hasImage ? "Capture the picture again" : "Capture image from screen", "image");
+        if (fields.Any(f => f.Key == "region") || condition is "textVisible" or "imageVisible")
+            yield return new("Select region on screen", "region");
+        if (fields.Any(f => f.Key == "color") || (finds && target == "pixel") || condition == "pixelColor")
             yield return new("Pick color from screen", "color");
         if (b.Type is BlockTypes.Click or BlockTypes.Move) yield return new("Pick point on screen", "point");
         if (b.Type == BlockTypes.WindowResize) yield return new("Use current window size", "size");
         if (b.Type == BlockTypes.WindowPosition) yield return new("Use current window position", "position");
+        if (DetectProbe.CanTest(b)) yield return new(b.Type is BlockTypes.If or BlockTypes.RepeatUntil ? "Check it on screen now" : "Test on screen now", "test");
+    }
+
+    /// <summary>The saved picture of a picture block or an "Image visible" condition.</summary>
+    private static string? ImageDataOf(Block b) =>
+        b.Type is BlockTypes.If or BlockTypes.RepeatUntil
+            ? Conditions.Inner(b.GetObject("condition"))?["imageData"] is JsonValue v && v.TryGetValue(out string? s) ? s : null
+            : b.GetString("imageData");
+
+    /// <summary>The inspector's little preview of the picture a block looks for.</summary>
+    private void ShowImagePreview(Block? b)
+    {
+        InspectorImage = null;
+        InspectorImageText = "";
+        if (b is null || ImageDataOf(b) is not { Length: > 0 } data) return;
+        if (b.Type is BlockTypes.FindClick or BlockTypes.ScanTurn && b.GetString("target", "text") != "image") return;
+        if (!ImageTemplate.TryDecode(data, out var t) || t is null)
+        {
+            InspectorImageText = "The saved picture is damaged. Capture it again.";
+            return;
+        }
+        var bitmap = BitmapSource.Create(t.Width, t.Height, 96, 96, PixelFormats.Gray8, null, t.Gray, t.Width);
+        bitmap.Freeze();
+        InspectorImage = bitmap;
+        InspectorImageText = $"Looking for this picture · {t.Width}×{t.Height}. Night-loop compares it in grayscale, so colors don't matter.";
     }
 
     [RelayCommand]
@@ -122,6 +155,7 @@ public sealed partial class MainViewModel
                 "color" => await PickColorAsync(b),
                 "region" => await PickRegionAsync(b),
                 "image" => await CaptureImageAsync(b),
+                "test" => await TestOnScreenAsync(b),
                 _ => false,
             };
             if (!changed) return;
@@ -208,8 +242,54 @@ public sealed partial class MainViewModel
     {
         if (await PickAsync(PickMode.Region, "Drag over the area to look in") is not { } r) return false;
         if (ToBlockPoint(r.X, r.Y) is not { } p) return false;
-        b.Params["region"] = new JsonArray(p.X, p.Y, r.Width, r.Height);
+        var region = new JsonArray(p.X, p.Y, r.Width, r.Height);
+        if (b.Type is BlockTypes.If or BlockTypes.RepeatUntil)
+        {
+            var c = b.GetObject("condition")?.DeepClone() as JsonObject;
+            if (Conditions.Inner(c) is not { } inner) return false;
+            inner["region"] = region;
+            b.Params["condition"] = c;
+        }
+        else b.Params["region"] = region;
+        Status = $"It now looks only in that {r.Width}×{r.Height} area, which is faster and avoids look-alikes elsewhere.";
         return true;
+    }
+
+    /// <summary>
+    /// "Test on screen now": hides Night-loop, takes one look for what the block is set to find (no clicks, no
+    /// turning, no waiting) and says what it saw.
+    /// </summary>
+    private async Task<bool> TestOnScreenAsync(Block b)
+    {
+        var window = Application.Current?.MainWindow;
+        var exe = TargetExe;
+        var wasVisible = window?.IsVisible == true;
+        ProbeResult result;
+        try
+        {
+            window?.Hide();
+            if (exe is not null && _windows.IsProcessRunning(exe)) _windows.Focus(exe);
+            await Task.Delay(350); // let the windows behind redraw first
+            var env = new RunEnvironment
+            {
+                Input = new Engine.Input.Win32InputSender(), // not used: a test look sends no input
+                Windows = _windows,
+                Screen = _screen,
+                Text = _runs.Text,
+                IsKeyDown = Engine.Input.KeyState.IsDown,
+            };
+            result = await DetectProbe.LookOnceAsync(b, env, exe);
+        }
+        finally
+        {
+            if (wasVisible && window is not null)
+            {
+                window.Show();
+                window.Activate();
+            }
+        }
+        Status = result.Message;
+        return false;
     }
 
     private async Task<bool> CaptureImageAsync(Block b)
@@ -241,7 +321,7 @@ public sealed partial class MainViewModel
         {
             b.Params["image"] = name;
         }
-        Status = $"Saved a {r.Width}×{r.Height} picture in this block.";
+        Status = $"Saved a {r.Width}×{r.Height} picture in this block. Its preview is in the block editor.";
         return true;
     }
 
@@ -288,7 +368,7 @@ public sealed partial class MainViewModel
 
     private bool NoGame()
     {
-        Status = "Pick a target game in Settings, or type a process name in this block.";
+        Status = "Pick a target game in Settings, or pick the program in this block.";
         return false;
     }
 

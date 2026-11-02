@@ -69,6 +69,17 @@ internal sealed class FakeWindows : IWindowService
     public bool Focus(string exeName) { Calls.Add($"focus {exeName}"); return true; }
     public ClientArea? GetWindowBounds(string exeName) => Bounds;
     public IReadOnlyList<ClientArea> GetMonitors() => Monitors;
+
+    /// <summary>What a launch does; by default the program opens its window at once.</summary>
+    public Func<string, string?>? OnLaunch { get; set; }
+
+    public string? Launch(string path, string? arguments)
+    {
+        Calls.Add($"launch {path}{(string.IsNullOrEmpty(arguments) ? "" : " " + arguments)}");
+        if (OnLaunch is { } launch) return launch(path);
+        Running = true;
+        return null;
+    }
 }
 
 /// <summary>A fake desktop: one solid color plus painted rectangles. Thread-safe enough for one run.</summary>

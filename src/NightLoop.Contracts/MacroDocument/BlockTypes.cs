@@ -52,8 +52,13 @@ public static class BlockTypes
     public const string WindowResize = "window.resize";
     public const string WindowPosition = "window.position";
     public const string WindowFocus = "window.focus";
-    /// <summary>Pause until a window opens and comes to the front. Params: process (optional), timeoutMs.</summary>
+    /// <summary>Pause until a window opens (and comes to the front). Params: process (optional), until (front/open), timeoutMs.</summary>
     public const string WaitForWindow = "window.waitFor";
+    /// <summary>
+    /// Start a program (or open a file or shortcut). Params: path, args (optional), ifRunning (focus/new),
+    /// wait (wait for its window, default true), timeoutMs.
+    /// </summary>
+    public const string WindowOpen = "window.open";
 
     public const string Comment = "utility.comment";
     public const string Description = "utility.description";
@@ -70,7 +75,7 @@ public static class BlockTypes
         Wait, WaitRandom, WaitForText, WaitForImage, Pause, Resume, WaitForKey,
         DetectText, DetectImage, DetectPixelColor, FindClick, ScanTurn,
         If, Else, End, Loop, RepeatUntil, Label, Goto, Stop,
-        WindowResize, WindowPosition, WindowFocus, WaitForWindow,
+        WindowResize, WindowPosition, WindowFocus, WaitForWindow, WindowOpen,
         Comment, Description, Notify, PlaySound, RunMacro, Screenshot,
     };
 

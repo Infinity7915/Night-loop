@@ -58,19 +58,22 @@ public static class SmokeTest
         var loading = new LoadingViewModel(() => Task.CompletedTask, () => Task.CompletedTask);
         loading.Fail("Smoke test: the server isn't running.", offerUpdate: true);
 
-        // The Macros screen gets sample blocks and saved macros so the pictures show a filled editor.
-        MainViewModel? macros = null;
-        MainViewModel SampleMacros()
+        // The Macros screen gets sample blocks and saved macros so the pictures show a filled editor. Each variant
+        // has the inspector on a different block: a window block, a picture with its preview, and Open window.
+        var samples = new Dictionary<string, MainViewModel>();
+        MainViewModel SampleMacros(string select = "position")
         {
-            if (macros is not null) return macros;
+            if (samples.TryGetValue(select, out var existing)) return existing;
+            // Only one editor holds F6 and F9 at a time (the app never has two); free them for the new one.
+            foreach (var old in samples.Values) old.Dispose();
             var dir = Path.Combine(Path.GetTempPath(), "nightloop-smoke");
             Directory.CreateDirectory(dir);
             var api = new Client.ApiClient(new System.Net.Http.HttpClient { BaseAddress = new Uri("http://127.0.0.1:9/v1/") }, Guid.Empty, "smoke");
             var games = new TargetGamesViewModel(new LocalData.GamesStore(Path.Combine(dir, "games.json")),
                 new LocalData.LocalSettings(Path.Combine(dir, "settings.json")));
-            macros = new MainViewModel(api, games);
-            macros.ShowSample();
-            return macros;
+            var macros = new MainViewModel(api, games, new LocalData.LocalSettings(Path.Combine(dir, "settings.json")));
+            macros.ShowSample(select);
+            return samples[select] = macros;
         }
 
         // Settings needs the app shell behind it (account, updates, games). It stays offline here.
@@ -89,6 +92,9 @@ public static class SmokeTest
             ("macros-full", () => new MacrosView { DataContext = SampleMacros() }, 1060, 2300),
             ("macros-narrow", () => new MacrosView { DataContext = SampleMacros() }, 740, 3000),
             ("macros-wide", () => new MacrosView { DataContext = SampleMacros() }, 1700, 2000),
+            // The loaded macro's options (record key) and a picture block with its preview.
+            ("macros-picture", () => new MacrosView { DataContext = SampleMacros("image") }, 1060, 2100),
+            ("macros-open-window", () => new MacrosView { DataContext = SampleMacros("open") }, 1060, 1300),
             ("settings", () => new SettingsView { DataContext = SampleSettings() }, 1060, 1700),
             ("settings-narrow", () => new SettingsView { DataContext = SampleSettings() }, 740, 1900),
             ("window", MainWindowContent, 1280, 800),

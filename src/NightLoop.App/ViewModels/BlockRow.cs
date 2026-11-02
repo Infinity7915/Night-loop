@@ -34,7 +34,12 @@ public sealed partial class BlockRow : ObservableObject
     [NotifyPropertyChangedFor(nameof(InlineDetail))]
     private string _detail = "";
     /// <summary>The detail shown after the title. Descriptions show theirs on its own lines instead.</summary>
-    public string InlineDetail => IsDescription ? "" : Detail;
+    public string InlineDetail => IsDescription ? "" : HeldFor.Length > 0 ? $"{Detail} · {HeldFor}" : Detail;
+
+    /// <summary>On a Hold down: how long until its Let go ("held 130 ms"). Set by the timeline.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(InlineDetail))]
+    private string _heldFor = "";
     [ObservableProperty] private string _note = "";
     /// <summary>A Description block's text, shown under its title.</summary>
     [ObservableProperty] private string _descriptionText = "";

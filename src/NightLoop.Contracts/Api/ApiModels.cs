@@ -73,7 +73,14 @@ public sealed record ChangePasswordRequest(string CurrentPassword, string NewPas
 
 public sealed record VerifyCodeRequest(Guid ChallengeId, string Code);
 
+/// <summary>CurrentPassword may be empty when the change only makes sign-in stricter (see AccountRules.SecurityChangeNeedsPassword).</summary>
 public sealed record SecurityRequest(bool TwofaEnabled, string TwofaMode, string CurrentPassword);
+
+/// <summary>
+/// POST /me/unlock, sent when the app starts with a saved session. With codes on every sign-in, a code is emailed and
+/// ChallengeId is set: the app asks for it (POST /me/unlock/verify) before opening the account. Null: carry on.
+/// </summary>
+public sealed record UnlockResponse(Guid? ChallengeId);
 
 public sealed record DeleteAccountRequest(string CurrentPassword);
 

@@ -20,6 +20,7 @@ internal sealed class MacroBuilder
 
     public MacroBuilder Press(string key, int holdMs = 30) => Add(BlockTypes.Key, new() { ["key"] = key, ["holdMs"] = holdMs });
     public MacroBuilder Down(string key) => Add(BlockTypes.Key, new() { ["key"] = key, ["action"] = "down" });
+    public MacroBuilder Up(string key) => Add(BlockTypes.Key, new() { ["key"] = key, ["action"] = "up" });
     public MacroBuilder Wait(int ms) => Add(BlockTypes.Wait, new() { ["ms"] = ms });
     public MacroBuilder Loop(int count) => Add(BlockTypes.Loop, new() { ["count"] = count });
     public MacroBuilder If(JsonObject condition) => Add(BlockTypes.If, new() { ["condition"] = condition });

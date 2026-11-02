@@ -88,6 +88,35 @@
       </Setter>
     </Style>
     <!-- Dashed tool button in the inspector: "Pick point on screen". -->
+    <!-- A program box: looks like a text box, opens File Explorer when clicked. -->
+    <Style x:Key="ProgramBox" TargetType="Button">
+      <Setter Property="Foreground" Value="{DynamicResource Text}" />
+      <Setter Property="Background" Value="{DynamicResource Bg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Border}" />
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="Padding" Value="10,4" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="{TemplateBinding Padding}">
+              <ContentPresenter VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
     <Style x:Key="ToolButton" TargetType="Button">
       <Setter Property="Foreground" Value="{DynamicResource TextSoft}" />
       <Setter Property="MinHeight" Value="40" />
@@ -248,7 +277,7 @@
                 </WrapPanel>
               </StackPanel>
               <WrapPanel VerticalAlignment="Center" HorizontalAlignment="Left">
-                <Button Command="{Binding ToggleRecordCommand}" Margin="0,4,0,4" ToolTip="{Binding RecordHotkeyText}">
+                <Button Command="{Binding ToggleRecordCommand}" Margin="0,4,0,4" ToolTip="{Binding RecordToolTip}">
                   <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource Tall}">
                       <Setter Property="Padding" Value="16,0" />
@@ -276,11 +305,24 @@
                     </TextBlock>
                   </StackPanel>
                 </Button>
-                <Button Content="Step" Command="{Binding StepCommand}" Style="{StaticResource Tall}" Margin="10,4,0,4"
-                        ToolTip="Run one block at a time, starting at the selected block" />
-                <Button Content="{Binding RunFromText}" Command="{Binding RunFromCommand}" Style="{StaticResource Tall}" Margin="10,4,0,4"
-                        IsEnabled="{Binding HasSelection}" ToolTip="Play from the selected block" />
-                <Button Command="{Binding TogglePlayCommand}" MinWidth="88" Margin="10,4,0,4" Content="{Binding PlayText}">
+                <!-- The record key: click it to change it (opens the options) -->
+                <Button Command="{Binding CaptureRecordHotkeyCommand}" Margin="10,4,0,4" Cursor="Hand" Focusable="False"
+                        ToolTip="Start / stop recording key. Click to change it.">
+                  <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                      <Border x:Name="Chip" Style="{StaticResource KeyChip}">
+                        <TextBlock Text="{Binding RecordHotkeyText}" Style="{StaticResource KeyChipText}" />
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Button.Template>
+                </Button>
+                <Button Command="{Binding TogglePlayCommand}" MinWidth="88" Margin="16,4,0,4" Content="{Binding PlayText}"
+                        ToolTip="{Binding PlayToolTip}">
                   <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource TallPrimary}">
                       <Style.Triggers>
@@ -319,8 +361,22 @@
                           ToolTip="Click, then press a key. Backspace clears it." />
                   <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="Start / stop key" FontWeight="SemiBold" />
+                    <TextBlock Text="Plays this macro from any window, even when another one is open here." Style="{StaticResource SmallLabel}"
+                               Margin="0,2,0,0" TextWrapping="Wrap" />
                     <TextBlock Text="{Binding EditorHotkeyError}" FontSize="12" Foreground="{DynamicResource Warning}" Margin="0,2,0,0"
                                TextWrapping="Wrap" Visibility="{Binding EditorHotkeyError, Converter={StaticResource TextToVisible}}" />
+                  </StackPanel>
+                </DockPanel>
+                <DockPanel Margin="0,14,0,0">
+                  <Button DockPanel.Dock="Right" Content="{Binding RecordHotkeyLabel}" Command="{Binding CaptureRecordHotkeyCommand}"
+                          FontFamily="{StaticResource Mono}" FontSize="13" FontWeight="Normal" MinHeight="44" MaxWidth="280" Background="{DynamicResource Bg}"
+                          ToolTip="Click, then press a key. Backspace puts F9 back." />
+                  <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="Start / stop recording key" FontWeight="SemiBold" />
+                    <TextBlock Text="Works from any window. Used for every macro on this PC." Style="{StaticResource SmallLabel}" Margin="0,2,0,0"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding RecordHotkeyError}" FontSize="12" Foreground="{DynamicResource Warning}" Margin="0,2,0,0"
+                               TextWrapping="Wrap" Visibility="{Binding RecordHotkeyError, Converter={StaticResource TextToVisible}}" />
                   </StackPanel>
                 </DockPanel>
                 <DockPanel Margin="0,14,0,0">
@@ -485,7 +541,7 @@
 
               <!-- Timeline -->
               <Grid MinHeight="200" Margin="0,8">
-                <ItemsControl ItemsSource="{Binding Blocks}">
+                <ItemsControl x:Name="Timeline" ItemsSource="{Binding Blocks}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:BlockRow}">
                       <Grid x:Name="Row" Margin="12,0" Background="Transparent" Cursor="Hand" MouseLeftButtonUp="OnRowClick">
@@ -614,6 +670,71 @@
                                      FontSize="13" Visibility="{Binding IsMultiLine, Converter={StaticResource BoolToVisible}}" />
                             <ComboBox ItemsSource="{Binding Choices}" SelectedItem="{Binding SelectedChoice}" MinHeight="40"
                                       Visibility="{Binding IsChoice, Converter={StaticResource BoolToVisible}}" />
+                            <!-- Program: click for File Explorer, the arrow lists running apps -->
+                            <Grid Visibility="{Binding IsProgram, Converter={StaticResource BoolToVisible}}">
+                              <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                              </Grid.ColumnDefinitions>
+                              <Button Style="{StaticResource ProgramBox}" Command="{Binding BrowseCommand}" ToolTip="{Binding Value}">
+                                <DockPanel>
+                                  <TextBlock DockPanel.Dock="Right" Text="&#xE8B7;" FontFamily="{StaticResource Icons}" FontSize="14"
+                                             Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                  <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding ProgramName}" FontFamily="{StaticResource Mono}" FontSize="13" TextTrimming="CharacterEllipsis"
+                                               Visibility="{Binding HasProgram, Converter={StaticResource BoolToVisible}}" />
+                                    <TextBlock Text="{Binding Placeholder}" Style="{StaticResource Muted}" FontSize="13" TextTrimming="CharacterEllipsis"
+                                               Visibility="{Binding HasProgram, Converter={StaticResource BoolToVisible}, ConverterParameter=invert}" />
+                                    <TextBlock Text="{Binding ProgramFolder}" Style="{StaticResource Muted}" FontSize="11" TextTrimming="CharacterEllipsis"
+                                               Visibility="{Binding ProgramFolder, Converter={StaticResource TextToVisible}}" />
+                                  </StackPanel>
+                                </DockPanel>
+                              </Button>
+                              <ToggleButton x:Name="RunningPick" Grid.Column="1" IsChecked="{Binding IsPickingRunning}" Width="40" MinHeight="40"
+                                            Margin="6,0,0,0" ToolTip="Pick a running app" Cursor="Hand" FocusVisualStyle="{x:Null}">
+                                <ToggleButton.Template>
+                                  <ControlTemplate TargetType="ToggleButton">
+                                    <Border x:Name="Bd" Background="{DynamicResource Bg}" BorderBrush="{DynamicResource Border}" BorderThickness="1"
+                                            CornerRadius="8">
+                                      <TextBlock Text="&#xE70D;" FontFamily="{StaticResource Icons}" FontSize="12" Foreground="{DynamicResource TextMuted}"
+                                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                      <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                      </Trigger>
+                                      <Trigger Property="IsChecked" Value="True">
+                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                      </Trigger>
+                                    </ControlTemplate.Triggers>
+                                  </ControlTemplate>
+                                </ToggleButton.Template>
+                              </ToggleButton>
+                              <Popup IsOpen="{Binding IsPickingRunning}" PlacementTarget="{Binding ElementName=RunningPick}" Placement="Bottom"
+                                     HorizontalOffset="-240" StaysOpen="False" AllowsTransparency="True" PopupAnimation="Fade">
+                                <Border Background="{DynamicResource PanelRaised}" BorderBrush="{DynamicResource Border}" BorderThickness="1"
+                                        CornerRadius="8" Margin="0,4,0,0" Padding="4" Width="280" MaxHeight="320">
+                                  <Grid>
+                                    <ListBox ItemsSource="{Binding RunningPrograms}" SelectedItem="{Binding PickedRunning}" Background="Transparent"
+                                             BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                      <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                          <StackPanel Margin="6,4">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Exe}" FontFamily="{StaticResource Mono}" FontSize="12"
+                                                       Foreground="{DynamicResource TextMuted}" TextTrimming="CharacterEllipsis" />
+                                          </StackPanel>
+                                        </DataTemplate>
+                                      </ListBox.ItemTemplate>
+                                    </ListBox>
+                                    <TextBlock Text="No apps with a window are running." Style="{StaticResource Muted}" Margin="10,8"
+                                               Visibility="{Binding RunningPrograms.Count, Converter={StaticResource ZeroToVisible}}" />
+                                  </Grid>
+                                </Border>
+                              </Popup>
+                            </Grid>
+                            <Button Style="{StaticResource LinkButton}" Content="Clear" HorizontalAlignment="Left" Margin="0,6,0,0"
+                                    Command="{Binding ClearProgramCommand}" Visibility="{Binding CanClear, Converter={StaticResource BoolToVisible}}" />
                             <TextBlock Text="{Binding Hint}" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
                                        Visibility="{Binding HasHint, Converter={StaticResource BoolToVisible}}" />
                             <TextBlock Text="{Binding Error}" Style="{StaticResource FieldError}"
@@ -628,6 +749,15 @@
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <!-- The picture this block looks for -->
+                    <StackPanel Margin="0,16,0,0" Visibility="{Binding InspectorImageText, Converter={StaticResource TextToVisible}}">
+                      <Border Background="{DynamicResource Bg}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="8" Padding="8"
+                              HorizontalAlignment="Left" Visibility="{Binding InspectorImage, Converter={StaticResource NullToVisible}}">
+                        <Image Source="{Binding InspectorImage}" MaxHeight="120" MaxWidth="230" Stretch="Uniform" StretchDirection="Both"
+                               RenderOptions.BitmapScalingMode="NearestNeighbor" SnapsToDevicePixels="True" />
+                      </Border>
+                      <TextBlock Text="{Binding InspectorImageText}" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" />
+                    </StackPanel>
                     <ItemsControl ItemsSource="{Binding InspectorTools}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:InspectorTool}">

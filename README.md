@@ -12,26 +12,30 @@ Night-loop never touches game memory. It only sends ordinary input through Windo
 ## What works today
 
 - **Record** keyboard and mouse with low-level hooks. Quick presses become one block, overlapping keys
-  (like Ctrl+C, or holding W while clicking) become separate down/up blocks so they replay exactly.
+  (like Ctrl+C, or holding W while clicking) become separate down/up blocks with their real hold times, so
+  they replay exactly. A new recording goes under the selected block.
   Pauses over 50 ms become Wait blocks. Clicks inside the target game are saved relative to its window.
 - **Replay** with `SendInput` using scan codes (many games ignore virtual-key events), eased mouse moves,
   drags, double clicks, scrolling and typing.
 - **Safety**: every key and button a macro presses is released when it stops, pauses or fails.
   **Ctrl+Alt+End** stops every macro at once. A target lock waits instead of typing into another window.
 - **Engine**: loops, repeat-until, if/else, labels and go-to, repeat count or forever, humanize
-  (random timing and mouse jitter), breakpoints and single-step, several macros at once.
-- **Editor**: build macros from 38 blocks in seven categories (Input, Camera, Timing, Detect, Logic, Window,
+  (random timing and mouse jitter), breakpoints, play from any block, several macros at once.
+- **Editor**: build macros from 39 blocks in seven categories (Input, Camera, Timing, Detect, Logic, Window,
   Utility). Reorder, duplicate, switch off or add notes to blocks, edit each block's settings in the side
-  panel, and debug with breakpoints, **Step** and **Run from**. Block settings can be picked straight off the
-  screen: a point, a color, a region or a picture to look for. New macros start with a starter sequence
+  panel, and debug with breakpoints. **Play** starts from the selected block and **Record** adds new blocks
+  under it. Block settings can be picked straight off the screen: a point, a color, a region or a picture to
+  look for (with a preview and a one-click test). Window blocks pick programs with File Explorer, and
+  **Open window** starts one. New macros start with a starter sequence
   (focus, resize and position the game window, a loop to fill in, a notification), which Settings can turn off.
 - **Screen reading**: wait for text (Windows' built-in text recognition), an image or a pixel color; find and
   click; scan and turn the camera until something shows up; if/until conditions on what's on screen.
 - **Saved macros**: groups with colors, search, a drafts banner with **Save all**, and per-macro start/stop
   keys (toggle or hold) with an on/off switch, so several macros can run side by side.
-- **Settings**: dark (deep purple), light or system theme with four accent colors, target games (Roblox,
+- **Settings**: dark (deep purple), light or system theme with four accent colors, always on top, target games (Roblox,
   Fortnite, Minecraft, or add any running app), a switch for the starter sequence new macros begin with,
-  account changes (username, email, password with email codes), two-factor sign-in, delete account.
+  account changes (username, email, password with email codes), two-factor sign-in (a code on new PCs only
+  by default, or every time Night-loop opens), delete account.
 - **Accounts**: sign up with an emailed code, sign in (optionally trusting a PC for 30 days), forgot
   password. One PC is signed in at a time; signing in elsewhere signs this PC out and stops its macros.
 - **Sync**: macros live on your account (up to 15). Edits autosave as a draft within a couple of seconds;
@@ -63,7 +67,9 @@ example [Night-loop-Server](https://github.com/Infinity7915/Night-loop-Server) r
 1. Create an account or sign in. In development the server prints the 6-digit code in its console.
 2. Pick a target game (or N/A for any window).
 3. Press **Record** or **F9**, do your thing, press **F9** again. It's saved to your account as a draft.
-4. Press **Play** or **F6** to replay. **F6** stops it, **Ctrl+Alt+End** stops everything.
+   The key next to Record changes F9 to another key.
+4. Press **Play** or **F6** to replay (from the selected block, if one is). **F6** stops it,
+   **Ctrl+Alt+End** stops everything.
 5. Press **Save** to keep this version.
 
 Night-loop runs with normal user rights. Windows won't let it send input to a game that runs as

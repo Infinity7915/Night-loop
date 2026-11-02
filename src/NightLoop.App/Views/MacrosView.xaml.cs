@@ -19,9 +19,20 @@ public partial class MacrosView : UserControl
     {
         InitializeComponent();
         PreviewKeyDown += OnPreviewKeyDown;
+        DataContextChanged += (_, e) =>
+        {
+            if (e.OldValue is MainViewModel old) old.RevealRequested -= Reveal;
+            if (e.NewValue is MainViewModel now) now.RevealRequested += Reveal;
+        };
     }
 
     private MainViewModel? Vm => DataContext as MainViewModel;
+
+    /// <summary>Scrolls a timeline row into sight once it's laid out (after recording, the new blocks).</summary>
+    private void Reveal(int index) => Dispatcher.BeginInvoke(() =>
+    {
+        if (Timeline.ItemContainerGenerator.ContainerFromIndex(index) is FrameworkElement row) row.BringIntoView();
+    }, System.Windows.Threading.DispatcherPriority.Loaded);
 
     private void OnRowClick(object sender, MouseButtonEventArgs e)
     {
@@ -33,8 +44,8 @@ public partial class MacrosView : UserControl
     {
         if (Vm is not { } vm) return;
 
-        // Capturing a start/stop key for the loaded macro or a saved one.
-        if (vm.IsCapturingEditorHotkey || vm.CapturingRow is not null)
+        // Capturing a start/stop key for the loaded macro or a saved one, or the record key.
+        if (vm.IsCapturingKey)
         {
             var key = e.Key == Key.System ? e.SystemKey : e.Key;
             var vk = KeyInterop.VirtualKeyFromKey(key);
@@ -46,8 +57,17 @@ public partial class MacrosView : UserControl
             if (key is Key.Back or Key.Delete) clear = true;
             else if (key != Key.Escape && KeyCatalog.NameOf(vk) is not null) hotkey = new Hotkey(CurrentModifiers(), vk);
 
-            if (vm.IsCapturingEditorHotkey) vm.OnEditorHotkeyCaptured(hotkey, clear);
+            if (vm.IsCapturingRecordHotkey) vm.OnRecordHotkeyCaptured(hotkey, clear);
+            else if (vm.IsCapturingEditorHotkey) vm.OnEditorHotkeyCaptured(hotkey, clear);
             else vm.CapturingRow?.OnCaptured(hotkey, clear);
+            return;
+        }
+
+        // Esc lets go of the highlighted block, so Play runs from the top and Record adds at the end.
+        if (e.Key == Key.Escape && vm.HasSelection && !IsTyping(e.OriginalSource))
+        {
+            vm.ClearSelection();
+            e.Handled = true;
             return;
         }
 

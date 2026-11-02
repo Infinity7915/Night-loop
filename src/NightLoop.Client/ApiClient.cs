@@ -99,6 +99,16 @@ public sealed class ApiClient
     public async Task<UserDto> UpdateSecurityAsync(SecurityRequest req, CancellationToken ct = default) =>
         (await SendAsync<MeResponse>(HttpMethod.Patch, "me/security", req, ct)).User;
 
+    /// <summary>
+    /// "Every sign-in" accounts: asks for the code that opens Night-loop on this launch. The server reuses a code
+    /// it sent in the last few minutes. ChallengeId is null when no code is needed.
+    /// </summary>
+    public Task<UnlockResponse> StartUnlockAsync(CancellationToken ct = default) =>
+        SendAsync<UnlockResponse>(HttpMethod.Post, "me/unlock", null, ct);
+
+    public async Task<UserDto> FinishUnlockAsync(Guid challengeId, string code, CancellationToken ct = default) =>
+        (await SendAsync<MeResponse>(HttpMethod.Post, "me/unlock/verify", new VerifyCodeRequest(challengeId, code), ct)).User;
+
     public Task DeleteAccountAsync(string currentPassword, CancellationToken ct = default) =>
         SendAsync<object>(HttpMethod.Delete, "me", new DeleteAccountRequest(currentPassword), ct);
 

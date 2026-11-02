@@ -18,6 +18,7 @@ internal sealed class MessageLoopThread : IDisposable
     private readonly Thread _thread;
     private readonly ManualResetEventSlim _ready = new();
     private uint _threadId;
+    private volatile bool _closed;
 
     public MessageLoopThread(string name, Action<MSG> onMessage)
     {
@@ -28,9 +29,11 @@ internal sealed class MessageLoopThread : IDisposable
     }
 
     /// <summary>Runs <paramref name="func"/> on the loop thread and returns its result.</summary>
+    /// <exception cref="ObjectDisposedException">The loop has stopped (waiting for it would never end).</exception>
     public T Invoke<T>(Func<T> func)
     {
         if (Environment.CurrentManagedThreadId == _thread.ManagedThreadId) return func();
+        if (_closed || !_thread.IsAlive) throw new ObjectDisposedException(_thread.Name);
         var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
         _work.Enqueue(() =>
         {
@@ -65,6 +68,8 @@ internal sealed class MessageLoopThread : IDisposable
 
     public void Dispose()
     {
+        if (_closed) return;
+        _closed = true;
         if (_thread.IsAlive)
         {
             PInvoke.PostThreadMessage(_threadId, PInvoke.WM_QUIT, 0, 0);

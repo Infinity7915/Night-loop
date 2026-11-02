@@ -24,6 +24,11 @@ public sealed class RecordingOptions
     /// <summary>The stop hotkey. Its modifier presses at the very end are dropped so they don't get replayed.</summary>
     public Hotkey? StopHotkey { get; init; }
     public int MaxBlocks { get; init; } = MacroLimits.MaxBlocks;
+    /// <summary>
+    /// The most JSON the recorded blocks may add. Recording into a macro that already has blocks passes what's left,
+    /// so the macro stays under the size limit.
+    /// </summary>
+    public int MaxBytes { get; init; } = MacroLimits.MaxDocumentBytes * 9 / 10;
     /// <summary>Paths are simplified until no point is further than this from the line the replay follows.</summary>
     public double PathTolerancePx { get; init; } = 1.5;
 }
@@ -70,10 +75,25 @@ public static class RecordingBuilder
         {
             var result = Emit(ToActions(cleaned, options, tolerance), options);
             // Long recordings with lots of movement: simplify paths harder until the macro fits the size limit.
-            if (tolerance > 64 || MacroJson.ByteSize(new MacroDoc { Name = "x", Blocks = result.Blocks }) <= MacroLimits.MaxDocumentBytes * 9 / 10)
-                return result;
+            if (Size(result.Blocks) <= options.MaxBytes) return result;
+            if (tolerance > 64) return TrimToFit(result.Blocks, options.MaxBytes);
             tolerance *= 2;
         }
+    }
+
+    private static int Size(List<Block> blocks) => MacroJson.ByteSize(new MacroDoc { Name = "x", Blocks = blocks });
+
+    /// <summary>Still too big with the simplest paths: keep as many blocks from the start as fit.</summary>
+    private static RecordingResult TrimToFit(List<Block> blocks, int maxBytes)
+    {
+        int lo = 0, hi = blocks.Count;
+        while (lo < hi)
+        {
+            var mid = (lo + hi + 1) / 2;
+            if (Size(blocks[..mid]) <= maxBytes) lo = mid;
+            else hi = mid - 1;
+        }
+        return new RecordingResult(blocks[..lo], Truncated: true);
     }
 
     /// <summary>Drops key auto-repeat, releases that were pressed before recording started, and the stop hotkey's modifiers.</summary>
@@ -87,6 +107,8 @@ public static class RecordingBuilder
         {
             switch (e.Kind)
             {
+                // Keys Night-loop has no name for (media keys, some OEM keys) can't be saved in a macro.
+                case RawInputKind.KeyDown or RawInputKind.KeyUp when KeyCatalog.NameOf(e.VirtualKey) is null: continue;
                 case RawInputKind.KeyDown when !keys.Add(e.VirtualKey): continue;
                 case RawInputKind.KeyUp when !keys.Remove(e.VirtualKey): continue;
                 case RawInputKind.MouseDown when !buttons.Add(e.Button): continue;
@@ -455,6 +477,8 @@ public static class RecordingBuilder
         var blocks = new List<Block>();
         var truncated = false;
         long? prevEnd = null;
+        // Gaps too short for their own wait add up here, so many quick inputs in a row keep their real pace.
+        long carried = 0;
         var next = 1;
         string Id() => $"b{next++}";
 
@@ -472,13 +496,15 @@ public static class RecordingBuilder
             var lead = block.Type is BlockTypes.Click or BlockTypes.Drag ? block.GetInt("moveMs", 0) : 0;
             if (prevEnd is { } pe)
             {
-                var gap = a.Start - pe - lead;
+                var gap = a.Start - pe - lead + carried;
+                carried = 0;
                 while (gap > o.MinWaitMs)
                 {
                     var ms = (int)Math.Min(gap, MacroLimits.WaitMaxMs);
                     if (!Add(Block.Create(Id(), BlockTypes.Wait, new JsonObject { ["ms"] = ms }))) break;
                     gap -= ms;
                 }
+                if (gap > 0) carried = gap;
             }
             if (truncated || !Add(a.Make(Id()))) break;
             prevEnd = Math.Max(prevEnd ?? a.End, a.End);

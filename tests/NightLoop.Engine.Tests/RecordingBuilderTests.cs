@@ -9,7 +9,7 @@ namespace NightLoop.Engine.Tests;
 
 public class RecordingBuilderTests
 {
-    private const int A = 0x41, C = 0x43, W = 0x57, LCtrl = 0xA2, F9 = 0x78;
+    private const int A = 0x41, C = 0x43, T = 0x54, W = 0x57, LCtrl = 0xA2, F9 = 0x78;
 
     private static List<Block> Build(RecordingOptions? o, params E[] events) => RecordingBuilder.Build(events, o).Blocks;
     private static List<Block> Build(params E[] events) => Build(null, events);
@@ -34,13 +34,49 @@ public class RecordingBuilderTests
     }
 
     [Fact]
-    public void Gaps_over_50ms_become_waits_and_shorter_gaps_do_not()
+    public void Gaps_over_50ms_become_waits_and_shorter_gaps_carry_into_the_next_wait()
     {
         var blocks = Build(
             E.KeyDown(0, A), E.KeyUp(50, A),
-            E.KeyDown(80, A), E.KeyUp(130, A),     // 30 ms gap: no wait
-            E.KeyDown(530, A), E.KeyUp(580, A));   // 400 ms gap: wait
-        Assert.Equal(["key A press 50", "key A press 50", "wait 400", "key A press 50"], Describe(blocks));
+            E.KeyDown(80, A), E.KeyUp(130, A),     // 30 ms gap: no wait of its own
+            E.KeyDown(530, A), E.KeyUp(580, A));   // 400 ms gap, plus the 30 ms carried over
+        Assert.Equal(["key A press 50", "key A press 50", "wait 430", "key A press 50"], Describe(blocks));
+    }
+
+    [Fact]
+    public void Many_short_gaps_add_up_so_the_replay_keeps_its_pace()
+    {
+        var blocks = Build(
+            E.KeyDown(0, A), E.KeyUp(40, A),
+            E.KeyDown(80, A), E.KeyUp(120, A),     // 40 ms
+            E.KeyDown(160, A), E.KeyUp(200, A));   // 40 ms: 80 ms carried
+        Assert.Equal(["key A press 40", "key A press 40", "wait 80", "key A press 40"], Describe(blocks));
+    }
+
+    [Fact]
+    public void Ctrl_held_past_the_letter_replays_in_the_same_order()
+    {
+        // Ctrl down, T pressed and released quickly, Ctrl let go a little later (opening a browser tab).
+        var blocks = Build(E.KeyDown(0, LCtrl), E.KeyDown(30, T), E.KeyUp(90, T), E.KeyUp(130, LCtrl));
+        Assert.Equal(["key LeftCtrl down", "key T press 60", "wait 70", "key LeftCtrl up"], Describe(blocks));
+    }
+
+    [Fact]
+    public void Keys_without_a_name_are_left_out_so_the_macro_stays_valid()
+    {
+        var blocks = Build(E.KeyDown(0, 0xFF), E.KeyUp(40, 0xFF), E.KeyDown(500, A), E.KeyUp(550, A));
+        Assert.Equal(["key A press 50"], Describe(blocks));
+    }
+
+    [Fact]
+    public void A_byte_budget_cuts_the_recording_short()
+    {
+        var events = new List<RawInputEvent>();
+        for (var i = 0; i < 200; i++) { events.Add(E.KeyDown(i * 200, A)); events.Add(E.KeyUp(i * 200 + 50, A)); }
+        var result = RecordingBuilder.Build(events, new RecordingOptions { MaxBytes = 2_000 });
+        Assert.True(result.Truncated);
+        Assert.NotEmpty(result.Blocks);
+        Assert.True(MacroJson.ByteSize(new MacroDoc { Name = "x", Blocks = result.Blocks }) <= 2_000);
     }
 
     [Fact]

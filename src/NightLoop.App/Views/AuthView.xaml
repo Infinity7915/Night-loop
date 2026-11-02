@@ -130,8 +130,7 @@
                     Style="{StaticResource LinkButton}" />
           </StackPanel>
           <StackPanel Orientation="Horizontal" Visibility="{Binding IsSignIn, Converter={StaticResource BoolToVisible}, ConverterParameter=invert}">
-            <Button Content="← Back to sign in" Command="{Binding ShowCommand}" CommandParameter="{x:Static vm:AuthMode.SignIn}"
-                    Style="{StaticResource LinkButton}" />
+            <Button Content="{Binding BackText}" Command="{Binding BackCommand}" Style="{StaticResource LinkButton}" />
           </StackPanel>
         </StackPanel>
       </StackPanel>

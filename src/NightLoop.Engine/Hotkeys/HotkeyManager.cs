@@ -24,6 +24,7 @@ public sealed class HotkeyManager : IDisposable
     private readonly Dictionary<int, (Hotkey Key, Action Callback)> _registered = [];
     private readonly MessageLoopThread _loop;
     private int _nextId = 1;
+    private bool _disposed;
 
     public HotkeyManager()
     {
@@ -34,6 +35,7 @@ public sealed class HotkeyManager : IDisposable
     /// <exception cref="HotkeyTakenException">Another program already uses this combo.</exception>
     public IDisposable Register(Hotkey hotkey, Action callback)
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
         var id = _loop.Invoke(() =>
         {
             var newId = _nextId++;
@@ -51,10 +53,14 @@ public sealed class HotkeyManager : IDisposable
         return new Registration(this, id);
     }
 
-    private void Unregister(int id) => _loop.Invoke(() =>
+    private void Unregister(int id)
     {
-        if (_registered.Remove(id)) PInvoke.UnregisterHotKey(default, id);
-    });
+        if (_disposed) return; // everything was unregistered already
+        _loop.Invoke(() =>
+        {
+            if (_registered.Remove(id)) PInvoke.UnregisterHotKey(default, id);
+        });
+    }
 
     private void OnMessage(MSG msg)
     {
@@ -65,6 +71,8 @@ public sealed class HotkeyManager : IDisposable
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         _loop.Invoke(() =>
         {
             foreach (var id in _registered.Keys) PInvoke.UnregisterHotKey(default, id);
