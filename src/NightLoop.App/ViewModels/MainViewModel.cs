@@ -201,11 +201,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ? "Pick a block on the left to edit it."
         : BlockCatalog.For(SelectedBlock.Block.Type)?.Description ?? "";
 
-    /// <summary>Play starts at the highlighted block: "Play from 04". With the first block (or none) highlighted it's "Play".</summary>
-    public string PlayText => IsAtBreakpoint ? "Continue" : IsPlaying ? "Stop" : SelectedBlock is { Index: > 0 } ? $"Play from {SelectedNumber}" : "Play";
+    /// <summary>Play starts at the highlighted block: "Play from 4". With the first block (or none) highlighted it's "Play".</summary>
+    public string PlayText => IsAtBreakpoint ? "Continue" : IsPlaying ? "Stop" : SelectedBlock is { Index: > 0 } sel ? $"Play from {sel.Index + 1}" : "Play";
 
     public string PlayToolTip => SelectedBlock is { Index: > 0 }
-        ? $"Play from block {SelectedNumber}, the highlighted one. Press Esc on the timeline to play from the top."
+        ? $"Play from block {SelectedBlock.Index + 1}, the highlighted one. Press Esc on the timeline to play from the top."
         : "Play the macro from the top.";
 
     /// <summary>The loaded macro's run state pill: "Running" or "Off".</summary>
