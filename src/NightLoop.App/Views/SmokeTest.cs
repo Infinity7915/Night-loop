@@ -106,6 +106,13 @@ public static class SmokeTest
             Themes.ThemeManager.Preview(mode, accent);
             failures += Draw(app, folder, mode, screens);
         }
+        // Each extra color theme on the screens it changes most.
+        var themed = screens.Where(s => s.Name is "macros" or "settings" or "window").ToArray();
+        foreach (var palette in Themes.ThemePalettes.All.Skip(1))
+        {
+            Themes.ThemeManager.Preview(Themes.ThemeManager.Dark, palette.Accent, palette.Id);
+            failures += Draw(app, folder, palette.Id, themed);
+        }
         return failures == 0 ? 0 : 1;
     }
 

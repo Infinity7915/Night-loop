@@ -222,6 +222,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public string BlockSummary => $"{Blocks.Count} blocks · {Blocks.Count(b => !b.Enabled)} off";
 
+    /// <summary>Blocks ticked on the timeline. Kept by block, so they stay ticked when the rows are rebuilt.</summary>
+    private readonly HashSet<Block> _checked = new(ReferenceEqualityComparer.Instance);
+    /// <summary>The last block ticked without Shift: Shift+click ticks everything from it to the clicked one.</summary>
+    private Block? _checkAnchor;
+
+    public int CheckedCount => _checked.Count;
+    public bool HasChecked => _checked.Count > 0;
+    public string CheckedText => _checked.Count == 1 ? "1 selected" : $"{_checked.Count} selected";
+
     /// <summary>Set by the shell: opens Settings, where the target game is picked.</summary>
     public Action? OpenSettings { get; set; }
 
@@ -412,9 +421,164 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public void ClearSelection() => SelectedBlock = null;
 
     /// <summary>Delete key on the timeline.</summary>
+    /// <summary>The Delete key: the ticked blocks when some are ticked, else the highlighted one.</summary>
     public void DeleteSelected()
     {
-        if (SelectedBlock is { } row) DeleteBlock(row);
+        if (HasChecked) DeleteChecked();
+        else if (SelectedBlock is { } row) DeleteBlock(row);
+    }
+
+    // ---------------- Ticked blocks (move and delete several at once) ----------------
+
+    /// <summary>
+    /// Ticks or unticks a row. With Shift, ticks every row from the last one ticked to this one (both included),
+    /// so two clicks select a whole run of blocks.
+    /// </summary>
+    public void CheckRow(BlockRow row, bool shift)
+    {
+        if (shift && _checkAnchor is { } anchor && Blocks.FirstOrDefault(r => ReferenceEquals(r.Block, anchor)) is { } from)
+        {
+            var (lo, hi) = (Math.Min(from.Index, row.Index), Math.Max(from.Index, row.Index));
+            for (var i = lo; i <= hi; i++) SetChecked(Blocks[i], true);
+        }
+        else
+        {
+            SetChecked(row, !row.IsChecked);
+            _checkAnchor = row.IsChecked ? row.Block : null;
+        }
+        NotifyChecked();
+    }
+
+    [RelayCommand]
+    private void CheckAll()
+    {
+        foreach (var row in Blocks) SetChecked(row, true);
+        NotifyChecked();
+    }
+
+    [RelayCommand]
+    public void ClearChecked()
+    {
+        foreach (var row in Blocks) row.IsChecked = false;
+        _checked.Clear();
+        _checkAnchor = null;
+        NotifyChecked();
+    }
+
+    private void SetChecked(BlockRow row, bool on)
+    {
+        row.IsChecked = on;
+        if (on) _checked.Add(row.Block);
+        else _checked.Remove(row.Block);
+    }
+
+    private void NotifyChecked()
+    {
+        OnPropertyChanged(nameof(CheckedCount));
+        OnPropertyChanged(nameof(HasChecked));
+        OnPropertyChanged(nameof(CheckedText));
+    }
+
+    /// <summary>
+    /// The ticked blocks as indexes. A ticked Loop, If or Repeat until (or its Else / End) brings its whole section,
+    /// so moving it keeps its blocks inside and the macro stays runnable.
+    /// </summary>
+    private SortedSet<int> CheckedSections()
+    {
+        var set = new SortedSet<int>();
+        for (var i = 0; i < _doc.Blocks.Count; i++)
+        {
+            if (!_checked.Contains(_doc.Blocks[i])) continue;
+            var (from, to) = SectionOf(i);
+            for (var k = from; k <= to; k++) set.Add(k);
+        }
+        return set;
+    }
+
+    [RelayCommand]
+    private void MoveCheckedUp() => MoveChecked(-1);
+
+    [RelayCommand]
+    private void MoveCheckedDown() => MoveChecked(+1);
+
+    /// <summary>
+    /// Moves the ticked blocks one step. Each run of ticked blocks swaps places with the block just above (or below)
+    /// it, so a gap between ticked blocks stays, and a run at the top (or bottom) stays put.
+    /// </summary>
+    private void MoveChecked(int by)
+    {
+        if (IsRecording || IsPlaying || !HasChecked) return;
+        var picked = CheckedSections();
+        var blocks = _doc.Blocks;
+        var moved = false;
+        if (by < 0)
+        {
+            for (var i = 1; i < blocks.Count; i++)
+            {
+                if (!picked.Contains(i) || picked.Contains(i - 1)) continue;
+                var end = i;
+                while (end + 1 < blocks.Count && picked.Contains(end + 1)) end++;
+                var above = blocks[i - 1];
+                blocks.RemoveAt(i - 1);
+                blocks.Insert(end, above);
+                for (var k = i; k <= end; k++) { picked.Remove(k); picked.Add(k - 1); }
+                picked.Remove(end);
+                moved = true;
+                i = end;
+            }
+        }
+        else
+        {
+            for (var i = blocks.Count - 2; i >= 0; i--)
+            {
+                if (!picked.Contains(i) || picked.Contains(i + 1)) continue;
+                var start = i;
+                while (start - 1 >= 0 && picked.Contains(start - 1)) start--;
+                var below = blocks[i + 1];
+                blocks.RemoveAt(i + 1);
+                blocks.Insert(start, below);
+                for (var k = i; k >= start; k--) { picked.Remove(k); picked.Add(k + 1); }
+                picked.Remove(start);
+                moved = true;
+                i = start;
+            }
+        }
+        if (!moved)
+        {
+            Status = by < 0 ? "The selected blocks are already at the top." : "The selected blocks are already at the bottom.";
+            return;
+        }
+        var keep = SelectedBlock?.Block;
+        ShowBlocks(selectIndex: keep is null ? null : _doc.Blocks.IndexOf(keep));
+        MarkChanged();
+    }
+
+    /// <summary>
+    /// Deletes the ticked blocks. A ticked Loop, If or Repeat until (or its End) also takes its End (or opener) and
+    /// Else, like deleting one; blocks inside that aren't ticked are kept.
+    /// </summary>
+    [RelayCommand]
+    private void DeleteChecked()
+    {
+        if (IsRecording || IsPlaying || !HasChecked) return;
+        var structure = MacroStructure.Analyze(_doc.Blocks);
+        var remove = new SortedSet<int>();
+        for (var i = 0; i < _doc.Blocks.Count; i++)
+        {
+            if (!_checked.Contains(_doc.Blocks[i])) continue;
+            remove.Add(i);
+            var type = _doc.Blocks[i].Type;
+            if (!(BlockTypes.IsOpener(type) || type == BlockTypes.End) || structure.Partner[i] is not (>= 0 and var partner)) continue;
+            remove.Add(partner);
+            if (structure.ElseOf[Math.Min(i, partner)] is >= 0 and var e) remove.Add(e);
+        }
+        var first = remove.Min;
+        foreach (var i in remove.Reverse()) _doc.Blocks.RemoveAt(i);
+        _checked.Clear();
+        _checkAnchor = null;
+        ShowBlocks(selectIndex: _doc.Blocks.Count == 0 ? null : Math.Min(first, _doc.Blocks.Count - 1));
+        MarkChanged();
+        Status = remove.Count == 1 ? "Deleted 1 block." : $"Deleted {remove.Count} blocks.";
     }
 
     private void OnRowChanged(BlockRow row)
@@ -495,7 +659,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         IsRecording = true;
         StepAside();
         HideWhileRecording();
-        Status = $"Recording… press {RecordHotkeyText} to stop. Keys and clicks on Night-loop itself aren't recorded.";
+        var where = SelectedBlock is { } sel ? $" New blocks go after block {sel.Number}{InsideText(sel.Index + 1)}." : "";
+        Status = $"Recording… press {RecordHotkeyText} to stop.{where} Keys and clicks on Night-loop itself aren't recorded.";
     }
 
     private void StopRecording()
@@ -543,7 +708,20 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             ? $"Recorded {what}, then stopped at the size limit for one macro."
             : atEnd
                 ? $"Recorded {what} at the end. Press Play ({PlayHotkeyText}) to replay from the top."
-                : $"Recorded {what} after block {at:00}.";
+                : $"Recorded {what} after block {at:00}{InsideText(at)}.";
+    }
+
+    /// <summary>" inside the If" (or Loop, ...) when a block put at this index lands inside one, else "".</summary>
+    private string InsideText(int index)
+    {
+        var structure = MacroStructure.Analyze(_doc.Blocks);
+        for (var i = Math.Min(index, _doc.Blocks.Count) - 1; i >= 0; i--)
+        {
+            var b = _doc.Blocks[i];
+            if (BlockTypes.IsOpener(b.Type) && structure.Partner[i] is var end && (end < 0 || end >= index))
+                return $" inside the {BlockCatalog.For(b.Type)?.Label ?? b.Type} (block {i + 1:00})";
+        }
+        return "";
     }
 
     /// <summary>Asks the view to scroll a timeline row into sight.</summary>
@@ -1006,9 +1184,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 if (!held.Contains(hold)) held.Add(hold);
                 row.HeldFor = HeldTime(i, hold) is { } ms ? $"held {ms:N0} ms" : "not let go";
             }
+            row.IsChecked = _checked.Contains(b);
             Blocks.Add(row);
             if (BlockTypes.IsOpener(b.Type) || b.Type == BlockTypes.Else) depth++;
         }
+        // Blocks that were deleted, or a whole other macro loaded, drop out of the ticked set.
+        var shown = new HashSet<Block>(_doc.Blocks, ReferenceEqualityComparer.Instance);
+        _checked.RemoveWhere(b => !shown.Contains(b));
+        if (_checkAnchor is not null && !shown.Contains(_checkAnchor)) _checkAnchor = null;
+        NotifyChecked();
         OnPropertyChanged(nameof(BlockSummary));
         SelectedBlock = keep is { } k && k >= 0 && k < Blocks.Count ? Blocks[k] : null;
     }
@@ -1073,11 +1257,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             case RunState.Stopped:
                 IsPlaying = false;
                 IsAtBreakpoint = false;
+                // The run's row highlight looks like a selection, so it mustn't stay once the run is over.
+                Highlight(-1);
                 Status = run.CompletedPasses == 1 ? "Done." : $"Done after {run.CompletedPasses} runs.";
                 break;
             case RunState.Faulted:
                 IsPlaying = false;
                 IsAtBreakpoint = false;
+                Highlight(-1);
                 Status = $"Stopped at {run.FaultBlockId}: {run.FaultMessage}";
                 if (Blocks.FirstOrDefault(b => b.Block.Id == run.FaultBlockId) is { } bad)
                 {

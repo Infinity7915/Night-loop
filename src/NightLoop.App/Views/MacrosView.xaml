@@ -513,6 +513,23 @@
                   <TextBlock Text="{Binding BlockSummary}" Style="{StaticResource Eyebrow}" FontSize="12" VerticalAlignment="Center" />
                 </StackPanel>
                 <WrapPanel>
+                  <!-- Ticked blocks: move or delete them together. Shift+click a tick ticks every block in between. -->
+                  <Border BorderBrush="{DynamicResource Border}" BorderThickness="0,0,1,0" Padding="0,0,12,0" Margin="0,0,16,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <Button Style="{StaticResource IconButton}" Width="32" Height="32" Margin="0" Content="&#xE8B3;" ToolTip="Select all blocks"
+                              Command="{Binding CheckAllCommand}" />
+                      <TextBlock Text="{Binding CheckedText}" Style="{StaticResource SmallLabel}" MinWidth="70" Margin="6,0,6,0" VerticalAlignment="Center"
+                                 ToolTip="Tick blocks on the timeline. Shift+click a second tick to select every block between the two." />
+                      <Button Style="{StaticResource IconButton}" Width="32" Height="32" Content="&#xE70E;" ToolTip="Move the selected blocks up"
+                              Command="{Binding MoveCheckedUpCommand}" IsEnabled="{Binding HasChecked}" />
+                      <Button Style="{StaticResource IconButton}" Width="32" Height="32" Content="&#xE70D;" ToolTip="Move the selected blocks down"
+                              Command="{Binding MoveCheckedDownCommand}" IsEnabled="{Binding HasChecked}" />
+                      <Button Style="{StaticResource IconButton}" Width="32" Height="32" Content="&#xE74D;" ToolTip="Delete the selected blocks"
+                              Command="{Binding DeleteCheckedCommand}" IsEnabled="{Binding HasChecked}" />
+                      <Button Style="{StaticResource IconButton}" Width="32" Height="32" Content="&#xE894;" ToolTip="Clear the selection (Esc)"
+                              Command="{Binding ClearCheckedCommand}" IsEnabled="{Binding HasChecked}" />
+                    </StackPanel>
+                  </Border>
                   <CheckBox Content="Humanize" IsChecked="{Binding Humanize}" FontWeight="SemiBold" FontSize="13" Margin="0,4,16,4" />
                   <StackPanel Orientation="Horizontal" Margin="0,2,16,2">
                     <TextBlock Text="Timing ±" Style="{StaticResource SmallLabel}" />
@@ -577,7 +594,9 @@
                               </ControlTemplate>
                             </Button.Template>
                           </Button>
-                          <CheckBox DockPanel.Dock="Left" IsChecked="{Binding Enabled}" Width="28" ToolTip="On / off"
+                          <CheckBox DockPanel.Dock="Left" IsChecked="{Binding IsChecked, Mode=OneWay}" Width="28" Focusable="False"
+                                    ToolTip="Select. Shift+click selects every block from the last one you ticked."
+                                    PreviewMouseLeftButtonDown="OnRowCheckDown" PreviewMouseLeftButtonUp="OnRowCheckUp"
                                     VerticalAlignment="Center" HorizontalAlignment="Center" />
                           <!-- Number, nesting guides, tag, title and summary -->
                           <Grid MinHeight="44" Margin="8,6,8,6">
@@ -618,6 +637,9 @@
                         <DataTrigger Binding="{Binding IsStructural}" Value="True">
                           <Setter TargetName="Tag" Property="Background" Value="{DynamicResource Structural}" />
                         </DataTrigger>
+                        <DataTrigger Binding="{Binding IsChecked}" Value="True">
+                          <Setter TargetName="RowBg" Property="Background" Value="{DynamicResource AccentSoft}" />
+                        </DataTrigger>
                         <DataTrigger Binding="{Binding IsSelected}" Value="True">
                           <Setter TargetName="RowBg" Property="Background" Value="{DynamicResource PanelRaised}" />
                           <Setter TargetName="RowBar" Property="Background" Value="{DynamicResource Accent}" />
@@ -653,6 +675,12 @@
                     <TextBlock Text="{Binding InspectorTitle}" FontSize="17" FontWeight="Bold" Margin="0,14,0,0" TextTrimming="CharacterEllipsis" />
                     <TextBlock Text="{Binding InspectorDescription}" Style="{StaticResource Muted}" FontSize="12" LineHeight="18"
                                TextWrapping="Wrap" Margin="0,4,0,0" />
+                    <DockPanel Margin="0,14,0,0" Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisible}}">
+                      <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding SelectedBlock.Enabled}" VerticalAlignment="Center"
+                                ToolTip="Turned off, Play skips this block" />
+                      <TextBlock Text="Block on" Style="{StaticResource Muted}" FontSize="12" VerticalAlignment="Center"
+                                 ToolTip="Turned off, Play skips this block" />
+                    </DockPanel>
                     <ItemsControl ItemsSource="{Binding InspectorFields}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:BlockField}">

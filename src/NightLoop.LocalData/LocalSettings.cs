@@ -41,6 +41,13 @@ public sealed class LocalSettings(string path)
         set => Write("theme", value);
     }
 
+    /// <summary>Color theme id ("night", "rose", "ocean"...), or null for the default. Unknown ids fall back to it.</summary>
+    public string? Palette
+    {
+        get => ReadString("palette") is { Length: > 0 and <= 32 } p && p.All(c => c is >= 'a' and <= 'z') ? p : null;
+        set => Write("palette", value);
+    }
+
     /// <summary>Accent color as #RRGGBB, or null for the default.</summary>
     public string? Accent
     {
