@@ -69,6 +69,12 @@ public sealed partial class MainViewModel
             _ => BlockTypes.WindowPosition,
         };
         SelectedBlock = Blocks.FirstOrDefault(r => r.Block.Type == pick);
+        // The default picture shows a few ticked blocks, as after a tick and a Shift+click.
+        if (select == "position" && Blocks.Count > 4)
+        {
+            CheckRow(Blocks[2], shift: false);
+            CheckRow(Blocks[4], shift: true);
+        }
         ShowEditorOptions = select == "image";
         ToggleCategory(Categories.First(c => c.Name == "Timing"));
         SyncText = "Draft · autosaved";

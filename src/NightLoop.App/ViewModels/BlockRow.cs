@@ -48,6 +48,8 @@ public sealed partial class BlockRow : ObservableObject
     [ObservableProperty] private string _color = "#C9D1D9";
     [ObservableProperty] private bool _isCurrent;
     [ObservableProperty] private bool _isSelected;
+    /// <summary>Ticked on the timeline, so the bar's Move up, Move down and Delete act on it with the others.</summary>
+    [ObservableProperty] private bool _isChecked;
     /// <summary>The run stopped here with an error.</summary>
     [ObservableProperty] private bool _isFault;
 

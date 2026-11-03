@@ -14,7 +14,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     {
         _shell = shell;
         Account = new AccountViewModel(shell.Session, shell.SignOutAsync);
-        Accents = ThemeManager.Accents.Select(hex => new AccentOption(hex)).ToList();
+        Accents = ThemeManager.AllAccents.Select(hex => new AccentOption(hex)).ToList();
+        Themes = ThemePalettes.All.Select(t => new ThemeOption(t)).ToList();
         ThemeManager.Changed += OnThemeChanged;
         // Detected / Not running labels stay current while Settings is open.
         _gameTimer = new DispatcherTimer(TimeSpan.FromSeconds(4), DispatcherPriority.Background,
@@ -27,6 +28,10 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     public TargetGamesViewModel Games => _shell.Games;
     public AccountViewModel Account { get; }
     public IReadOnlyList<AccentOption> Accents { get; }
+    public IReadOnlyList<ThemeOption> Themes { get; }
+
+    /// <summary>Dark / Light / System only changes the Night theme; the others bring their own.</summary>
+    public bool ModeApplies => ThemeManager.Palette.Id == ThemePalettes.NightId;
 
     /// <summary>New macros start with the ready-made blocks (focus, resize, a loop, a notification). Kept on this PC.</summary>
     public bool StarterSequence
@@ -76,7 +81,9 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(ThemeMode));
         OnPropertyChanged(nameof(Accent));
+        OnPropertyChanged(nameof(ModeApplies));
         foreach (var a in Accents) a.Refresh();
+        foreach (var t in Themes) t.Refresh();
     }
 
     public void Dispose()
@@ -95,6 +102,22 @@ public sealed class AccentOption(string hex) : ObservableObject
     {
         get => string.Equals(ThemeManager.Accent, Hex, StringComparison.OrdinalIgnoreCase);
         set { if (value) ThemeManager.SetAccent(Hex); }
+    }
+
+    internal void Refresh() => OnPropertyChanged(nameof(IsSelected));
+}
+
+/// <summary>One color theme button: a little preview of its page and accent, and its name.</summary>
+public sealed class ThemeOption(ThemePalette palette) : ObservableObject
+{
+    public string Name => palette.Name;
+    public string Preview => palette.Preview;
+    public string AccentHex => palette.Accent;
+
+    public bool IsSelected
+    {
+        get => ThemeManager.Palette.Id == palette.Id;
+        set { if (value) ThemeManager.SetPalette(palette.Id); }
     }
 
     internal void Refresh() => OnPropertyChanged(nameof(IsSelected));

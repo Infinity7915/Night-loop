@@ -31,6 +31,13 @@ public static class ThemeManager
     public static string Mode { get; private set; } = Dark;
     public static string Accent { get; private set; } = DefaultAccent;
 
+    /// <summary>The color theme (Night, Rose, Ocean...). Only Night follows the mode; the others set their own.</summary>
+    public static ThemePalette Palette { get; private set; } = ThemePalettes.Default;
+
+    /// <summary>The theme accents first after the mockup four, so every theme's own color can be picked again.</summary>
+    public static IReadOnlyList<string> AllAccents { get; } =
+        Accents.Concat(ThemePalettes.All.Select(t => t.Accent)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
     /// <summary>True when the light palette is showing (Light, or System while Windows uses light apps).</summary>
     public static bool IsLight { get; private set; }
 
@@ -42,15 +49,17 @@ public static class ThemeManager
         _settings = settings;
         Mode = settings.Theme;
         Accent = settings.Accent ?? DefaultAccent;
+        Palette = ThemePalettes.For(settings.Palette);
         Apply();
     }
 
     /// <summary>Shows a theme without saving it (the CI smoke test draws every screen in both modes).</summary>
-    public static void Preview(string mode, string accent)
+    public static void Preview(string mode, string accent, string palette = ThemePalettes.NightId)
     {
         _settings = null;
         Mode = mode;
         Accent = accent;
+        Palette = ThemePalettes.For(palette);
         Apply();
     }
 
@@ -70,15 +79,38 @@ public static class ThemeManager
         Apply();
     }
 
+    /// <summary>Picks a color theme and its accent (the accent can still be changed after).</summary>
+    public static void SetPalette(string id)
+    {
+        var palette = ThemePalettes.For(id);
+        if (palette == Palette) return;
+        Palette = palette;
+        Accent = palette.Accent.ToUpperInvariant();
+        if (_settings is not null)
+        {
+            _settings.Palette = palette.Id;
+            _settings.Accent = Accent;
+        }
+        Apply();
+    }
+
     private static void Apply()
     {
         if (Application.Current is not { } app) return;
-        IsLight = Mode == Light || (Mode == System && WindowsUsesLightApps());
+        IsLight = Palette.Id == ThemePalettes.NightId
+            ? Mode == Light || (Mode == System && WindowsUsesLightApps())
+            : Palette.Light;
         ListenForWindowsChanges();
 
         // The palette is always the first merged dictionary (see App.xaml).
         var dictionaries = app.Resources.MergedDictionaries;
         var palette = new ResourceDictionary { Source = IsLight ? LightUri : DarkUri };
+        foreach (var (key, hex) in Palette.Colors)
+        {
+            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+            brush.Freeze();
+            palette[key] = brush;
+        }
         if (dictionaries.Count > 0) dictionaries[0] = palette;
         else dictionaries.Add(palette);
 

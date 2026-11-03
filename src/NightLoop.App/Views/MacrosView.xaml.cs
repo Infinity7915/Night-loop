@@ -36,9 +36,22 @@ public partial class MacrosView : UserControl
 
     private void OnRowClick(object sender, MouseButtonEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: BlockRow row } && Vm is { } vm)
-            vm.SelectBlockCommand.Execute(row);
+        if (sender is not FrameworkElement { DataContext: BlockRow row } || Vm is not { } vm) return;
+        // Shift+click on a row ticks the whole run from the last tick, like Shift+click on its tick box.
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && vm.HasChecked) vm.CheckRow(row, shift: true);
+        else vm.SelectBlockCommand.Execute(row);
     }
+
+    /// <summary>The tick box selects the row for Move up / Move down / Delete; the view model decides, not the box.</summary>
+    private void OnRowCheckDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is FrameworkElement { DataContext: BlockRow row } && Vm is { } vm)
+            vm.CheckRow(row, Keyboard.Modifiers.HasFlag(ModifierKeys.Shift));
+    }
+
+    /// <summary>Keeps the click on the tick box from also highlighting the row.</summary>
+    private void OnRowCheckUp(object sender, MouseButtonEventArgs e) => e.Handled = true;
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -63,10 +76,20 @@ public partial class MacrosView : UserControl
             return;
         }
 
-        // Esc lets go of the highlighted block, so Play runs from the top and Record adds at the end.
-        if (e.Key == Key.Escape && vm.HasSelection && !IsTyping(e.OriginalSource))
+        // Esc first clears the ticks, then lets go of the highlighted block, so Play runs from the top and Record
+        // adds at the end.
+        if (e.Key == Key.Escape && (vm.HasChecked || vm.HasSelection) && !IsTyping(e.OriginalSource))
         {
-            vm.ClearSelection();
+            if (vm.HasChecked) vm.ClearChecked();
+            else vm.ClearSelection();
+            e.Handled = true;
+            return;
+        }
+
+        // Ctrl+A ticks every block, unless you're typing in a field.
+        if (e.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control && !IsTyping(e.OriginalSource))
+        {
+            vm.CheckAllCommand.Execute(null);
             e.Handled = true;
             return;
         }
