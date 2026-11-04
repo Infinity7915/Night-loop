@@ -170,7 +170,7 @@
 
   <Grid>
     <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                PanningMode="VerticalOnly" ScrollChanged="OnScrollChanged">
+                ScrollChanged="OnScrollChanged">
       <StackPanel Margin="40,36,40,40">
         <!-- Header -->
         <controls:SplitRow>

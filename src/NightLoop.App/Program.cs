@@ -10,8 +10,6 @@ public static class Program
     {
         // CI: build every screen once and save a picture of each, then exit (see Views/SmokeTest.cs).
         if (args.Length == 2 && args[0] == "--smoke") return Smoke(args[1]);
-        // CI: drive the Macros screen with injected touch input (see Views/TouchTest.cs).
-        if (args.Length == 2 && args[0] == "--touch-test") return TouchTestRun(args[1]);
 
         // Must run first: during install, update and uninstall Velopack starts the exe with special arguments,
         // does its work here and exits. It also installs an update downloaded last session before the window opens.
@@ -21,22 +19,6 @@ public static class Program
         app.InitializeComponent();
         Themes.ThemeManager.Load(new LocalData.LocalSettings());
         return app.Run();
-    }
-
-    private static int TouchTestRun(string folder)
-    {
-        Directory.CreateDirectory(folder);
-        try
-        {
-            var app = new App();
-            app.InitializeComponent();
-            return Views.TouchTest.Run(app, folder);
-        }
-        catch (Exception ex)
-        {
-            File.WriteAllText(Path.Combine(folder, "touch.error.txt"), ex.ToString());
-            return 2;
-        }
     }
 
     private static int Smoke(string folder)

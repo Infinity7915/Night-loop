@@ -28,8 +28,6 @@ public partial class MainWindow : Window
         DataContext = _shell;
         FitToScreen();
         SizeChanged += (_, _) => UpdateScale();
-        // Touch: a swipe that scrolls past the end of a page shouldn't drag the whole window along.
-        ManipulationBoundaryFeedback += (_, e) => e.Handled = true;
         // Signing out of Windows or shutting down must never be held up by the hide-to-tray close.
         if (Application.Current is { } app) app.SessionEnding += (_, _) => _exiting = true;
     }

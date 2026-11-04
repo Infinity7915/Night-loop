@@ -43,21 +43,6 @@ jobs:
           Get-Content smoke\*.error.txt -ErrorAction SilentlyContinue
           if ($p.ExitCode -ne 0) { throw "UI smoke test failed (exit $($p.ExitCode))" }
 
-      # Touch screens: opens the Macros screen in a real window and drives it with Windows touch injection
-      # (a swipe must scroll, taps must press a button and pick a block). Exit 3 means this machine can't inject
-      # touch at all, which is reported as a warning rather than a pass.
-      - name: Touch test
-        shell: pwsh
-        timeout-minutes: 3
-        run: |
-          $exe = Get-ChildItem src/NightLoop.App/bin/Release -Recurse -Filter NightLoop.exe | Select-Object -First 1
-          $p = Start-Process $exe.FullName -ArgumentList '--touch-test', "$pwd\smoke" -Wait -PassThru
-          "Exit code: $($p.ExitCode)"
-          Get-Content smoke\touch.txt -ErrorAction SilentlyContinue
-          Get-Content smoke\touch.error.txt -ErrorAction SilentlyContinue
-          if ($p.ExitCode -eq 3) { "::warning::Touch injection isn't available on this runner; touch was not tested." }
-          elseif ($p.ExitCode -ne 0) { throw "Touch test failed (exit $($p.ExitCode))" }
-
       - name: Upload screen pictures
         if: always()
         uses: actions/upload-artifact@v4
