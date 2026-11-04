@@ -10,11 +10,6 @@ namespace NightLoop.App.Views;
 /// <summary>The block editor and the account's saved macros. DataContext is a MainViewModel.</summary>
 public partial class MacrosView : UserControl
 {
-    /// <summary>Below this width the block editor panel moves under the timeline.</summary>
-    private const double SideBySideWidth = 740;
-    /// <summary>The block editor panel width when it sits beside the timeline (the mockup's 280 px).</summary>
-    private const double InspectorWidth = 280;
-
     public MacrosView()
     {
         InitializeComponent();
@@ -115,14 +110,29 @@ public partial class MacrosView : UserControl
 
     private static bool IsTyping(object source) => source is TextBoxBase or PasswordBox or ComboBox { IsEditable: true };
 
-    private void OnEditorBodySizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        var sideBySide = e.NewSize.Width >= SideBySideWidth;
-        if (sideBySide == (Grid.GetColumn(Inspector) == 1)) return;
+    private void OnEditorBodySizeChanged(object sender, SizeChangedEventArgs e) => FollowScroll();
 
-        InspectorColumn.Width = sideBySide ? new GridLength(InspectorWidth) : new GridLength(0);
-        Grid.SetColumn(Inspector, sideBySide ? 1 : 0);
-        Grid.SetRow(Inspector, sideBySide ? 0 : 1);
-        Inspector.BorderThickness = sideBySide ? new Thickness(1, 0, 0, 0) : new Thickness(0, 1, 0, 0);
+    private void OnInspectorSizeChanged(object sender, SizeChangedEventArgs e) => FollowScroll();
+
+    private void OnScrollChanged(object sender, ScrollChangedEventArgs e) => FollowScroll();
+
+    /// <summary>
+    /// Block editor follows scrolling (Settings › Macros). When the timeline is taller than the page, the editor
+    /// moves down its column by the same share the timeline has been scrolled: 0% scrolled keeps it at the top,
+    /// 100% puts it at the bottom. Because it moves by that share of the spare room, it stays on screen the whole way.
+    /// </summary>
+    private void FollowScroll()
+    {
+        if (!IsLoaded || Vm is not { } vm || EditorBody.ActualHeight <= 0) return;
+        var room = Inspector.ActualHeight - Inspector.Padding.Top - Inspector.Padding.Bottom - InspectorPanel.ActualHeight;
+        var offset = 0.0;
+        if (vm.EditorFollowsScroll && room > 1)
+        {
+            var top = EditorBody.TranslatePoint(new Point(0, 0), Scroller).Y; // < 0 once the timeline's top scrolls away
+            var travel = EditorBody.ActualHeight - Scroller.ViewportHeight;
+            var share = travel > 1 ? Math.Clamp(-top / travel, 0, 1) : 0;
+            offset = Math.Round(share * room);
+        }
+        if (Math.Abs(InspectorShift.Y - offset) >= 0.5) InspectorShift.Y = offset;
     }
 }

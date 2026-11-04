@@ -26,6 +26,8 @@ public static class BlockTypes
     public const string WaitRandom = "timing.waitRandom";
     public const string WaitForText = "timing.waitForText";
     public const string WaitForImage = "timing.waitForImage";
+    /// <summary>The opposite of Wait for image: wait until the picture is no longer on screen. Same params.</summary>
+    public const string WaitForImageGone = "timing.waitForImageGone";
     public const string Pause = "timing.pause";
     /// <summary>Unpause another macro. Params: target, from (paused/start).</summary>
     public const string Resume = "timing.resume";
@@ -35,6 +37,8 @@ public static class BlockTypes
     public const string DetectText = "detect.text";
     public const string DetectImage = "detect.image";
     public const string DetectPixelColor = "detect.pixelColor";
+    /// <summary>The opposite of Wait for pixel: wait until the point no longer has the color. Same params.</summary>
+    public const string DetectPixelColorGone = "detect.pixelColorGone";
     /// <summary>Find text, an image or a color and click it. Params: target, value, button, region, onFail.</summary>
     public const string FindClick = "detect.findClick";
     /// <summary>Turn the camera step by step until a target is seen. Params: target, value, direction, stepPx, maxTurns, whenFound, onFail.</summary>
@@ -72,15 +76,15 @@ public static class BlockTypes
     {
         Key, Click, Move, Drag, Scroll, Type, Combo, HoldKey,
         CameraTurn, CameraTurnUntilText, CameraTurnUntilImage, CameraZoom, CameraCenter,
-        Wait, WaitRandom, WaitForText, WaitForImage, Pause, Resume, WaitForKey,
-        DetectText, DetectImage, DetectPixelColor, FindClick, ScanTurn,
+        Wait, WaitRandom, WaitForText, WaitForImage, WaitForImageGone, Pause, Resume, WaitForKey,
+        DetectText, DetectImage, DetectPixelColor, DetectPixelColorGone, FindClick, ScanTurn,
         If, Else, End, Loop, RepeatUntil, Label, Goto, Stop,
         WindowResize, WindowPosition, WindowFocus, WaitForWindow, WindowOpen,
         Comment, Description, Notify, PlaySound, RunMacro, Screenshot,
     };
 
     /// <summary>Blocks with an "On fail" choice (continue, retry, go to label, stop).</summary>
-    public static bool HasOnFail(string type) => type is WaitForText or WaitForImage or DetectPixelColor or FindClick or ScanTurn;
+    public static bool HasOnFail(string type) => type is WaitForText or WaitForImage or WaitForImageGone or DetectPixelColor or DetectPixelColorGone or FindClick or ScanTurn;
 
     /// <summary>Blocks that open a section closed by logic.end.</summary>
     public static bool IsOpener(string type) => type is If or Loop or RepeatUntil;
@@ -93,7 +97,7 @@ public static class BlockTypes
     /// <summary>Blocks that read the screen for text or images. Pixel colors don't count: they need no text reading.</summary>
     public static bool NeedsVision(Block block) => block.Type switch
     {
-        WaitForText or WaitForImage or DetectText or DetectImage or CameraTurnUntilText or CameraTurnUntilImage => true,
+        WaitForText or WaitForImage or WaitForImageGone or DetectText or DetectImage or CameraTurnUntilText or CameraTurnUntilImage => true,
         FindClick or ScanTurn => block.GetString("target", "text") != "pixel",
         _ => false,
     };

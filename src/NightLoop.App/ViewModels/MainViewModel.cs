@@ -60,6 +60,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _api = api;
         _games = games;
         _settings = settings ?? new LocalSettings();
+        _editorFollowsScroll = _settings.EditorFollowsScroll;
         _games.TargetChanged += OnTargetChanged;
         _runs = new RunManager(new Win32InputSender(), _windows)
         {
@@ -76,7 +77,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             OnPropertyChanged(nameof(StopAllText));
             OnPropertyChanged(nameof(IsBusy));
         });
-        _runs.Notify = message => OnUi(() => Status = message);
+        // The Notify block: a Windows notification from the tray icon; inside Night-loop only if there's no tray icon.
+        _runs.Notify = message => OnUi(() =>
+        {
+            if (!Services.TrayIcon.Notify("Night-loop", message)) Status = message;
+        });
         _toastTimer = new DispatcherTimer(TimeSpan.FromSeconds(5), DispatcherPriority.Normal, (_, _) => HideToast(), Dispatcher.CurrentDispatcher);
         _toastTimer.Stop();
         _runs.PlaySound = PlayWindowsSound;
@@ -131,7 +136,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PlayText))]
     private bool _isAtBreakpoint;
-    [ObservableProperty] private bool _recordMouseMoves;
+    [ObservableProperty] private bool _recordMouseMoves = true;
+    /// <summary>Settings › Macros › Block editor follows scrolling. The view reads it on every scroll.</summary>
+    [ObservableProperty] private bool _editorFollowsScroll = true;
     [ObservableProperty] private int _repeatCount = 1;
     [ObservableProperty] private bool _repeatForever;
     [ObservableProperty] private bool _humanize;
@@ -456,6 +463,19 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         NotifyChecked();
     }
 
+    /// <summary>True when every block on the timeline is ticked, so the Select all button unticks them instead.</summary>
+    public bool AllChecked => Blocks.Count > 0 && Blocks.All(r => r.IsChecked);
+
+    public string CheckAllToolTip => AllChecked ? "Deselect all blocks (Esc)" : "Select all blocks (Ctrl+A)";
+
+    /// <summary>The one Select all button: ticks every block, or unticks them all when they are already ticked.</summary>
+    [RelayCommand]
+    private void ToggleCheckAll()
+    {
+        if (AllChecked) ClearChecked();
+        else CheckAll();
+    }
+
     [RelayCommand]
     public void ClearChecked()
     {
@@ -477,6 +497,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CheckedCount));
         OnPropertyChanged(nameof(HasChecked));
         OnPropertyChanged(nameof(CheckedText));
+        OnPropertyChanged(nameof(AllChecked));
+        OnPropertyChanged(nameof(CheckAllToolTip));
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using NightLoop.App.ViewModels;
@@ -41,5 +42,18 @@ public partial class AuthView : UserControl
             if (vm.IsCode || vm.IsReset) CodeBox.Focus();
             else PasswordBox.Focus();
         });
+    }
+
+    /// <summary>The blue terms line: opens the official Terms of Service on GitHub in the browser.</summary>
+    private void OnTermsClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(Updates.GitHubRepo.TermsUrl) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            MessageBox.Show($"Couldn't open the browser. The terms are at {Updates.GitHubRepo.TermsUrl}", "Night-loop");
+        }
     }
 }

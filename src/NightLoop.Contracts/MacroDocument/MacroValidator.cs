@@ -239,6 +239,7 @@ public static class MacroValidator
                 OnFail();
                 break;
             case BlockTypes.WaitForImage:
+            case BlockTypes.WaitForImageGone:
                 Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
                 Need(OptIntIn("confidencePct", 1, 100), "Confidence must be 1–100%.");
                 Image();
@@ -246,6 +247,7 @@ public static class MacroValidator
                 OnFail();
                 break;
             case BlockTypes.DetectPixelColor:
+            case BlockTypes.DetectPixelColorGone:
                 Need(b.GetInt("x") is not null && b.GetInt("y") is not null, "Wait for pixel needs x and y.");
                 Need(IsColor(b.GetString("color")), "Color must look like #RRGGBB.");
                 Need(OptIntIn("tolerance", 0, 255), "Tolerance must be 0–255.");

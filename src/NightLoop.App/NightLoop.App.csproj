@@ -4,6 +4,10 @@
     <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <UseWPF>true</UseWPF>
+    <!-- Only for the notification-area (tray) icon and its Windows notifications (Services/TrayIcon.cs). -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- The DPI settings in app.manifest are for WPF (per-monitor v2); the WinForms analyzer only knows its own API. -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
     <RootNamespace>NightLoop.App</RootNamespace>
     <AssemblyName>NightLoop</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -22,7 +26,13 @@
     <ProjectReference Include="..\NightLoop.Updates\NightLoop.Updates.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <!-- WinForms is used in one file; keep its names (Application, MessageBox, Color…) out of the WPF code. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+  <ItemGroup>
     <Resource Include="Assets\icon.png" />
+    <EmbeddedResource Include="Assets\icon.ico" LogicalName="NightLoop.icon.ico" />
     <None Include="Assets\icon.svg" />
   </ItemGroup>
 </Project>

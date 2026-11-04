@@ -77,8 +77,12 @@ public static class SmokeTest
         }
 
         // Settings needs the app shell behind it (account, updates, games). It stays offline here.
+        ShellViewModel? shell = null;
+        ShellViewModel Shell() => shell ??= new ShellViewModel();
         SettingsViewModel? settings = null;
-        SettingsViewModel SampleSettings() => settings ??= new SettingsViewModel(new ShellViewModel());
+        SettingsViewModel SampleSettings() => settings ??= new SettingsViewModel(Shell());
+        // The create-account screen, with its terms line.
+        AuthViewModel SignUp() => new(Shell().Session, Shell().Local, null) { Mode = AuthMode.SignUp };
 
         // Pages render at the width they get in the window: 1060 at the default 1280 window (minus the 220 sidebar),
         // 740 at the smallest window. The narrow ones catch rows that overlap or get cut off when the window shrinks.
@@ -86,6 +90,7 @@ public static class SmokeTest
         {
             ("loading", () => new LoadingView { DataContext = loading }, 1280, 800),
             ("auth", () => new AuthView(), 1280, 800),
+            ("auth-signup", () => new AuthView { DataContext = SignUp() }, 1280, 800),
             ("home", () => new HomeView(), 1060, 800),
             ("macros", () => new MacrosView { DataContext = SampleMacros() }, 1060, 800),
             // The whole Macros page, down to the saved macros list.

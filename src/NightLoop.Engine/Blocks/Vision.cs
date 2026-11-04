@@ -61,6 +61,21 @@ internal static class Vision
         }
     }
 
+    /// <summary>Looks again and again until it is no longer found or the timeout passes. False on timeout.</summary>
+    public static async Task<bool> WaitForGoneAsync(RunContext ctx, LookFor what, int timeoutMs)
+    {
+        var pollMs = what.Kind switch { "pixel" => 50, "image" => 120, _ => 200 };
+        var waited = 0;
+        while (true)
+        {
+            if (await FindAsync(ctx, what) is null) return true;
+            if (timeoutMs > 0 && waited >= timeoutMs) return false;
+            var step = timeoutMs > 0 ? Math.Min(pollMs, timeoutMs - waited) : pollMs;
+            await ctx.PauseExactAsync(Math.Max(1, step));
+            waited += Math.Max(1, step);
+        }
+    }
+
     private static ImageTemplate Template(string? data)
     {
         if (string.IsNullOrEmpty(data)) throw new MacroFaultException("Pick a picture first: use \"Capture image from screen\" on this block.");

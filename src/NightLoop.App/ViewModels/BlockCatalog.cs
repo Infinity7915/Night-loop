@@ -64,7 +64,7 @@ public sealed record BlockDef(
 }
 
 /// <summary>
-/// The block catalog from the Macros mockup: 39 blocks in seven categories, with the mockup's labels, tags,
+/// The block catalog from the Macros mockup: 41 blocks in seven categories, with the mockup's labels, tags,
 /// descriptions, fields and summaries. The palette, the inspector and the timeline all read from here. Hidden entries
 /// only edit blocks from older macros.
 /// </summary>
@@ -99,7 +99,7 @@ public static class BlockCatalog
         new("center", "Center"), new("topLeft", "Top-left"), new("topRight", "Top-right"),
         new("bottomLeft", "Bottom-left"), new("bottomRight", "Bottom-right"), new("custom", "Custom"),
     ];
-    private static readonly Choice[] NotifyKinds = [new("toast", "Toast"), new("sound", "Sound"), new("both", "Toast + sound")];
+    private static readonly Choice[] NotifyKinds = [new("toast", "Notify"), new("sound", "Sound"), new("both", "Notify + sound")];
     private static readonly Choice[] Sounds = [new("default", "Default"), new("beep", "Beep"), new("exclamation", "Exclamation"), new("asterisk", "Asterisk"), new("question", "Question")];
 
     private const int Coord = 32_767;
@@ -194,7 +194,7 @@ public static class BlockCatalog
             [F.MacroName("target", "Macro", all: true), F.Pick("from", "Continue from", ResumeFrom, "paused")],
             b => $"{MacroLabel(b.GetString("target", ""))} · {Label(ResumeFrom, b.GetString("from", "paused")).ToLowerInvariant()}"),
 
-        // ---- Detect (5) ----
+        // ---- Detect (7) ----
         new("waittext", BlockTypes.WaitForText, "Wait for text", "OCR", "Detect", "Read the screen until the exact characters appear.",
             () => new() { ["text"] = "Quest complete", ["match"] = "exact", ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
             [F.Text("text", "Text", MacroLimits.TypeTextMaxLength, mono: false), F.Pick("match", "Match", Matches, "exact"),
@@ -214,6 +214,18 @@ public static class BlockCatalog
              F.Int("tolerance", "Tolerance", 0, 255), F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
              F.OnFail(), F.FailLabel()],
             b => $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)} = {b.GetString("color", "")} · {b.GetInt("timeoutMs", 5000)} ms"),
+        new("imagegone", BlockTypes.WaitForImageGone, "Image gone", "!IMG", "Detect", "Wait until a saved picture is no longer on screen.",
+            () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
+            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.Region(),
+             F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
+             F.OnFail(), F.FailLabel()],
+            b => $"{ImageName(b)} gone · {b.GetInt("confidencePct", 90)}% · {b.GetInt("timeoutMs", 10_000)} ms"),
+        new("pixelgone", BlockTypes.DetectPixelColorGone, "Pixel gone", "!PIX", "Detect", "Wait until one point is no longer a color, like a loading bar.",
+            () => new() { ["x"] = 0, ["y"] = 0, ["color"] = "#FFFFFF", ["tolerance"] = 10, ["timeoutMs"] = 5000, ["onFail"] = "continue", ["relativeTo"] = "gameWindow" },
+            [F.Int("x", "X", -Coord, Coord), F.Int("y", "Y", -Coord, Coord), F.Color("color", "Color"),
+             F.Int("tolerance", "Tolerance", 0, 255), F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
+             F.OnFail(), F.FailLabel()],
+            b => $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)} ≠ {b.GetString("color", "")} · {b.GetInt("timeoutMs", 5000)} ms"),
         new("findclick", BlockTypes.FindClick, "Find & click", "FND", "Detect", "Find text, an image or a color and click it.",
             () => new() { ["target"] = "text", ["value"] = "Claim", ["button"] = "left", ["timeoutMs"] = 5000, ["onFail"] = "continue" },
             [F.Pick("target", "Find", FindTargets, "text"), F.FindValue(), F.Pick("button", "Button", Buttons, "left"),
@@ -279,7 +291,7 @@ public static class BlockCatalog
             PositionSummary),
 
         // ---- Utility (4) ----
-        new("notify", BlockTypes.Notify, "Notify", "NTF", "Utility", "Show a toast or play a sound.",
+        new("notify", BlockTypes.Notify, "Notify", "NTF", "Utility", "Send a Windows notification or play a sound.",
             () => new() { ["kind"] = "toast", ["message"] = "Done" },
             [F.Pick("kind", "Type", NotifyKinds, "toast"), F.Text("message", "Message", 200, optional: true, mono: false)],
             b => $"{Label(NotifyKinds, b.GetString("kind", "toast"))} · \"{b.GetString("message", "")}\""),

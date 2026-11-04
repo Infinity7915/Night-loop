@@ -17,8 +17,8 @@ public sealed record ProbeResult(bool Found, string Message, (int X, int Y)? Poi
 public static class DetectProbe
 {
     /// <summary>Blocks the editor offers the test for.</summary>
-    public static bool CanTest(Block block) => block.Type is BlockTypes.WaitForText or BlockTypes.WaitForImage
-        or BlockTypes.DetectPixelColor or BlockTypes.FindClick or BlockTypes.ScanTurn or BlockTypes.If or BlockTypes.RepeatUntil;
+    public static bool CanTest(Block block) => block.Type is BlockTypes.WaitForText or BlockTypes.WaitForImage or BlockTypes.WaitForImageGone
+        or BlockTypes.DetectPixelColor or BlockTypes.DetectPixelColorGone or BlockTypes.FindClick or BlockTypes.ScanTurn or BlockTypes.If or BlockTypes.RepeatUntil;
 
     public static async Task<ProbeResult> LookOnceAsync(Block block, RunEnvironment environment, string? targetExe, CancellationToken ct = default)
     {
@@ -30,9 +30,9 @@ public static class DetectProbe
             return block.Type switch
             {
                 BlockTypes.If or BlockTypes.RepeatUntil => await ConditionAsync(block, ctx),
-                BlockTypes.DetectPixelColor => Pixel(block, ctx),
+                BlockTypes.DetectPixelColor or BlockTypes.DetectPixelColorGone => Pixel(block, ctx),
                 BlockTypes.WaitForText => await FindAsync(ctx, DetectBlocksLook.Text(block)),
-                BlockTypes.WaitForImage => await FindAsync(ctx, DetectBlocksLook.Picture(block)),
+                BlockTypes.WaitForImage or BlockTypes.WaitForImageGone => await FindAsync(ctx, DetectBlocksLook.Picture(block)),
                 BlockTypes.FindClick or BlockTypes.ScanTurn => await FindAsync(ctx, DetectBlocksLook.Target(block)),
                 _ => new ProbeResult(false, "This block doesn't look at the screen."),
             };

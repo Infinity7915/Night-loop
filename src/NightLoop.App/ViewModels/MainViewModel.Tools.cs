@@ -104,7 +104,7 @@ public sealed partial class MainViewModel
             : "";
         var hasImage = ImageDataOf(b) is { Length: > 0 };
 
-        if (b.Type == BlockTypes.WaitForImage || (finds && target == "image") || condition == "imageVisible")
+        if (b.Type is BlockTypes.WaitForImage or BlockTypes.WaitForImageGone || (finds && target == "image") || condition == "imageVisible")
             yield return new(hasImage ? "Capture the picture again" : "Capture image from screen", "image");
         if (fields.Any(f => f.Key == "region") || condition is "textVisible" or "imageVisible")
             yield return new("Select region on screen", "region");

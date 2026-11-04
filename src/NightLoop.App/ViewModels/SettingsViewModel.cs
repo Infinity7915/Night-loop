@@ -45,6 +45,31 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>The block editor slides along beside a long timeline as the page scrolls. Kept on this PC.</summary>
+    public bool EditorFollowsScroll
+    {
+        get => _shell.Local.EditorFollowsScroll;
+        set
+        {
+            if (_shell.Local.EditorFollowsScroll == value) return;
+            _shell.Local.EditorFollowsScroll = value;
+            if (_shell.Macros is { } macros) macros.EditorFollowsScroll = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Closing the window hides Night-loop to the tray instead of quitting. Kept on this PC.</summary>
+    public bool CloseToTray
+    {
+        get => _shell.Local.CloseToTray;
+        set
+        {
+            if (_shell.Local.CloseToTray == value) return;
+            _shell.Local.CloseToTray = value;
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>Keeps the window above all others. Kept on this PC.</summary>
     public bool AlwaysOnTop
     {

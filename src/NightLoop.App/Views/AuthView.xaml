@@ -88,8 +88,14 @@
           <Button Content="Forgot password?" Command="{Binding ShowCommand}" CommandParameter="{x:Static vm:AuthMode.Forgot}"
                   Style="{StaticResource LinkButton}" Margin="0,10,0,0" HorizontalAlignment="Left"
                   Visibility="{Binding IsSignIn, Converter={StaticResource BoolToVisible}}" />
-          <CheckBox Content="I'm at least 13 and accept the terms and privacy policy" IsChecked="{Binding AcceptedTerms}" Margin="0,14,0,0"
-                    Visibility="{Binding IsSignUp, Converter={StaticResource BoolToVisible}}" />
+          <!-- The box ticks; the blue line opens the Terms of Service on GitHub. -->
+          <DockPanel Margin="0,14,0,0" Visibility="{Binding IsSignUp, Converter={StaticResource BoolToVisible}}">
+            <CheckBox x:Name="TermsBox" DockPanel.Dock="Left" IsChecked="{Binding AcceptedTerms}" VerticalAlignment="Top" Margin="0,1,8,0"
+                      AutomationProperties.Name="Agree to the Terms of Service" ToolTip="Tick to agree" />
+            <TextBlock TextWrapping="Wrap" FontSize="13" LineHeight="19">
+              <Hyperlink Click="OnTermsClick" Foreground="#3B82F6" ToolTip="Opens the Night-loop Terms of Service on GitHub">Click to agree: I'm at least 13 and accept the Night-loop Terms of Service and Privacy Policy</Hyperlink>
+            </TextBlock>
+          </DockPanel>
         </StackPanel>
 
         <TextBlock Text="{Binding FormError}" Style="{StaticResource FieldError}" Margin="0,14,0,0"
