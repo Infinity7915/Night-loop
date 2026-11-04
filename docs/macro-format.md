@@ -44,6 +44,9 @@ These are optional params, so existing macros are unaffected:
 | `input.scroll` | positive `amount` scrolls up | Matches Windows wheel direction |
 | `window.waitFor` | `until`: `front` (default) or `open` | "Open" carries on as soon as the window exists, even behind others |
 | `window.open` (new) | `path` (required, up to 260 characters, `%LOCALAPPDATA%` style variables allowed), `args`, `ifRunning`: `focus` (default) or `new`, `wait` (default true), `timeoutMs` | Starts a program, or brings it to the front if it's already running, then waits for its window |
+| `timing.waitForImageGone` (new, "Image gone") | same params as `timing.waitForImage` | Waits until the picture is no longer on screen (a loading screen closing, a popup going away) |
+| `detect.pixelColorGone` (new, "Pixel gone") | same params as `detect.pixelColor` | Waits until the point no longer has the color |
+| `utility.notify` | `kind`: `toast` is shown as "Notify" | Sends a Windows notification (from Night-loop's tray icon), not a message inside Night-loop |
 | any block | `note` (text, up to 200 characters) | A short note shown under the block in the editor; ignored when running |
 
 ## Disabled blocks
@@ -58,10 +61,11 @@ Every block in the palette runs:
 - **Input**: key, key combo, hold key, click, mouse move, drag, scroll, type text.
 - **Camera**: turn, zoom, center on a target.
 - **Timing**: wait, random wait, wait for key, pause and resume another macro.
-- **Detect**: wait for text (Windows OCR), wait for image, wait for pixel color, find and click, scan and turn.
+- **Detect**: wait for text (Windows OCR), wait for image, wait for pixel color, image gone, pixel gone, find and
+  click, scan and turn.
 - **Logic**: loop, repeat until, if, else, end, label, go to label, run macro, stop.
 - **Window**: open window (start a program), focus, wait for window, resize, position.
-- **Utility**: notify, screenshot (saved to Pictures\Night-loop), comment, description.
+- **Utility**: notify (a Windows notification), screenshot (saved to Pictures\Night-loop), comment, description.
 
 Conditions: `textVisible`, `imageVisible`, `pixelColor`, `windowFocused`, `processRunning`, `keyHeld`, `not`,
 `all`, `any`. Regions are `[x, y, width, height]` inside the game window. Points with `relativeTo: "gameWindow"`

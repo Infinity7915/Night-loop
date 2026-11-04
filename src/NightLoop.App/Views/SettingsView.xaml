@@ -66,7 +66,7 @@
   </UserControl.Resources>
 
   <Grid>
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly">
       <StackPanel Margin="40" MaxWidth="880" HorizontalAlignment="Stretch">
         <TextBlock Text="SETTINGS" Style="{StaticResource Eyebrow}" FontSize="12" />
         <TextBlock Text="Settings" Style="{StaticResource PageTitle}" FontSize="34" Margin="0,8,0,0" />
@@ -139,6 +139,15 @@
               <StackPanel>
                 <TextBlock Text="Always on top" FontWeight="SemiBold" FontSize="14" />
                 <TextBlock Text="Keeps Night-loop above every other window, games included. Clicks a macro sends where Night-loop sits land on Night-loop, so keep it to one side."
+                           Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+            </DockPanel>
+            <DockPanel Margin="0,20,0,0">
+              <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding CloseToTray}" VerticalAlignment="Center"
+                        ToolTip="Keep running in the tray when closed" Margin="16,0,0,0" />
+              <StackPanel>
+                <TextBlock Text="Keep running in the tray when closed" FontWeight="SemiBold" FontSize="14" />
+                <TextBlock Text="Closing the window hides Night-loop to the notification area so hotkeys and macros keep working. Right-click its icon and pick Exit to quit."
                            Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
               </StackPanel>
             </DockPanel>
@@ -250,13 +259,22 @@
         <Border Style="{StaticResource SectionCard}">
           <StackPanel>
             <TextBlock Text="Macros" Style="{StaticResource CardTitle}" />
-            <TextBlock Text="How new macros start. Saved locally on this PC." Style="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap" />
+            <TextBlock Text="How new macros start and how the editor scrolls. Saved locally on this PC." Style="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap" />
             <DockPanel Margin="0,20,0,0">
               <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding StarterSequence}" VerticalAlignment="Center"
                         ToolTip="Starter sequence for new macros" Margin="16,0,0,0" />
               <StackPanel>
                 <TextBlock Text="Starter sequence for new macros" FontWeight="SemiBold" FontSize="14" />
                 <TextBlock Text="New macros start with Focus, Resize and Position for the target game, a loop to fill in and a notification at the end."
+                           Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+            </DockPanel>
+            <DockPanel Margin="0,20,0,0">
+              <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding EditorFollowsScroll}" VerticalAlignment="Center"
+                        ToolTip="Block editor follows scrolling" Margin="16,0,0,0" />
+              <StackPanel>
+                <TextBlock Text="Block editor follows scrolling" FontWeight="SemiBold" FontSize="14" />
+                <TextBlock Text="When a macro has more blocks than fit on screen, the block editor slides down beside the timeline as you scroll, so it's always in sight."
                            Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
               </StackPanel>
             </DockPanel>

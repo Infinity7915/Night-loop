@@ -15,7 +15,8 @@ internal static class DetectBlocks
     private const int CenterMaxSteps = 25;
     private const int CenterMaxMovePx = 400;
 
-    public static async Task<bool> WaitForPixelAsync(Block b, RunContext ctx)
+    /// <summary>Waits until the point has the color, or with <paramref name="gone"/> until it no longer has it.</summary>
+    public static async Task<bool> WaitForPixelAsync(Block b, RunContext ctx, bool gone = false)
     {
         if (!Rgb.TryParse(b.GetString("color"), out var color)) throw new MacroFaultException("Pick a color like #FF0000.");
         var p = ctx.ToScreen(b.GetInt("x", 0), b.GetInt("y", 0), b.GetString("relativeTo"), jitter: false);
@@ -25,7 +26,7 @@ internal static class DetectBlocks
         while (true)
         {
             var px = ctx.Capture(new ScreenRect(p.X, p.Y, 1, 1))[0, 0];
-            if (px.IsNear(color, tolerance)) return true;
+            if (px.IsNear(color, tolerance) != gone) return true;
             if (timeout > 0 && waited >= timeout) return false;
             await ctx.PauseExactAsync(50);
             waited += 50;
@@ -37,6 +38,9 @@ internal static class DetectBlocks
 
     public static async Task<bool> WaitForImageAsync(Block b, RunContext ctx) =>
         await Vision.WaitForAsync(ctx, Picture(b), b.GetInt("timeoutMs", 10_000)) is not null;
+
+    public static Task<bool> WaitForImageGoneAsync(Block b, RunContext ctx) =>
+        Vision.WaitForGoneAsync(ctx, Picture(b), b.GetInt("timeoutMs", 10_000));
 
     public static async Task<bool> FindClickAsync(Block b, RunContext ctx)
     {

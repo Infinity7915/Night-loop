@@ -199,6 +199,56 @@ public class PlaybackTests
     }
 
     [Fact]
+    public async Task Pixel_gone_waits_until_the_color_leaves()
+    {
+        var screen = new FakeScreen(200, 200);
+        screen.Paint(50, 60, 1, 1, new Rgb(255, 0, 0));
+        screen.OnCapture = s =>
+        {
+            if (Volatile.Read(ref s.Captures) == 3) s.Clear();
+        };
+        var doc = new MacroBuilder()
+            .Add(BlockTypes.DetectPixelColorGone, new() { ["x"] = 50, ["y"] = 60, ["color"] = "#FF0000", ["tolerance"] = 5, ["timeoutMs"] = 0 })
+            .Press("A").Build();
+        Assert.Empty(MacroValidator.Validate(doc));
+        var r = await RunAsync(doc, screen: screen);
+        Assert.Equal(RunState.Stopped, r.Run.State);
+        Assert.Equal(3, screen.Captures);
+        Assert.Equal(["down A", "up A"], r.Input.Log);
+    }
+
+    [Fact]
+    public async Task Image_gone_waits_until_the_picture_leaves_and_fails_on_timeout()
+    {
+        var pattern = new byte[24 * 24 * 4];
+        var rng = new Random(11);
+        for (var i = 0; i < 24 * 24; i++) pattern[i * 4] = pattern[i * 4 + 1] = pattern[i * 4 + 2] = (byte)rng.Next(256);
+        var template = ImageTemplate.FromImage(new ScreenImage(0, 0, 24, 24, pattern));
+
+        var screen = new FakeScreen(320, 240);
+        screen.Show(150, 90, template);
+        screen.OnCapture = s =>
+        {
+            if (Volatile.Read(ref s.Captures) == 2) s.Clear();
+        };
+        var gone = new MacroBuilder()
+            .Add(BlockTypes.WaitForImageGone, new() { ["imageData"] = template.Encode(), ["timeoutMs"] = 0 })
+            .Press("A").Build();
+        Assert.Empty(MacroValidator.Validate(gone));
+        var r = await RunAsync(gone, screen: screen);
+        Assert.Equal(["down A", "up A"], r.Input.Log);
+
+        // Still there when the time runs out: On fail "stop" ends the macro.
+        var stays = new FakeScreen(320, 240);
+        stays.Show(150, 90, template);
+        var timeout = new MacroBuilder()
+            .Add(BlockTypes.WaitForImageGone, new() { ["imageData"] = template.Encode(), ["timeoutMs"] = 300, ["onFail"] = "stop" })
+            .Press("B").Build();
+        var t = await RunAsync(timeout, screen: stays);
+        Assert.Empty(t.Input.Log);
+    }
+
+    [Fact]
     public async Task On_fail_go_to_label_jumps_and_stop_ends_the_macro()
     {
         var screen = new FakeScreen(100, 100);

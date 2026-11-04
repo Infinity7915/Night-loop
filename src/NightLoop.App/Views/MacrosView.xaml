@@ -169,7 +169,8 @@
   </UserControl.Resources>
 
   <Grid>
-    <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                PanningMode="VerticalOnly" ScrollChanged="OnScrollChanged">
       <StackPanel Margin="40,36,40,40">
         <!-- Header -->
         <controls:SplitRow>
@@ -516,8 +517,8 @@
                   <!-- Ticked blocks: move or delete them together. Shift+click a tick ticks every block in between. -->
                   <Border BorderBrush="{DynamicResource Border}" BorderThickness="0,0,1,0" Padding="0,0,12,0" Margin="0,0,16,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                      <Button Style="{StaticResource IconButton}" Width="32" Height="32" Margin="0" Content="&#xE8B3;" ToolTip="Select all blocks"
-                              Command="{Binding CheckAllCommand}" />
+                      <Button Style="{StaticResource IconButton}" Width="32" Height="32" Margin="0" Content="&#xE8B3;" ToolTip="{Binding CheckAllToolTip}"
+                              Command="{Binding ToggleCheckAllCommand}" />
                       <TextBlock Text="{Binding CheckedText}" Style="{StaticResource SmallLabel}" MinWidth="70" Margin="6,0,6,0" VerticalAlignment="Center"
                                  ToolTip="Tick blocks on the timeline. Shift+click a second tick to select every block between the two." />
                       <Button Style="{StaticResource IconButton}" Width="32" Height="32" Content="&#xE70E;" ToolTip="Move the selected blocks up"
@@ -526,8 +527,6 @@
                               Command="{Binding MoveCheckedDownCommand}" IsEnabled="{Binding HasChecked}" />
                       <Button Style="{StaticResource IconButton}" Width="32" Height="32" Content="&#xE74D;" ToolTip="Delete the selected blocks"
                               Command="{Binding DeleteCheckedCommand}" IsEnabled="{Binding HasChecked}" />
-                      <Button Style="{StaticResource IconButton}" Width="32" Height="32" Content="&#xE894;" ToolTip="Clear the selection (Esc)"
-                              Command="{Binding ClearCheckedCommand}" IsEnabled="{Binding HasChecked}" />
                     </StackPanel>
                   </Border>
                   <CheckBox Content="Humanize" IsChecked="{Binding Humanize}" FontWeight="SemiBold" FontSize="13" Margin="0,4,16,4" />
@@ -545,7 +544,8 @@
               </DockPanel>
             </Border>
 
-            <!-- Timeline + block editor. When the page is narrow the editor moves under the timeline (code-behind). -->
+            <!-- Timeline + block editor, always side by side (the window shrinks the whole UI instead). With many blocks
+                 the editor slides down beside the timeline as the page scrolls (code-behind, Settings › Macros). -->
             <Grid x:Name="EditorBody" SizeChanged="OnEditorBodySizeChanged">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -666,8 +666,11 @@
 
               <!-- Block editor (inspector) -->
               <Border x:Name="Inspector" Grid.Column="1" BorderBrush="{DynamicResource Border}" BorderThickness="1,0,0,0" Padding="20"
-                      Background="{DynamicResource Inset}">
-                <DockPanel>
+                      Background="{DynamicResource Inset}" ClipToBounds="True">
+                <DockPanel x:Name="InspectorPanel" VerticalAlignment="Top" SizeChanged="OnInspectorSizeChanged">
+                  <DockPanel.RenderTransform>
+                    <TranslateTransform x:Name="InspectorShift" />
+                  </DockPanel.RenderTransform>
                   <Button DockPanel.Dock="Bottom" Content="{Binding SaveText}" Style="{StaticResource TallPrimary}" Margin="0,20,0,0"
                           HorizontalAlignment="Stretch" Command="{Binding SaveCommand}" />
                   <StackPanel>

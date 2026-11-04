@@ -76,6 +76,26 @@ public sealed class LocalSettings(string path)
         set => WriteNode("alwaysOnTop", value);
     }
 
+    /// <summary>
+    /// Settings › Macros: with many blocks, the block editor slides down beside the timeline as the page scrolls,
+    /// so it stays in sight. On unless turned off.
+    /// </summary>
+    public bool EditorFollowsScroll
+    {
+        get => Read()?["editorFollowsScroll"] is not JsonValue v || !v.TryGetValue(out bool on) || on;
+        set => WriteNode("editorFollowsScroll", value);
+    }
+
+    /// <summary>
+    /// Settings › Appearance: closing the window hides Night-loop to the notification area (system tray) so
+    /// hotkeys and macros keep working. Right-click the tray icon › Exit quits. On unless turned off.
+    /// </summary>
+    public bool CloseToTray
+    {
+        get => Read()?["closeToTray"] is not JsonValue v || !v.TryGetValue(out bool on) || on;
+        set => WriteNode("closeToTray", value);
+    }
+
     /// <summary>The start / stop recording key, like "F9" or "Ctrl+Shift+R". Null means the default (F9).</summary>
     public string? RecordHotkey
     {

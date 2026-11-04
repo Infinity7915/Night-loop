@@ -5,7 +5,7 @@
         xmlns:views="clr-namespace:NightLoop.App.Views"
         xmlns:controls="clr-namespace:NightLoop.App.Controls"
         Title="Night-loop" Icon="/Assets/icon.png"
-        Width="1280" Height="800" MinWidth="960" MinHeight="600"
+        Width="1280" Height="800" MinWidth="560" MinHeight="400"
         WindowStartupLocation="CenterScreen" Style="{StaticResource NightWindow}" Topmost="{Binding AlwaysOnTop}">
   <Window.Resources>
     <DataTemplate DataType="{x:Type vm:LoadingViewModel}">
@@ -25,7 +25,11 @@
     </DataTemplate>
   </Window.Resources>
 
-  <Grid>
+  <!-- The whole UI scales down as the window gets smaller than the size it was designed for (code-behind). -->
+  <Grid x:Name="RootGrid">
+    <Grid.LayoutTransform>
+      <ScaleTransform x:Name="UiScale" ScaleX="1" ScaleY="1" />
+    </Grid.LayoutTransform>
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="Auto" />
       <ColumnDefinition Width="*" />

@@ -54,6 +54,10 @@ internal static class BlockExecutor
                 return await DetectBlocks.WaitForImageAsync(b, ctx);
             case BlockTypes.DetectPixelColor:
                 return await DetectBlocks.WaitForPixelAsync(b, ctx);
+            case BlockTypes.WaitForImageGone:
+                return await DetectBlocks.WaitForImageGoneAsync(b, ctx);
+            case BlockTypes.DetectPixelColorGone:
+                return await DetectBlocks.WaitForPixelAsync(b, ctx, gone: true);
 
             case BlockTypes.WindowFocus:
                 WindowBlocks.Focus(b, ctx);
