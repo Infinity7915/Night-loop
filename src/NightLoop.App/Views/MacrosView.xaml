@@ -357,6 +357,9 @@
                   </StackPanel>
                 </DockPanel>
                 <DockPanel Margin="0,14,0,0">
+                  <Button DockPanel.Dock="Right" Content="None" Command="{Binding ClearEditorHotkeyCommand}" IsEnabled="{Binding EditorHasHotkey}"
+                          FontSize="13" FontWeight="Normal" MinHeight="44" Margin="8,0,0,0" Background="{DynamicResource Bg}"
+                          ToolTip="No start / stop key: the macro only runs from Play" />
                   <Button DockPanel.Dock="Right" Content="{Binding EditorHotkeyLabel}" Command="{Binding CaptureEditorHotkeyCommand}"
                           FontFamily="{StaticResource Mono}" FontSize="13" FontWeight="Normal" MinHeight="44" MaxWidth="280" Background="{DynamicResource Bg}"
                           ToolTip="Click, then press a key. Backspace clears it." />
@@ -1124,6 +1127,9 @@
                                       </StackPanel>
                                     </DockPanel>
                                     <DockPanel Margin="0,14,0,0">
+                                      <Button DockPanel.Dock="Right" Content="None" Command="{Binding ClearHotkeyCommand}" IsEnabled="{Binding HasHotkey}"
+                                              FontSize="13" FontWeight="Normal" MinHeight="44" Margin="8,0,0,0" Background="{DynamicResource Bg}"
+                                              ToolTip="No start / stop key: the macro only runs from Play" />
                                       <Button DockPanel.Dock="Right" Content="{Binding HotkeyLabel}" Command="{Binding CaptureHotkeyCommand}"
                                               FontFamily="{StaticResource Mono}" FontSize="13" FontWeight="Normal" MinHeight="44" MaxWidth="280"
                                               Background="{DynamicResource Bg}" ToolTip="Click, then press a key. Backspace clears it." />

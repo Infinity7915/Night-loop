@@ -534,6 +534,15 @@ public sealed partial class SavedMacroRow : ObservableObject
         _owner.CapturingRow = this;
     }
 
+    /// <summary>The None button: the macro gets no start / stop key.</summary>
+    [RelayCommand]
+    private void ClearHotkey()
+    {
+        if (IsCapturing) { IsCapturing = false; _owner.CapturingRow = null; }
+        HotkeyError = "";
+        if (HasHotkey) OnCaptured(null, clear: true);
+    }
+
     /// <summary>Called by the view with the key pressed while capturing. Escape cancels, Backspace/Delete clears.</summary>
     public void OnCaptured(Hotkey? hotkey, bool clear)
     {

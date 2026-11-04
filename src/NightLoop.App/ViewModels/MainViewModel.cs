@@ -171,7 +171,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     // Loaded macro options (gear button): start key, trigger mode, run alongside.
     [ObservableProperty] private bool _showEditorOptions;
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PlayHotkeyText), nameof(EditorHotkeyLabel))]
+    [NotifyPropertyChangedFor(nameof(PlayHotkeyText), nameof(EditorHotkeyLabel), nameof(EditorHasHotkey))]
     private string _editorHotkey = "";
     [ObservableProperty] private string _editorTriggerMode = TriggerModes.Toggle;
     [ObservableProperty] private bool _editorRunAlongside = true;
@@ -179,6 +179,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _editorHotkeyError = "";
     [ObservableProperty] private bool _isCapturingRecordHotkey;
     [ObservableProperty] private string _recordHotkeyError = "";
+
+    /// <summary>The loaded macro has a start / stop key (the None button is only useful then).</summary>
+    public bool EditorHasHotkey => !string.IsNullOrEmpty(EditorHotkey);
 
     public string EditorHotkeyLabel => IsCapturingEditorHotkey
         ? "Press a key combo… (Esc cancels)"
@@ -931,6 +934,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         EditorHotkeyError = "";
         IsCapturingEditorHotkey = true;
     }
+
+    /// <summary>The None button: no start / stop key, so the macro only runs from Play (or Run macro).</summary>
+    [RelayCommand]
+    private void ClearEditorHotkey() => OnEditorHotkeyCaptured(null, clear: true);
 
     /// <summary>Called by the view with the key pressed while capturing. Escape cancels, Backspace/Delete clears.</summary>
     public void OnEditorHotkeyCaptured(Hotkey? hotkey, bool clear)
