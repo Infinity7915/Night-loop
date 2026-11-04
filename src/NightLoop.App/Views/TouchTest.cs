@@ -73,6 +73,19 @@ public static class TouchTest
         window.PreviewMouseDown += (_, _) => mice++;
         log.Add($"info tablet devices: {System.Windows.Input.Tablet.TabletDevices.Count}, active: {window.IsActive}, " +
                 $"pointer support: {(AppContext.TryGetSwitch("Switch.System.Windows.Input.Stylus.EnablePointerSupport", out var on) && on)}");
+        // Can this desktop deliver input to a window at all? A mouse click on the page header should arrive.
+        var probe = window.PointToScreen(new Point(window.ActualWidth * 0.5, 20));
+        SetCursorPos((int)probe.X, (int)probe.Y);
+        mouse_event(MouseLeftDown, 0, 0, 0, IntPtr.Zero);
+        mouse_event(MouseLeftUp, 0, 0, 0, IntPtr.Zero);
+        await Task.Delay(500);
+        if (mice == 0)
+        {
+            log.Add("SKIP this desktop doesn't deliver any input to windows (a real mouse click didn't arrive either), so touch can't be tested here.");
+            return 3;
+        }
+        mice = 0;
+
         var scroller = (ScrollViewer)view.FindName("Scroller");
         // 1. A swipe up scrolls the page down.
         var before = scroller.VerticalOffset;
@@ -218,6 +231,15 @@ public static class TouchTest
         public uint Orientation;
         public uint Pressure;
     }
+
+    private const uint MouseLeftDown = 0x0002, MouseLeftUp = 0x0004;
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll")]
+    private static extern void mouse_event(uint flags, int dx, int dy, int data, IntPtr extra);
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
