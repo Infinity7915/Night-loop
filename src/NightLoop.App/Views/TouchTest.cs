@@ -67,6 +67,12 @@ public static class TouchTest
             return 3;
         }
 
+        var touches = 0;
+        var mice = 0;
+        window.PreviewTouchDown += (_, _) => touches++;
+        window.PreviewMouseDown += (_, _) => mice++;
+        log.Add($"info tablet devices: {System.Windows.Input.Tablet.TabletDevices.Count}, active: {window.IsActive}, " +
+                $"pointer support: {(AppContext.TryGetSwitch("Switch.System.Windows.Input.Stylus.EnablePointerSupport", out var on) && on)}");
         var scroller = (ScrollViewer)view.FindName("Scroller");
         // 1. A swipe up scrolls the page down.
         var before = scroller.VerticalOffset;
@@ -110,6 +116,7 @@ public static class TouchTest
             ok &= picked;
         }
 
+        log.Add($"info touch-downs seen: {touches}, mouse-downs seen: {mice}");
         log.Add(ok ? "PASSED" : "FAILED");
         return ok ? 0 : 1;
     }

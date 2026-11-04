@@ -16,6 +16,10 @@
     <StartupObject>NightLoop.App.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Touch and pen through Windows' pointer messages (WM_POINTER) instead of the old WISP tablet stack. -->
+    <RuntimeHostConfigurationOption Include="Switch.System.Windows.Input.Stylus.EnablePointerSupport" Value="true" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
   </ItemGroup>
   <ItemGroup>
