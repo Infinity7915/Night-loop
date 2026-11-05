@@ -96,6 +96,9 @@
               <Hyperlink Click="OnTermsClick" Foreground="#3B82F6" ToolTip="Opens the Night-loop Terms of Service on GitHub">Click to agree: I'm at least 13 and accept the Night-loop Terms of Service and Privacy Policy</Hyperlink>
             </TextBlock>
           </DockPanel>
+          <TextBlock Text="Macros you create and store with Night-loop are assets of Night-loop and aren't owned by you (Terms, section 5)."
+                     Style="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"
+                     Visibility="{Binding IsSignUp, Converter={StaticResource BoolToVisible}}" />
         </StackPanel>
 
         <TextBlock Text="{Binding FormError}" Style="{StaticResource FieldError}" Margin="0,14,0,0"

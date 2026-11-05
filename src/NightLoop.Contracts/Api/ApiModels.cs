@@ -65,6 +65,21 @@ public sealed record UserDto(
 
 public sealed record MeResponse(UserDto User);
 
+/// <summary>
+/// GET /me/data: the "Download my data" summary. The password is never included: the server only has a one-way hash,
+/// so PasswordSet just says there is one. Macros themselves are never exported, only how many the account holds.
+/// </summary>
+public sealed record AccountDataResponse(
+    string Email,
+    string Username,
+    long UserNumber,
+    long UsageSeconds,
+    int MacroCount,
+    bool PasswordSet,
+    DateTimeOffset? PasswordChangedAt,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset ExportedAt);
+
 public sealed record ChangeUsernameRequest(string Username, string CurrentPassword);
 
 public sealed record ChangeEmailRequest(string NewEmail, string CurrentPassword);

@@ -10,9 +10,14 @@
   Anything inside these comment marks is hidden. Delete everything else to show "Nothing new right now."
 -->
 
-# Welcome to Night-loop 0.1.0
+# Happy early Thanksgiving from Night-loop!
 
-This is the first public test build. Record what you do with the keyboard and mouse, then replay it.
+Thanksgiving is almost here, and we're thankful for everyone testing Night-loop. Thank you for every macro, bug report and idea. Enjoy the food, the family and a well-earned break.
 
-- Night-loop updates itself. Press Refresh on Home or Check now in Settings to get new versions.
-- Press Ctrl+Alt+End at any time to stop every macro.
+# What's new in 0.5.0
+
+- Recording and playback are more precise.
+- Start keys save on their own, and macros can share a key.
+- Download my data is now in Settings.
+- Security and safety improvements across the app and server.
+- Updated Terms of Service (please give section 5 a read).

@@ -294,6 +294,7 @@ internal static class InputBlocks
         }
 
         var steps = scaled / MoveStepMs;
+        var pace = ctx.Pace(scaled, steps);
         for (var i = 1; i <= steps; i++)
         {
             var t = (double)i / steps;
@@ -303,7 +304,7 @@ internal static class InputBlocks
             else ctx.Input.MoveTo(
                 (int)Math.Round(from.X + (to.X - from.X) * e + bendX * arc),
                 (int)Math.Round(from.Y + (to.Y - from.Y) * e + bendY * arc));
-            await ctx.PauseExactAsync(MoveStepMs);
+            await pace.NextAsync();
         }
     }
 
@@ -321,6 +322,7 @@ internal static class InputBlocks
         var total = Math.Max(durationMs, path[^1].T);
         var scaled = ctx.Scale(total);
         var steps = Math.Max(1, scaled / MoveStepMs);
+        var pace = ctx.Pace(scaled, steps);
         var points = new List<(int X, int Y, int T)>(path) { (end.X, end.Y, total) };
         var seg = 0;
         for (var i = 1; i <= steps; i++)
@@ -331,7 +333,7 @@ internal static class InputBlocks
             var b = points[seg + 1];
             var f = b.T > a.T ? Math.Clamp((t - a.T) / (b.T - a.T), 0, 1) : 1;
             ctx.Input.MoveTo((int)Math.Round(a.X + (b.X - a.X) * f), (int)Math.Round(a.Y + (b.Y - a.Y) * f));
-            await ctx.PauseExactAsync(MoveStepMs);
+            await pace.NextAsync();
         }
         ctx.Input.MoveTo(end.X, end.Y);
     }
@@ -350,6 +352,7 @@ internal static class InputBlocks
 
         var scaled = ctx.Scale(total);
         var steps = Math.Max(1, scaled / MoveStepMs);
+        var pace = ctx.Pace(scaled, steps);
         int sentX = 0, sentY = 0, seg = 0;
         for (var i = 1; i <= steps; i++)
         {
@@ -368,7 +371,7 @@ internal static class InputBlocks
             if (tx != sentX || ty != sentY) ctx.Input.MoveBy(tx - sentX, ty - sentY);
             sentX = tx;
             sentY = ty;
-            if (i < steps) await ctx.PauseExactAsync(MoveStepMs);
+            await pace.NextAsync();
         }
     }
 

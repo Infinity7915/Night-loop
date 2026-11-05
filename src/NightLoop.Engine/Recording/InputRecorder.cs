@@ -23,7 +23,7 @@ public sealed class RecorderSettings
     public Hotkey? StopHotkey { get; init; }
     public bool RecordMouseMoves { get; init; }
     /// <summary>Keep at most one mouse position every this many milliseconds (raw motion in between is added up).</summary>
-    public int MoveSampleMs { get; init; } = 16;
+    public int MoveSampleMs { get; init; } = 8;
     /// <summary>Skip clicks and keys aimed at Night-loop's own windows (like the Record button).</summary>
     public bool IgnoreOwnWindows { get; init; } = true;
 }

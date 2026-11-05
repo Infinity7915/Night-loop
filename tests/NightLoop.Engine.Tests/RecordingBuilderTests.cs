@@ -34,13 +34,13 @@ public class RecordingBuilderTests
     }
 
     [Fact]
-    public void Gaps_over_50ms_become_waits_and_shorter_gaps_carry_into_the_next_wait()
+    public void Gaps_over_20ms_become_waits_and_shorter_gaps_carry_into_the_next_wait()
     {
         var blocks = Build(
             E.KeyDown(0, A), E.KeyUp(50, A),
-            E.KeyDown(80, A), E.KeyUp(130, A),     // 30 ms gap: no wait of its own
-            E.KeyDown(530, A), E.KeyUp(580, A));   // 400 ms gap, plus the 30 ms carried over
-        Assert.Equal(["key A press 50", "key A press 50", "wait 430", "key A press 50"], Describe(blocks));
+            E.KeyDown(60, A), E.KeyUp(110, A),     // 10 ms gap: no wait of its own
+            E.KeyDown(510, A), E.KeyUp(560, A));   // 400 ms gap, plus the 10 ms carried over
+        Assert.Equal(["key A press 50", "key A press 50", "wait 410", "key A press 50"], Describe(blocks));
     }
 
     [Fact]
@@ -48,9 +48,9 @@ public class RecordingBuilderTests
     {
         var blocks = Build(
             E.KeyDown(0, A), E.KeyUp(40, A),
-            E.KeyDown(80, A), E.KeyUp(120, A),     // 40 ms
-            E.KeyDown(160, A), E.KeyUp(200, A));   // 40 ms: 80 ms carried
-        Assert.Equal(["key A press 40", "key A press 40", "wait 80", "key A press 40"], Describe(blocks));
+            E.KeyDown(55, A), E.KeyUp(95, A),      // 15 ms
+            E.KeyDown(110, A), E.KeyUp(150, A));   // 15 ms: 30 ms carried
+        Assert.Equal(["key A press 40", "key A press 40", "wait 30", "key A press 40"], Describe(blocks));
     }
 
     [Fact]
@@ -58,7 +58,20 @@ public class RecordingBuilderTests
     {
         // Ctrl down, T pressed and released quickly, Ctrl let go a little later (opening a browser tab).
         var blocks = Build(E.KeyDown(0, LCtrl), E.KeyDown(30, T), E.KeyUp(90, T), E.KeyUp(130, LCtrl));
-        Assert.Equal(["key LeftCtrl down", "key T press 60", "wait 70", "key LeftCtrl up"], Describe(blocks));
+        Assert.Equal(["key LeftCtrl down", "wait 30", "key T press 60", "wait 40", "key LeftCtrl up"], Describe(blocks));
+    }
+
+    [Fact]
+    public void Simplified_paths_keep_changes_of_speed_along_a_straight_line()
+    {
+        // Straight line to the right: slow for 200 ms, then fast. A purely spatial simplification keeps only the ends
+        // and replays it at one steady speed; the time-aware one keeps the point where the speed changes.
+        var points = new List<(int X, int Y, int T)>();
+        for (var t = 0; t <= 200; t += 8) points.Add((t / 8, 0, t));            // 1 px per 8 ms
+        for (var t = 208; t <= 400; t += 8) points.Add((25 + (t - 200) * 2, 0, t)); // 16 px per 8 ms
+        var kept = RecordingBuilder.Simplify(points, 1.0);
+        Assert.Contains(kept, p => p.T is >= 192 and <= 216);
+        Assert.True(kept.Count < points.Count / 4, "a steady stretch still collapses to a few points");
     }
 
     [Fact]

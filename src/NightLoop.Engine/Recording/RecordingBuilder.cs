@@ -6,8 +6,8 @@ namespace NightLoop.Engine.Recording;
 
 public sealed class RecordingOptions
 {
-    /// <summary>Gaps longer than this become timing.wait blocks (schema: 50 ms).</summary>
-    public int MinWaitMs { get; init; } = 50;
+    /// <summary>Gaps longer than this become timing.wait blocks. Shorter gaps add up into the next wait, so the pace stays the same.</summary>
+    public int MinWaitMs { get; init; } = 20;
     /// <summary>A press and release closer than this many pixels is a click; further apart is a drag.</summary>
     public int ClickSlopPx { get; init; } = 4;
     /// <summary>Holding a button longer than this without moving records separate down and up blocks.</summary>
@@ -30,7 +30,7 @@ public sealed class RecordingOptions
     /// </summary>
     public int MaxBytes { get; init; } = MacroLimits.MaxDocumentBytes * 9 / 10;
     /// <summary>Paths are simplified until no point is further than this from the line the replay follows.</summary>
-    public double PathTolerancePx { get; init; } = 1.5;
+    public double PathTolerancePx { get; init; } = 1.0;
 }
 
 public sealed record RecordingResult(List<Block> Blocks, bool Truncated);
@@ -408,7 +408,7 @@ public static class RecordingBuilder
     }
 
     /// <summary>
-    /// Ramer–Douglas–Peucker on the points (time is kept per point), then thinned to the block limit. The last point
+    /// Time-aware Ramer–Douglas–Peucker on the points (see <see cref="Rdp"/>), then thinned to the block limit. The last point
     /// is the block's end and isn't stored in the path.
     /// </summary>
     internal static List<(int X, int Y, int T)> Simplify(List<(int X, int Y, int T)> points, double tolerance)
@@ -425,18 +425,25 @@ public static class RecordingBuilder
         }
     }
 
+    /// <summary>
+    /// Time-aware Ramer–Douglas–Peucker. Each point is compared with where replay would put the cursor at that
+    /// point's own time (moving at a steady pace between the two kept ends), not just with the line between them.
+    /// So a hand that slows down or speeds up along a straight line keeps the points that show it, and replay
+    /// follows the recorded speed as well as the recorded path.
+    /// </summary>
     private static void Rdp(List<(int X, int Y, int T)> p, int first, int last, double tolerance, bool[] keep)
     {
         if (last - first < 2) return;
-        double ax = p[first].X, ay = p[first].Y, bx = p[last].X, by = p[last].Y;
-        var len = Math.Sqrt((bx - ax) * (bx - ax) + (by - ay) * (by - ay));
+        double ax = p[first].X, ay = p[first].Y, at = p[first].T;
+        double bx = p[last].X, by = p[last].Y, bt = p[last].T;
         var worst = -1.0;
         var index = -1;
         for (var i = first + 1; i < last; i++)
         {
-            var d = len < 1e-9
-                ? Math.Sqrt(Math.Pow(p[i].X - ax, 2) + Math.Pow(p[i].Y - ay, 2))
-                : Math.Abs((bx - ax) * (ay - p[i].Y) - (ax - p[i].X) * (by - ay)) / len;
+            var f = bt > at ? Math.Clamp((p[i].T - at) / (bt - at), 0, 1) : 0;
+            var ex = ax + (bx - ax) * f;
+            var ey = ay + (by - ay) * f;
+            var d = Math.Sqrt((p[i].X - ex) * (p[i].X - ex) + (p[i].Y - ey) * (p[i].Y - ey));
             if (d > worst) { worst = d; index = i; }
         }
         if (worst <= tolerance) return;

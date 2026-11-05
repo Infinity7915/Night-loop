@@ -446,8 +446,14 @@
               <DockPanel>
                 <Button DockPanel.Dock="Right" Content="Sign out" Style="{StaticResource Tall}" Foreground="{DynamicResource Record}"
                         BorderBrush="{DynamicResource DangerBorder}" Command="{Binding SignOutCommand}" />
-                <Button Style="{StaticResource LinkButton}" Content="Delete account" Foreground="{DynamicResource TextMuted}" FontSize="13"
-                        HorizontalAlignment="Left" VerticalAlignment="Center" Command="{Binding DeleteAccountCommand}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                  <Button Style="{StaticResource LinkButton}" Content="Download my data" Foreground="{DynamicResource TextMuted}" FontSize="13"
+                          VerticalAlignment="Center" Command="{Binding DownloadDataCommand}"
+                          ToolTip="Saves a text file with your email, username, time used and how many macros you have (not the macros)" />
+                  <TextBlock Text="·" Foreground="{DynamicResource TextMuted}" Margin="10,0" VerticalAlignment="Center" />
+                  <Button Style="{StaticResource LinkButton}" Content="Delete account" Foreground="{DynamicResource TextMuted}" FontSize="13"
+                          VerticalAlignment="Center" Command="{Binding DeleteAccountCommand}" />
+                </StackPanel>
               </DockPanel>
             </Border>
           </StackPanel>

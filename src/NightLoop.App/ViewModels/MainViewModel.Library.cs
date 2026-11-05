@@ -231,8 +231,9 @@ public sealed partial class MainViewModel
             if (req.HotkeyStart is not null) EditorHotkey = req.HotkeyStart;
             if (req.TriggerMode is not null) EditorTriggerMode = req.TriggerMode;
             if (req.RunAlongside is { } ra) EditorRunAlongside = ra;
-            if (req.GroupId is null && req.Ungroup is null) return;
-            req = new UpdateMacroRequest(GroupId: req.GroupId, Ungroup: req.Ungroup);
+            // The start key and the group are saved straight away; trigger and run alongside ride with autosave.
+            if (req.GroupId is null && req.Ungroup is null && req.HotkeyStart is null) return;
+            req = new UpdateMacroRequest(GroupId: req.GroupId, Ungroup: req.Ungroup, HotkeyStart: req.HotkeyStart, HotkeyStop: req.HotkeyStop);
             await FlushAsync();
         }
         try

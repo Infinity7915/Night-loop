@@ -109,6 +109,10 @@ public sealed class ApiClient
     public async Task<UserDto> FinishUnlockAsync(Guid challengeId, string code, CancellationToken ct = default) =>
         (await SendAsync<MeResponse>(HttpMethod.Post, "me/unlock/verify", new VerifyCodeRequest(challengeId, code), ct)).User;
 
+    /// <summary>The "Download my data" summary (no password, no macros: see <see cref="AccountDataResponse"/>).</summary>
+    public Task<AccountDataResponse> GetAccountDataAsync(CancellationToken ct = default) =>
+        SendAsync<AccountDataResponse>(HttpMethod.Get, "me/data", null, ct);
+
     public Task DeleteAccountAsync(string currentPassword, CancellationToken ct = default) =>
         SendAsync<object>(HttpMethod.Delete, "me", new DeleteAccountRequest(currentPassword), ct);
 

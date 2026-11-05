@@ -9,7 +9,8 @@ namespace NightLoop.App.ViewModels;
 
 /// <summary>
 /// Settings → Account (schema sections 4 and 5): change username, email and password, two-factor settings,
-/// delete the account, sign out. Macros never leave the server, so there is no data download here. Changes ask for the
+/// download a text summary of the account's data, delete the account, sign out. Macros never leave the server, so
+/// the download lists how many there are, not the macros themselves. Changes ask for the
 /// current password, except two-factor changes that only make signing in stricter; email and password changes also
 /// need a code sent by email. The server enforces all of it.
 /// </summary>
@@ -191,6 +192,49 @@ public sealed partial class AccountViewModel : ObservableObject
         });
         RefreshUser(); // the switch snaps back until the change is confirmed
     }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DownloadDataCommand))]
+    private bool _isDownloading;
+
+    /// <summary>
+    /// "Download my data": asks for a folder and saves a text file with the email, a note that a password is set
+    /// (it's only stored as a one-way hash), username, time used and how many macros the account holds.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanDownload))]
+    private async Task DownloadDataAsync()
+    {
+        Notice = "";
+        var picker = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Choose where to save your Night-loop data",
+            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+        };
+        if (picker.ShowDialog() != true) return;
+
+        IsDownloading = true;
+        try
+        {
+            var data = await _session.Api.GetAccountDataAsync();
+            var path = Path.Combine(picker.FolderName, AccountDataText.FileName(data, DateTimeOffset.Now));
+            await File.WriteAllTextAsync(path, AccountDataText.Format(data));
+            Notice = $"Saved your data to {path}";
+        }
+        catch (Exception ex) when (ex is ApiException or ServerUnreachableException)
+        {
+            Notice = $"Couldn't download your data: {ex.Message}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Notice = $"Couldn't save the file there: {ex.Message}";
+        }
+        finally
+        {
+            IsDownloading = false;
+        }
+    }
+
+    private bool CanDownload() => !IsDownloading;
 
     [RelayCommand]
     private void DeleteAccount() => Open(new AccountDialog(AccountDialogKind.Delete)

@@ -1,7 +1,7 @@
 # Night-loop Terms of Service
 
-**Version:** 2026-11-04
-**Effective date:** November 4, 2026
+**Version:** 2026-11-05
+**Effective date:** November 5, 2026
 
 These Terms of Service ("Terms") are an agreement between you and the operator of Night-loop ("Night-loop",
 "we", "us" or "our"). They cover the Night-loop desktop application for Windows (the "App"), the Night-loop
@@ -63,7 +63,7 @@ Night-loop is built to collect as little as it can. In short:
 | Email address | Sign-in, codes, security notices | Encrypted (AES-256-GCM); looked up by a keyed hash |
 | Password | Sign-in | Never stored; only a one-way Argon2id hash |
 | Username and user number | Shown in the App | Plain text (it's a display name) |
-| Your macros and macro groups (names, blocks, saved pictures) | So your macros follow your account | Encrypted (AES-256-GCM) |
+| Macros and macro groups on your account (names, blocks, saved pictures; Night-loop's property, section 5) | So your macros follow your account | Encrypted (AES-256-GCM) |
 | Macro settings (hotkeys, target game, trigger mode, block count) | Listing your macros | Plain text |
 | PC name (e.g. "Windows 11 · DESKTOP-7Q2") | Device list and "new sign-in" emails | Encrypted (AES-256-GCM) |
 | A hash of your PC's hardware ID and a random install ID | Recognising your PC for two-factor sign-in | One-way hash only |
@@ -88,17 +88,29 @@ perfectly secure. Encryption protects a copy of the database, but someone who to
 itself could read what the server can read. We will tell affected users about a breach as the law requires.
 
 **Your rights.** Depending on where you live (for example under the GDPR or the CCPA), you may have rights to
-access, correct, delete or get a copy of your personal data, and to object to some uses of it. Delete your
-account in Settings; for anything else, contact us (section 14). After you delete your account, it's disabled
+access, correct, delete or get a copy of your personal data, and to object to some uses of it. Download a copy of
+your account data or delete your account in Settings › Account; for anything else, contact us (section 14). After you delete your account, it's disabled
 straight away and deleted for good after 30 days.
 
-## 5. Your macros and content
+## 5. Macros are Night-loop's property
 
-- Your macros are yours. You give us only the permission we need to store them, sync them to your account and
-  show them back to you in the App.
-- Macros are kept on the Service and are not exported or shared by Night-loop.
-- You're responsible for what your macros do, and for having the right to use any picture or text you put in
-  them.
+- **Macros created with Night-loop and stored on the Service are assets of Night-loop. They are not owned by
+  you.** This covers every macro and macro group, including its blocks, recordings, settings and any picture or
+  text saved inside it, whether you recorded it, built it in the editor, or both.
+- To the extent you have any rights in a macro (for example in a picture or text you added), you assign them to
+  Night-loop when the macro is saved to the Service. Where the law doesn't allow that assignment, you instead give
+  Night-loop a worldwide, perpetual, irrevocable, royalty-free and transferable license to use, copy, change,
+  store and delete it for any purpose.
+- While your account is open and in good standing, Night-loop lets you use, edit, run and delete the macros on
+  your account through the App. This permission is personal to you, and it ends when your account is deleted or
+  closed.
+- Macros can only be created and changed with the App's macro editor. They can't be exported, imported, copied out
+  of the Service, moved to another account, or used with any other program or server, and you agree not to try
+  (including with a modified copy of the App).
+- Your account details (email, username and the other data in section 4) are not macros: they stay yours, and you
+  can download a copy in Settings › Account › Download my data.
+- You're still responsible for what your macros do, and for having the right to use any picture or text you put
+  in them.
 
 ## 6. Acceptable use
 
@@ -107,7 +119,8 @@ When you use Night-loop, you agree **not** to:
 - break any law, or use Night-loop to harm, harass, defraud or spy on anyone;
 - use it in a game, program or website whose rules forbid macros, automation or third-party input tools
   (see section 7);
-- attack, overload, probe or reverse-engineer the Service, get around its limits or security, or access
+- attack, overload, probe or reverse-engineer the Service, get around its limits or security (for example the
+  number of macros an account can hold), send it macros that weren't made with the App's macro editor, or access
   another person's account or data;
 - create accounts automatically, share or sell accounts, or impersonate someone;
 - use the Service to store or spread malware or illegal content.
