@@ -387,10 +387,10 @@ public class PlaybackTests
     [Theory]
     [InlineData("center")]
     [InlineData("click")]
-    public async Task Scan_and_turn_never_leaves_the_camera_tilted(string whenFound)
+    public async Task Scan_and_turn_never_turns_sideways_and_up_or_down_at_once(string whenFound)
     {
-        // The target is low on screen (on the ground). Centering turns sideways only; clicking it may tilt to aim
-        // but tilts back by the same amount.
+        // The target is right of and below the middle. Centering turns sideways until it is in the middle left to
+        // right, and only then tilts down to it. Clicking turns sideways only, tilts just to aim and tilts back.
         var screen = new FakeScreen(400, 300);
         var input = new FakeInput();
         int movedX = 0, movedY = 0;
@@ -413,11 +413,20 @@ public class PlaybackTests
         await run.Completion.WaitAsync(Timeout);
 
         Assert.Equal(RunState.Stopped, run.State);
-        var dys = input.Log.Where(l => l.StartsWith("rel ", StringComparison.Ordinal)).Select(l => int.Parse(l[4..].Split(',')[1])).ToList();
-        Assert.Equal(0, dys.Sum());
-        if (whenFound == "center") Assert.All(dys, dy => Assert.Equal(0, dy));
-        else Assert.Equal(1, input.Log.Count(l => l == "mdown Left"));
-        Assert.InRange(320 - movedX * 2, 200 - 40, 200 + 40); // sideways: centered
+        var turns = input.Log.Where(l => l.StartsWith("rel ", StringComparison.Ordinal))
+            .Select(l => l[4..].Split(',')).Select(p => (X: int.Parse(p[0]), Y: int.Parse(p[1]))).ToList();
+        Assert.DoesNotContain(turns, t => t.X != 0 && t.Y != 0);
+        var lastSideways = turns.FindLastIndex(t => t.X != 0);
+        var firstTilt = turns.FindIndex(t => t.Y != 0);
+        Assert.True(firstTilt > lastSideways, "every sideways turn comes before any tilt");
+        Assert.InRange(320 - movedX * 2, 200 - 40, 200 + 40); // centered left to right
+        if (whenFound == "center")
+            Assert.InRange(250 - movedY * 2, 150 - 40, 150 + 40); // then top to bottom
+        else
+        {
+            Assert.Equal(0, movedY); // tilted back after the click
+            Assert.Equal(1, input.Log.Count(l => l == "mdown Left"));
+        }
     }
 
     [Fact]

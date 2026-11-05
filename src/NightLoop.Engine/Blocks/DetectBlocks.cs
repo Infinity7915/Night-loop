@@ -95,7 +95,7 @@ internal static class DetectBlocks
                         // The camera follows the mouse here, so gliding to the target would turn the view away from
                         // it. Turn the target into the middle (sideways only), then click without moving the mouse.
                         var tolerance = b.GetInt("tolerancePx", 40);
-                        var (at, ratio) = await CenterAsync(ctx, ctx.LastFound, tolerance, method);
+                        var (at, ratio) = await CenterAsync(ctx, ctx.LastFound, tolerance, method, tilt: false);
                         await ClickAimedAsync(b, ctx, at, ratio, tolerance, method);
                         break;
                     case "click":
@@ -126,45 +126,59 @@ internal static class DetectBlocks
     }
 
     /// <summary>
-    /// Turns sideways toward the target until it is in the middle, measuring how far it moved on screen for each
-    /// pixel of turn, so it settles in a few steps whatever the game's mouse sensitivity is. It never tilts the
-    /// camera up or down: a target on the ground is always below the middle, and tilting toward it would point the
-    /// view at the floor. Returns where the target is now and the measured screen pixels per pixel of turn.
+    /// Puts the target in the middle of the screen in separate steps, never turning both ways at once: first it turns
+    /// sideways until the target is centered left to right, and only then (when <paramref name="tilt"/> is on) tilts
+    /// up or down until it is centered top to bottom. Each step measures how far the target moved on screen for each
+    /// pixel of turn, so it settles in a few turns whatever the game's mouse sensitivity is. Returns where the target
+    /// is now and the measured sideways screen pixels per pixel of turn.
     /// </summary>
-    private static async Task<((int X, int Y) Point, double Ratio)> CenterAsync(RunContext ctx, FoundTarget target, int tolerance, string method)
+    private static async Task<((int X, int Y) Point, double Ratio)> CenterAsync(RunContext ctx, FoundTarget target, int tolerance, string method, bool tilt = true)
     {
         var what = new LookFor(target.Kind, target.Value, target.ImageData, target.Tolerance, target.ConfidencePct, Region: null, SizeTolerancePct: target.SizeTolerancePct, MatchColor: target.MatchColor);
         var view = ctx.AreaFor(null).Center;
-        var point = target.Point;
-        double? ratio = null;
+        var (ok, point, ratio) = await CenterAxisAsync(ctx, what, target, target.Point, view, tolerance, method, vertical: false, guess: null);
+        // Sideways sensitivity is a good first guess for up and down.
+        if (ok && tilt)
+            (_, point, _) = await CenterAxisAsync(ctx, what, target, point, view, tolerance, method, vertical: true, guess: ratio);
+        return (point, ratio ?? 1);
+    }
 
+    /// <summary>One direction of <see cref="CenterAsync"/>: only sideways turns, or only up and down. Ok is false when the target was lost.</summary>
+    private static async Task<(bool Ok, (int X, int Y) Point, double? Ratio)> CenterAxisAsync(RunContext ctx, LookFor what, FoundTarget target,
+        (int X, int Y) point, (int X, int Y) view, int tolerance, string method, bool vertical, double? guess)
+    {
+        double? ratio = null;
         for (var i = 0; i < CenterMaxSteps; i++)
         {
-            var dx = point.X - view.X;
-            if (Math.Abs(dx) <= tolerance) break;
+            var off = vertical ? point.Y - view.Y : point.X - view.X;
+            if (Math.Abs(off) <= tolerance) break;
 
-            // Until the game's sensitivity is known, the first turn is a small, safe one to measure it.
+            // Until this direction's sensitivity is measured, turn carefully: part of the way on a guess, or a small
+            // safe turn to measure it.
             var send = ratio is { } r
-                ? (int)Math.Clamp(dx / r * 0.85, -CenterMaxMovePx, CenterMaxMovePx)
-                : (int)Math.Clamp(dx * 0.4, -CenterFirstMovePx, CenterFirstMovePx);
-            if (send == 0) send = Math.Sign(dx);
-            await ctx.InputAsync(() => InputBlocks.TurnAsync(ctx, method, send, 0, InputBlocks.DefaultTurnMs(send)));
+                ? (int)Math.Clamp(off / r * 0.85, -CenterMaxMovePx, CenterMaxMovePx)
+                : guess is { } g
+                    ? (int)Math.Clamp(off / g * 0.6, -CenterFirstMovePx, CenterFirstMovePx)
+                    : (int)Math.Clamp(off * 0.4, -CenterFirstMovePx, CenterFirstMovePx);
+            if (send == 0) send = Math.Sign(off);
+            var (sx, sy) = vertical ? (0, send) : (send, 0);
+            await ctx.InputAsync(() => InputBlocks.TurnAsync(ctx, method, sx, sy, InputBlocks.DefaultTurnMs(send)));
             await ctx.PauseExactAsync(ScanSettleMs);
 
             if (await Vision.FindAsync(ctx, what) is not { } next)
             {
                 ctx.Environment.Log?.Invoke("Center on target: lost sight of the target while turning.");
-                break;
+                return (false, point, ratio);
             }
             // How many screen pixels the target moved per pixel of turn (it moves the opposite way to the turn).
             // A reading that went the wrong way (the target itself moved) is ignored.
-            var moved = point.X - next.X;
+            var moved = vertical ? point.Y - next.Y : point.X - next.X;
             if (Math.Abs(moved) > 2 && Math.Sign(moved) == Math.Sign(send))
                 ratio = Math.Clamp(moved / (double)send, 0.05, 20);
             point = next;
             ctx.LastFound = target with { Point = next };
         }
-        return (point, ratio ?? 1);
+        return (true, point, ratio);
     }
 
     /// <summary>

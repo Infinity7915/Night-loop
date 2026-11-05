@@ -10,6 +10,10 @@
   Anything inside these comment marks is hidden. Delete everything else to show "Nothing new right now."
 -->
 
+# What's new in 0.6.3
+
+- Center camera on it (Scan & turn) and Center on target now put the target right in the middle in two steps: first they turn sideways until it is centered left to right, then they look up or down at it. They never turn both ways at once.
+
 # What's new in 0.6.2
 
 - Match colors: picture blocks now check colors as well as shape, so a look-alike in another color is never clicked. On by default. Capture older pictures again to use it.
