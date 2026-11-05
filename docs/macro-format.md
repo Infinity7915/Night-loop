@@ -47,7 +47,11 @@ These are optional params, so existing macros are unaffected:
 | `timing.waitForImageGone` (new, "Image gone") | same params as `timing.waitForImage` | Waits until the picture is no longer on screen (a loading screen closing, a popup going away) |
 | `detect.pixelColorGone` (new, "Pixel gone") | same params as `detect.pixelColor` | Waits until the point no longer has the color |
 | `utility.notify` | `kind`: `toast` is shown as "Notify" | Sends a Windows notification (from Night-loop's tray icon), not a message inside Night-loop |
-| `timing.waitForImage`, `timing.waitForImageGone`, `detect.findClick` / `detect.scanTurn` with `target: "image"`, `imageVisible` conditions | `sizeTolerancePct` (0–60, default 0 when missing; new blocks get 25) | Also finds the picture smaller or bigger than captured, from (100 − n)% to (100 + n)% of its size, like a thing farther away in a game |
+| `timing.waitForImage`, `timing.waitForImageGone`, `detect.findClick` / `detect.scanTurn` with `target: "image"`, `imageVisible` conditions | `sizeTolerancePct` (0–60, optional) | Missing (or 25, the 0.6.0 default) is automatic: any size from 30% to 160% of how it was captured. A number limits it to (100 − n)% to (100 + n)%; 0 is the exact size only |
+| same picture blocks and conditions | `matchColor` (bool, default true) | The colors must match as well as the shape. Pictures captured from 0.6.2 on are saved as `nl2:` (gray + a color copy up to 16×16); older `nl1:` pictures are shape-only |
+| `camera.center`, `detect.scanTurn` | — | Centering turns sideways only, never up or down. Scan & turn's click with `mouseMove` tilts to aim and tilts back after the click |
+| same picture blocks and conditions | `matchColor` (bool, default true) | The colors must match as well as the shape. Pictures captured from 0.6.2 on are saved as `nl2:` (gray + a color copy up to 16×16); older `nl1:` pictures are shape-only |
+| `camera.center`, `detect.scanTurn` | — | Centering turns sideways only, never up or down. Scan & turn's click with `mouseMove` tilts to aim and tilts back after the click |
 | any block | `note` (text, up to 200 characters) | A short note shown under the block in the editor; ignored when running |
 
 ## Disabled blocks

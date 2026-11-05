@@ -9,15 +9,28 @@ namespace NightLoop.Engine.Screen;
 public sealed class ImageTemplate
 {
     private const string Prefix = "nl1:";
+    /// <summary>Same, plus a small color copy for "Match colors": … gray bytes, thumb width, thumb height, RGB bytes.</summary>
+    private const string ColorPrefix = "nl2:";
+    /// <summary>The color copy is at most this many pixels a side: enough to tell a red coin from a blue one.</summary>
+    public const int ColorSide = 16;
     /// <summary>Largest side the app saves. Bigger captures are refused with a hint to pick a smaller area.</summary>
     public const int MaxSide = 200;
 
-    private ImageTemplate(int width, int height, byte[] gray)
+    private ImageTemplate(int width, int height, byte[] gray, int colorWidth = 0, int colorHeight = 0, byte[]? rgb = null)
     {
         Width = width;
         Height = height;
         Gray = gray;
+        ColorWidth = colorWidth;
+        ColorHeight = colorHeight;
+        Rgb = rgb;
     }
+
+    /// <summary>A small color copy (RGB bytes, top row first), or null for pictures captured before 0.6.2.</summary>
+    public byte[]? Rgb { get; }
+    public int ColorWidth { get; }
+    public int ColorHeight { get; }
+    public bool HasColor => Rgb is not null;
 
     public int Width { get; }
     public int Height { get; }
@@ -28,7 +41,38 @@ public sealed class ImageTemplate
     {
         if (image.Width > MaxSide || image.Height > MaxSide)
             throw new ArgumentException($"Pictures can be at most {MaxSide}×{MaxSide} px.", nameof(image));
-        return new ImageTemplate(image.Width, image.Height, ToGray(image));
+        var cw = Math.Min(ColorSide, image.Width);
+        var ch = Math.Min(ColorSide, image.Height);
+        return new ImageTemplate(image.Width, image.Height, ToGray(image), cw, ch, ColorThumb(image, 0, 0, image.Width, image.Height, cw, ch));
+    }
+
+    /// <summary>Area-averaged RGB of part of an image, shrunk to <paramref name="cw"/>×<paramref name="ch"/>.</summary>
+    internal static byte[] ColorThumb(ScreenImage image, int x0, int y0, int w, int h, int cw, int ch)
+    {
+        var rgb = new byte[cw * ch * 3];
+        var px = image.Bgra;
+        for (var cy = 0; cy < ch; cy++)
+        for (var cx = 0; cx < cw; cx++)
+        {
+            int ax = x0 + cx * w / cw, bx = Math.Max(ax + 1, x0 + (cx + 1) * w / cw);
+            int ay = y0 + cy * h / ch, by = Math.Max(ay + 1, y0 + (cy + 1) * h / ch);
+            long r = 0, g = 0, b = 0, n = 0;
+            for (var y = ay; y < by && y < image.Height; y++)
+            for (var x = ax; x < bx && x < image.Width; x++)
+            {
+                var i = (y * image.Width + x) * 4;
+                b += px[i];
+                g += px[i + 1];
+                r += px[i + 2];
+                n++;
+            }
+            if (n == 0) n = 1;
+            var o = (cy * cw + cx) * 3;
+            rgb[o] = (byte)(r / n);
+            rgb[o + 1] = (byte)(g / n);
+            rgb[o + 2] = (byte)(b / n);
+        }
+        return rgb;
     }
 
     public string Encode()
@@ -41,14 +85,22 @@ public sealed class ImageTemplate
             z.WriteByte((byte)(Height >> 8));
             z.WriteByte((byte)Height);
             z.Write(Gray);
+            if (Rgb is not null)
+            {
+                z.WriteByte((byte)ColorWidth);
+                z.WriteByte((byte)ColorHeight);
+                z.Write(Rgb);
+            }
         }
-        return Prefix + Convert.ToBase64String(raw.ToArray());
+        return (Rgb is null ? Prefix : ColorPrefix) + Convert.ToBase64String(raw.ToArray());
     }
 
     public static bool TryDecode(string? text, out ImageTemplate? template)
     {
         template = null;
-        if (text is null || !text.StartsWith(Prefix, StringComparison.Ordinal)) return false;
+        if (text is null) return false;
+        var color = text.StartsWith(ColorPrefix, StringComparison.Ordinal);
+        if (!color && !text.StartsWith(Prefix, StringComparison.Ordinal)) return false;
         try
         {
             var bytes = Convert.FromBase64String(text[Prefix.Length..]);
@@ -60,7 +112,17 @@ public sealed class ImageTemplate
             if (w is < 1 or > MaxSide || h is < 1 or > MaxSide) return false;
             var gray = new byte[w * h];
             z.ReadExactly(gray);
-            template = new ImageTemplate(w, h, gray);
+            if (!color)
+            {
+                template = new ImageTemplate(w, h, gray);
+                return true;
+            }
+            Span<byte> size = stackalloc byte[2];
+            z.ReadExactly(size);
+            if (size[0] is < 1 or > ColorSide || size[1] is < 1 or > ColorSide) return false;
+            var rgb = new byte[size[0] * size[1] * 3];
+            z.ReadExactly(rgb);
+            template = new ImageTemplate(w, h, gray, size[0], size[1], rgb);
             return true;
         }
         catch (Exception ex) when (ex is FormatException or InvalidDataException or EndOfStreamException)
@@ -94,12 +156,16 @@ public static class TemplateMatcher
     public const int MaxSizeTolerancePct = NightLoop.Contracts.MacroDocument.MacroLimits.SizeToleranceMaxPct;
     private const int CoarseTarget = 8;
     private const int MaxFactor = 8;
-    private const int Candidates = 5;
+    private const int Candidates = 6;
     /// <summary>Smaller than this, a picture has too little detail to tell apart from anything else.</summary>
     private const int MinSide = 8;
 
     /// <param name="Scale">The size it was found at, 1 = as captured.</param>
-    public readonly record struct Match(int X, int Y, double Score, double Scale = 1);
+    /// <param name="ColorOk">False when colors were checked and no well-shaped spot had the picture's colors.</param>
+    public readonly record struct Match(int X, int Y, double Score, double Scale = 1, bool ColorOk = true);
+
+    /// <summary>How far colors may be (0–255, per channel, averaged over the picture) for "Match colors".</summary>
+    public const int ColorLimit = 45;
 
     /// <summary>Automatic size: from this much of the captured size (far away)…</summary>
     public const double AutoMinScale = 0.3;
@@ -111,29 +177,39 @@ public static class TemplateMatcher
     /// <paramref name="sizeTolerancePct"/>: how much smaller or bigger it may look (0 = only the captured size);
     /// null looks at every size from <see cref="AutoMinScale"/> to <see cref="AutoMaxScale"/>.
     /// </summary>
-    public static Match? Find(ScreenImage screen, ImageTemplate template, int? sizeTolerancePct = 0)
+    public static Match? Find(ScreenImage screen, ImageTemplate template, int? sizeTolerancePct = 0, bool matchColor = false)
     {
         var (min, max) = sizeTolerancePct is { } pct
             ? (1 - Math.Clamp(pct, 0, MaxSizeTolerancePct) / 100.0, 1 + Math.Clamp(pct, 0, MaxSizeTolerancePct) / 100.0)
             : (AutoMinScale, AutoMaxScale);
-        return Find(screen, template, min, max);
+        return Find(screen, template, min, max, matchColor);
     }
 
     /// <summary>Best match at any size between <paramref name="minScale"/> and <paramref name="maxScale"/> of the captured one.</summary>
-    public static Match? Find(ScreenImage screen, ImageTemplate template, double minScale, double maxScale)
+    /// With <paramref name="matchColor"/> (and a picture that has its colors saved), the best spot whose colors match
+    /// too: two things with the same shape but different colors aren't mixed up.
+    public static Match? Find(ScreenImage screen, ImageTemplate template, double minScale, double maxScale, bool matchColor = false)
     {
         var hay = new Haystack(ImageTemplate.ToGray(screen), screen.Width, screen.Height);
         var scales = Scales(template, minScale, maxScale, out var step);
 
-        var results = new Found?[scales.Count];
+        var results = new List<Found>[scales.Count];
         void Try(int i) => results[i] = FindAtScale(hay, template, scales[i]);
         if (scales.Count == 1) Try(0);
         else Parallel.For(0, scales.Count, Try);
 
-        Found? best = null;
-        foreach (var r in results)
-            if (r is { } f && (best is null || f.Score > best.Value.Score)) best = f;
-        if (best is not { } b) return null;
+        var all = results.SelectMany(r => r).OrderByDescending(f => f.Score).ToList();
+        if (all.Count == 0) return null;
+        var b = all[0];
+        var checkColor = matchColor && template.HasColor;
+        var colorOk = true;
+        if (checkColor)
+        {
+            // The best-shaped spot with the right colors; a same-shaped thing in another color is skipped.
+            var pick = all.FirstOrDefault(f => ColorDistance(screen, template, f) <= ColorLimit);
+            if (pick.W > 0) b = pick;
+            else colorOk = false;
+        }
 
         // Between two tried sizes: try halfway either side, near where it was found, and keep the better one.
         if (scales.Count > 1)
@@ -142,10 +218,50 @@ public static class TemplateMatcher
             {
                 var s = b.Scale + d;
                 if (s < minScale - 1e-9 || s > maxScale + 1e-9) continue;
-                if (Polish(hay, template, b, s) is { } p && p.Score > b.Score) b = p;
+                if (Polish(hay, template, b, s) is { } p && p.Score > b.Score
+                    && (!checkColor || !colorOk || ColorDistance(screen, template, p) <= ColorLimit)) b = p;
             }
         }
-        return new Match(screen.Left + b.X + b.W / 2, screen.Top + b.Y + b.H / 2, Math.Max(0, b.Score), b.Scale);
+        return new Match(screen.Left + b.X + b.W / 2, screen.Top + b.Y + b.H / 2, Math.Max(0, b.Score), b.Scale, colorOk);
+    }
+
+    /// <summary>
+    /// How different the colors are at a found spot: both are shrunk to a small grid, the screen's brightness is
+    /// evened out to the picture's (lighting changes in games), and the per-channel difference is averaged.
+    /// </summary>
+    internal static double ColorDistance(ScreenImage screen, ImageTemplate t, (int X, int Y, int W, int H) at)
+    {
+        if (t.Rgb is not { } want) return 0;
+        var gw = Math.Min(t.ColorWidth, Math.Max(1, at.W / 2));
+        var gh = Math.Min(t.ColorHeight, Math.Max(1, at.H / 2));
+        var mine = gw == t.ColorWidth && gh == t.ColorHeight ? want : ResizeRgb(want, t.ColorWidth, t.ColorHeight, gw, gh);
+        var seen = ImageTemplate.ColorThumb(screen, at.X, at.Y, at.W, at.H, gw, gh);
+        double sumWant = 0, sumSeen = 0;
+        for (var i = 0; i < mine.Length; i++) { sumWant += mine[i]; sumSeen += seen[i]; }
+        var gain = sumSeen < 1 ? 1 : Math.Clamp(sumWant / sumSeen, 0.6, 1.6);
+        double total = 0;
+        for (var i = 0; i < mine.Length; i += 3)
+        {
+            var d = 0.0;
+            for (var c = 0; c < 3; c++) d = Math.Max(d, Math.Abs(mine[i + c] - Math.Min(255, seen[i + c] * gain)));
+            total += d;
+        }
+        return total / (mine.Length / 3);
+    }
+
+    private static double ColorDistance(ScreenImage screen, ImageTemplate t, Found f) => ColorDistance(screen, t, (f.X, f.Y, f.W, f.H));
+
+    private static byte[] ResizeRgb(byte[] rgb, int w, int h, int nw, int nh)
+    {
+        var dst = new byte[nw * nh * 3];
+        for (var c = 0; c < 3; c++)
+        {
+            var plane = new byte[w * h];
+            for (var i = 0; i < plane.Length; i++) plane[i] = rgb[i * 3 + c];
+            var small = Resize(plane, w, h, nw, nh);
+            for (var i = 0; i < small.Length; i++) dst[i * 3 + c] = small[i];
+        }
+        return dst;
     }
 
     /// <summary>Sizes to try: 1 first, then outwards in steps small enough that the edges are off by ~2 px at most.</summary>
@@ -165,17 +281,18 @@ public static class TemplateMatcher
 
     private readonly record struct Found(int X, int Y, int W, int H, double Score, double Scale);
 
-    private static Found? FindAtScale(Haystack hay, ImageTemplate template, double scale)
+    /// <summary>The spots that look most like the picture at this size, each followed down to full size.</summary>
+    private static List<Found> FindAtScale(Haystack hay, ImageTemplate template, double scale)
     {
+        var found = new List<Found>();
         var w = (int)Math.Round(template.Width * scale);
         var h = (int)Math.Round(template.Height * scale);
-        if (w < MinSide || h < MinSide || w > hay.Width || h > hay.Height) return null;
+        if (w < MinSide || h < MinSide || w > hay.Width || h > hay.Height) return found;
         var full = Resize(template.Gray, template.Width, template.Height, w, h);
         var factor = Math.Clamp(Math.Min(w, h) / CoarseTarget, 1, MaxFactor);
 
         var coarse = hay.Level(factor);
         var tCoarse = new Needle(Shrink(full, w, h, factor, out var cw, out var ch), cw, ch);
-        Found? best = null;
         foreach (var (cx, cy, _) in Scan(coarse, tCoarse, Candidates))
         {
             // Follow the candidate down to full size, halving the shrink each time.
@@ -190,9 +307,9 @@ public static class TemplateMatcher
                 f = next;
             }
             var (fx, fy, score) = BestNear(hay.Level(1), new Needle(full, w, h), x, y, 1);
-            if (best is null || score > best.Value.Score) best = new Found(fx, fy, w, h, score, scale);
+            found.Add(new Found(fx, fy, w, h, score, scale));
         }
-        return best;
+        return found;
     }
 
     /// <summary>Tries one more size around an earlier find, keeping its middle in place.</summary>

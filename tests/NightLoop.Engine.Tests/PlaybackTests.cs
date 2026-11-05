@@ -384,6 +384,42 @@ public class PlaybackTests
         Assert.Equal(2, input.Log.Count(l => l == "mdown Left"));
     }
 
+    [Theory]
+    [InlineData("center")]
+    [InlineData("click")]
+    public async Task Scan_and_turn_never_leaves_the_camera_tilted(string whenFound)
+    {
+        // The target is low on screen (on the ground). Centering turns sideways only; clicking it may tilt to aim
+        // but tilts back by the same amount.
+        var screen = new FakeScreen(400, 300);
+        var input = new FakeInput();
+        int movedX = 0, movedY = 0;
+        screen.OnCapture = s =>
+        {
+            var rel = input.Log.Where(l => l.StartsWith("rel ", StringComparison.Ordinal)).Select(l => l[4..].Split(',')).ToList();
+            var x = rel.Sum(p => int.Parse(p[0]));
+            var y = rel.Sum(p => int.Parse(p[1]));
+            if (x == movedX && y == movedY && s.Captures > 1) return;
+            (movedX, movedY) = (x, y);
+            s.Clear();
+            s.Paint(320 - x * 2, 250 - y * 2, 6, 6, new Rgb(255, 255, 0));
+        };
+        var doc = new MacroBuilder().Add(BlockTypes.ScanTurn, new()
+        {
+            ["target"] = "pixel", ["value"] = "#FFFF00", ["method"] = "mouseMove", ["whenFound"] = whenFound,
+        }).Build();
+        var run = new MacroRun(MacroCompiler.Compile(doc), new RunEnvironment { Input = input, Delay = new FakeDelay(), Screen = screen });
+        run.Start();
+        await run.Completion.WaitAsync(Timeout);
+
+        Assert.Equal(RunState.Stopped, run.State);
+        var dys = input.Log.Where(l => l.StartsWith("rel ", StringComparison.Ordinal)).Select(l => int.Parse(l[4..].Split(',')[1])).ToList();
+        Assert.Equal(0, dys.Sum());
+        if (whenFound == "center") Assert.All(dys, dy => Assert.Equal(0, dy));
+        else Assert.Equal(1, input.Log.Count(l => l == "mdown Left"));
+        Assert.InRange(320 - movedX * 2, 200 - 40, 200 + 40); // sideways: centered
+    }
+
     [Fact]
     public async Task Scan_and_turn_with_right_drag_glides_to_the_target_and_clicks_three_times()
     {

@@ -208,7 +208,7 @@ public static class BlockCatalog
             b => $"\"{b.GetString("text", "")}\" · {b.GetString("match", "exact")} · {b.GetInt("timeoutMs", 10_000)} ms"),
         new("waitimage", BlockTypes.WaitForImage, "Wait for image", "IMG", "Detect", "Wait until a saved picture shows up on screen.",
             () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
-            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.Region(),
+            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.MatchColor(), F.Region(),
              F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
              F.OnFail(), F.FailLabel()],
             b => $"{ImageName(b)} · {b.GetInt("confidencePct", 90)}% · {b.GetInt("timeoutMs", 10_000)} ms"),
@@ -220,7 +220,7 @@ public static class BlockCatalog
             b => $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)} = {b.GetString("color", "")} · {b.GetInt("timeoutMs", 5000)} ms"),
         new("imagegone", BlockTypes.WaitForImageGone, "Image gone", "!IMG", "Detect", "Wait until a saved picture is no longer on screen.",
             () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
-            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.Region(),
+            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.MatchColor(), F.Region(),
              F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
              F.OnFail(), F.FailLabel()],
             b => $"{ImageName(b)} gone · {b.GetInt("confidencePct", 90)}% · {b.GetInt("timeoutMs", 10_000)} ms"),
@@ -589,6 +589,13 @@ internal static class F
     /// <summary>25 was 0.6.0's default and now means Auto, so it shows as blank.</summary>
     private static string AutoSize(int? stored) => stored is null or 25 ? "" : stored.Value.ToString(CultureInfo.InvariantCulture);
 
+    private const string MatchColorHint =
+        "On: the colors have to match too, so a same-shaped thing in another color is never clicked. Off: only the shape counts.";
+
+    /// <summary>Picture blocks: the colors have to match as well as the shape. On unless turned off.</summary>
+    public static FieldDef MatchColor() =>
+        YesNo("matchColor", "Match colors", fallback: true, yes: "On", no: "Off") with { Hint = MatchColorHint };
+
     /// <summary>Find &amp; click / Scan &amp; turn: how close a picture or color has to be, shown for the kind being looked for.</summary>
     public static FieldDef[] LookTuning()
     {
@@ -598,6 +605,7 @@ internal static class F
             Int("confidencePct", "Confidence %", 1, 100, optional: true, placeholder: "90",
                 hint: "How alike the spot has to be. Lower finds it more easily but may click the wrong thing.") with { ShowIf = b => Is(b, "image") },
             SizeTolerance() with { ShowIf = b => Is(b, "image") },
+            MatchColor() with { ShowIf = b => Is(b, "image") },
             Int("tolerance", "Color tolerance", 0, 255, optional: true, placeholder: "10",
                 hint: "How far each color channel may be from the one picked.") with { ShowIf = b => Is(b, "pixel") },
         ];
@@ -610,6 +618,17 @@ internal static class F
         return
         [
             ConditionInt("confidencePct", "Confidence %", 1, 100, "90", null) with { ShowIf = IsImage },
+            new FieldDef("condition.matchColor", "Match colors", FieldKind.Choice,
+                b => (Conditions.Inner(b.GetObject("condition"))?["matchColor"] is JsonValue v && v.TryGetValue(out bool on) && !on) ? "false" : "true",
+                (b, value) =>
+                {
+                    var condition = b.GetObject("condition")?.DeepClone() as JsonObject ?? [];
+                    if (Conditions.Inner(condition) is not { } inner) return null;
+                    inner["matchColor"] = value == "true";
+                    b.Params["condition"] = condition;
+                    return null;
+                },
+                [new("true", "On"), new("false", "Off")], Hint: MatchColorHint) with { ShowIf = IsImage },
             ConditionInt("sizeTolerancePct", "Size tolerance %", 0, MacroLimits.SizeToleranceMaxPct, "Auto", SizeToleranceHint)
                 with { ShowIf = IsImage, Get = b => AutoSize(BlockParams.AsInt(Conditions.Inner(b.GetObject("condition"))?["sizeTolerancePct"])) },
         ];

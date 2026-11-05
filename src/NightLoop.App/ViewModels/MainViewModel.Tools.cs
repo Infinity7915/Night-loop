@@ -137,7 +137,9 @@ public sealed partial class MainViewModel
         var bitmap = BitmapSource.Create(t.Width, t.Height, 96, 96, PixelFormats.Gray8, null, t.Gray, t.Width);
         bitmap.Freeze();
         InspectorImage = bitmap;
-        InspectorImageText = $"Looking for this picture · {t.Width}×{t.Height}. Night-loop compares it in grayscale, so colors don't matter.";
+        InspectorImageText = t.HasColor
+            ? $"Looking for this picture · {t.Width}×{t.Height}, at any size. With Match colors on, its colors have to match too."
+            : $"Looking for this picture · {t.Width}×{t.Height}, at any size. It was captured before colors were saved, so only its shape counts. Capture it again to match colors.";
     }
 
     [RelayCommand]

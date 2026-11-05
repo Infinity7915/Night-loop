@@ -97,3 +97,80 @@ public class TemplateMatcherTests
         Assert.NotEmpty(MacroValidator.Validate(With(MacroLimits.SizeToleranceMaxPct + 1)));
     }
 }
+
+public class ColorMatchTests
+{
+    /// <summary>The same sprite shape drawn in a tint: same brightness pattern, different color.</summary>
+    private static void DrawSprite(byte[] px, int width, int ox, int oy, int size, (double R, double G, double B) tint)
+    {
+        for (var y = 0; y < size; y++)
+        for (var x = 0; x < size; x++)
+        {
+            double u = (x + 0.5) / size, v = (y + 0.5) / size;
+            var g = Math.Exp(-((u - 0.4) * (u - 0.4) + (v - 0.45) * (v - 0.45)) * 12) * 180 + (Math.Sin(u * 20) * Math.Cos(v * 17) + 1) * 30 + 15;
+            var i = ((oy + y) * width + ox + x) * 4;
+            px[i] = (byte)Math.Clamp(g * tint.B, 0, 255);
+            px[i + 1] = (byte)Math.Clamp(g * tint.G, 0, 255);
+            px[i + 2] = (byte)Math.Clamp(g * tint.R, 0, 255);
+            px[i + 3] = 255;
+        }
+    }
+
+    private static readonly (double, double, double) Red = (1.3, 0.35, 0.3);
+    private static readonly (double, double, double) Blue = (0.3, 0.4, 1.3);
+
+    [Fact]
+    public void Match_colors_skips_a_same_shaped_thing_in_another_color()
+    {
+        var shot = new byte[40 * 40 * 4];
+        DrawSprite(shot, 40, 0, 0, 40, Red);
+        var red = ImageTemplate.FromImage(new ScreenImage(0, 0, 40, 40, shot));
+        Assert.True(ImageTemplate.TryDecode(red.Encode(), out var decoded));
+        Assert.True(decoded!.HasColor);
+
+        // A blue one on the left and the red one further right.
+        var px = new byte[400 * 200 * 4];
+        DrawSprite(px, 400, 40, 60, 40, Blue);
+        DrawSprite(px, 400, 260, 80, 40, Red);
+        var screen = new ScreenImage(0, 0, 400, 200, px);
+
+        var m = TemplateMatcher.Find(screen, decoded, sizeTolerancePct: 0, matchColor: true)!.Value;
+        Assert.True(m.ColorOk);
+        Assert.InRange(m.X, 278, 282);
+        Assert.InRange(m.Y, 98, 102);
+
+        // Only the blue one on screen: shape found, colors don't match.
+        var onlyBlue = new byte[400 * 200 * 4];
+        DrawSprite(onlyBlue, 400, 40, 60, 40, Blue);
+        var miss = TemplateMatcher.Find(new ScreenImage(0, 0, 400, 200, onlyBlue), decoded, sizeTolerancePct: 0, matchColor: true)!.Value;
+        Assert.False(miss.ColorOk);
+        var shapeOnly = TemplateMatcher.Find(new ScreenImage(0, 0, 400, 200, onlyBlue), decoded, sizeTolerancePct: 0, matchColor: false)!.Value;
+        Assert.True(shapeOnly.ColorOk);
+        Assert.InRange(shapeOnly.X, 58, 62);
+    }
+
+    [Fact]
+    public void Colors_still_match_when_the_game_is_darker()
+    {
+        var shot = new byte[40 * 40 * 4];
+        DrawSprite(shot, 40, 0, 0, 40, Red);
+        var red = ImageTemplate.FromImage(new ScreenImage(0, 0, 40, 40, shot));
+        var px = new byte[200 * 200 * 4];
+        DrawSprite(px, 200, 80, 80, 40, (Red.Item1 * 0.75, Red.Item2 * 0.75, Red.Item3 * 0.75));
+        var m = TemplateMatcher.Find(new ScreenImage(0, 0, 200, 200, px), red, sizeTolerancePct: 0, matchColor: true)!.Value;
+        Assert.True(m.ColorOk);
+    }
+
+    [Fact]
+    public void Old_gray_pictures_still_decode_and_skip_the_color_check()
+    {
+        // An nl1 picture (no colors) made by hand.
+        using var raw = new MemoryStream();
+        using (var z = new System.IO.Compression.DeflateStream(raw, System.IO.Compression.CompressionLevel.Fastest, leaveOpen: true))
+        {
+            z.Write([0, 2, 0, 2, 10, 200, 200, 10]);
+        }
+        Assert.True(ImageTemplate.TryDecode("nl1:" + Convert.ToBase64String(raw.ToArray()), out var t));
+        Assert.False(t!.HasColor);
+    }
+}
