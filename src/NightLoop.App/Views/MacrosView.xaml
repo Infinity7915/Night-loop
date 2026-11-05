@@ -528,7 +528,7 @@
                               Command="{Binding MoveCheckedUpCommand}" IsEnabled="{Binding HasChecked}" />
                       <Button Style="{StaticResource IconButton}" Width="32" Height="32" Content="&#xE70D;" ToolTip="Move the selected blocks down"
                               Command="{Binding MoveCheckedDownCommand}" IsEnabled="{Binding HasChecked}" />
-                      <Button Style="{StaticResource IconButton}" Width="32" Height="32" Content="&#xE74D;" ToolTip="Delete the selected blocks"
+                      <Button Style="{StaticResource IconButton}" Width="32" Height="32" Content="&#xE74D;" ToolTip="Delete the selected blocks. Keys for delete, copy, paste and undo are in Settings › Macros."
                               Command="{Binding DeleteCheckedCommand}" IsEnabled="{Binding HasChecked}" />
                     </StackPanel>
                   </Border>
@@ -564,7 +564,8 @@
                 <ItemsControl x:Name="Timeline" ItemsSource="{Binding Blocks}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:BlockRow}">
-                      <Grid x:Name="Row" Margin="12,0" Background="Transparent" Cursor="Hand" MouseLeftButtonUp="OnRowClick">
+                      <Grid x:Name="Row" Margin="12,0" Background="Transparent" Cursor="Hand" MouseLeftButtonUp="OnRowClick"
+                            Focusable="True" FocusVisualStyle="{x:Null}">
                         <Border x:Name="RowBg" CornerRadius="8" Background="Transparent" />
                         <Border x:Name="RowBar" CornerRadius="8,0,0,8" Width="3" HorizontalAlignment="Left" Background="Transparent" />
                         <DockPanel Margin="2,0,6,0">

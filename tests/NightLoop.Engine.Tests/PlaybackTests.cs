@@ -527,7 +527,7 @@ public class PlaybackTests
         screen.Clear();
         var missing = await Blocks.DetectProbe.LookOnceAsync(block, env, null);
         Assert.False(missing.Found);
-        Assert.Equal("Didn't find the picture on screen right now.", missing.Message);
+        Assert.StartsWith("Didn't find the picture. The closest spot was", missing.Message);
     }
 
     [Fact]

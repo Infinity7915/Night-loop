@@ -190,7 +190,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public string RecordHotkeyLabel => IsCapturingRecordHotkey ? "Press a key combo… (Esc cancels)" : $"{RecordHotkeyText}  ·  Change";
 
     /// <summary>Waiting for a key press to use as a start/stop key (the app's own keys are let go meanwhile).</summary>
-    public bool IsCapturingKey => IsCapturingEditorHotkey || IsCapturingRecordHotkey || CapturingRow is not null;
+    public bool IsCapturingKey => IsCapturingEditorHotkey || IsCapturingRecordHotkey || CapturingRow is not null || CapturingShortcut is not null;
 
     partial void OnIsCapturingEditorHotkeyChanged(bool value)
     {
@@ -440,7 +440,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Esc on the timeline: nothing highlighted, so Play starts at the top and Record adds at the end.</summary>
     public void ClearSelection() => SelectedBlock = null;
 
-    /// <summary>Delete key on the timeline.</summary>
     /// <summary>The Delete key: the ticked blocks when some are ticked, else the highlighted one.</summary>
     public void DeleteSelected()
     {
@@ -626,7 +625,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnFieldChanged(BlockRow row, BlockField field)
     {
-        OnRowChanged(row);
+        // Typing into one field is one change to undo, not one per key.
+        _undoGroup = $"{row.Block.Id}:{field.Def.Key}";
+        try { OnRowChanged(row); }
+        finally { _undoGroup = null; }
         // A choice can show or hide other fields and tools (On fail → Go to label, Find → Image…).
         if (field.RebuildsInspector)
             Application.Current?.Dispatcher.BeginInvoke(() => { if (SelectedBlock == row) BuildInspector(); }, DispatcherPriority.Background);
@@ -1137,6 +1139,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private void MarkChanged()
     {
         if (_loading) return;
+        RememberForUndo();
         _pristine = false;
         if (_autosaver is not null)
         {
@@ -1209,6 +1212,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             // A macro remembers the game it was made for; opening it switches the target to that game.
             if (doc.TargetGame is not null) _games.SelectByName(doc.TargetGame);
             ShowBlocks(selectIndex: select);
+            ResetUndo();
         }
         finally
         {

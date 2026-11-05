@@ -13,7 +13,15 @@ public partial class MacrosView : UserControl
     public MacrosView()
     {
         InitializeComponent();
-        PreviewKeyDown += OnPreviewKeyDown;
+        // Keys are caught on the whole window, so the shortcuts work wherever the keyboard focus happens to be
+        // (after clicking a row, nothing inside this page may have it).
+        Loaded += (_, _) => HookWindow(Window.GetWindow(this));
+        Unloaded += (_, _) => HookWindow(null);
+        PreviewMouseDown += OnPreviewMouseDown;
+        IsVisibleChanged += (_, e) =>
+        {
+            if (e.NewValue is false) Vm?.CancelDeleteConfirms();
+        };
         DataContextChanged += (_, e) =>
         {
             if (e.OldValue is MainViewModel old) old.RevealRequested -= Reveal;
@@ -22,6 +30,61 @@ public partial class MacrosView : UserControl
     }
 
     private MainViewModel? Vm => DataContext as MainViewModel;
+    private Window? _window;
+
+    private void HookWindow(Window? window)
+    {
+        if (_window == window) return;
+        if (_window is not null)
+        {
+            _window.PreviewKeyDown -= OnPreviewKeyDown;
+            _window.Deactivated -= OnWindowDeactivated;
+        }
+        _window = window;
+        if (_window is not null)
+        {
+            _window.PreviewKeyDown += OnPreviewKeyDown;
+            _window.Deactivated += OnWindowDeactivated;
+        }
+    }
+
+    /// <summary>Switching to another window (or the game) puts an armed "Delete?" back.</summary>
+    private void OnWindowDeactivated(object? sender, EventArgs e) => Vm?.CancelDeleteConfirms();
+
+    /// <summary>
+    /// Any click puts an armed "Delete?" back, unless it's on that same button (the second press that deletes).
+    /// </summary>
+    private void OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (Vm is not { } vm) return;
+        object? keep = null;
+        if (FindParent<Button>(e.OriginalSource as DependencyObject) is { } button)
+        {
+            keep = button.DataContext switch
+            {
+                SavedMacroRow row when button.Command == row.DeleteCommand => row,
+                GroupSection section when button.Command == section.DeleteCommand => section,
+                _ => null,
+            };
+        }
+        vm.CancelDeleteConfirms(keep);
+    }
+
+    private static T? FindParent<T>(DependencyObject? d) where T : DependencyObject
+    {
+        while (d is not null and not T)
+            d = d is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D ? System.Windows.Media.VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d);
+        return d as T;
+    }
+
+    /// <summary>Clicking a row moves the keyboard focus off any field, so Ctrl+C, Ctrl+V, Ctrl+Z and Delete act on blocks.</summary>
+    private static void FocusRow(object sender)
+    {
+        var row = sender as DependencyObject;
+        while (row is not null and not FrameworkElement { Name: "Row" })
+            row = System.Windows.Media.VisualTreeHelper.GetParent(row);
+        if (row is UIElement element) element.Focus();
+    }
 
     /// <summary>Scrolls a timeline row into sight once it's laid out (after recording, the new blocks).</summary>
     private void Reveal(int index) => Dispatcher.BeginInvoke(() =>
@@ -32,6 +95,7 @@ public partial class MacrosView : UserControl
     private void OnRowClick(object sender, MouseButtonEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: BlockRow row } || Vm is not { } vm) return;
+        FocusRow(sender);
         // Shift+click on a row ticks the whole run from the last tick, like Shift+click on its tick box.
         if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && vm.HasChecked) vm.CheckRow(row, shift: true);
         else vm.SelectBlockCommand.Execute(row);
@@ -41,6 +105,7 @@ public partial class MacrosView : UserControl
     private void OnRowCheckDown(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
+        FocusRow(sender);
         if (sender is FrameworkElement { DataContext: BlockRow row } && Vm is { } vm)
             vm.CheckRow(row, Keyboard.Modifiers.HasFlag(ModifierKeys.Shift));
     }
@@ -50,9 +115,14 @@ public partial class MacrosView : UserControl
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (Vm is not { } vm) return;
+        if (Vm is not { } vm || !IsVisible) return;
+
+        // A key press puts an armed "Delete?" back, unless it's Enter or Space on that button (which presses it).
+        var onDelete = Keyboard.FocusedElement is Button { DataContext: SavedMacroRow or GroupSection } && e.Key is Key.Enter or Key.Space;
+        if (!onDelete) vm.CancelDeleteConfirms();
 
         // Capturing a start/stop key for the loaded macro or a saved one, or the record key.
+        if (vm.CapturingShortcut is not null) return; // Settings is picking an editor shortcut
         if (vm.IsCapturingKey)
         {
             var key = e.Key == Key.System ? e.SystemKey : e.Key;
@@ -89,15 +159,18 @@ public partial class MacrosView : UserControl
             return;
         }
 
-        // Delete removes the selected block, unless you're typing in a field.
-        if (e.Key == Key.Delete && !IsTyping(e.OriginalSource))
-        {
-            vm.DeleteSelected();
-            e.Handled = true;
-        }
+        // Undo, redo, copy, cut, paste and delete, with the keys from Settings › Macros. In a text field the keys
+        // keep their usual meaning there.
+        if (IsTyping(e.OriginalSource)) return;
+        var pressed = e.Key == Key.System ? e.SystemKey : e.Key;
+        var code = KeyInterop.VirtualKeyFromKey(pressed);
+        if (KeyCatalog.IsModifier(code) || pressed is Key.None or Key.ImeProcessed) return;
+        if (vm.ShortcutAction(new Hotkey(CurrentModifiers(), code)) is not { } action) return;
+        vm.RunShortcut(action);
+        e.Handled = true;
     }
 
-    private static HotkeyModifiers CurrentModifiers()
+    internal static HotkeyModifiers CurrentModifiers()
     {
         var mods = HotkeyModifiers.None;
         var m = Keyboard.Modifiers;

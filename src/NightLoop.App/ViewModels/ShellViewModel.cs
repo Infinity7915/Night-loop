@@ -122,6 +122,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
     partial void OnCurrentPageChanged(object? oldValue, object newValue)
     {
         if (oldValue is SettingsViewModel s && newValue != s) s.OnHidden();
+        if (oldValue is MainViewModel m && newValue != m) m.CancelDeleteConfirms();
     }
 
     /// <summary>

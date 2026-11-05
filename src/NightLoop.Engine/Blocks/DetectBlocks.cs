@@ -47,7 +47,7 @@ internal static class DetectBlocks
         var what = Target(b);
         var found = await Vision.WaitForAsync(ctx, what, b.GetInt("timeoutMs", 0));
         if (found is not { } p) return false;
-        ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p);
+        ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct);
         await ClickFoundAsync(b, ctx, p);
         return true;
     }
@@ -87,7 +87,7 @@ internal static class DetectBlocks
                 // Turning has stopped. Look once more after the view settles, so the click lands where the target is now.
                 await ctx.PauseExactAsync(ScanSettleMs);
                 if (await Vision.FindAsync(ctx, what) is { } settled) p = settled;
-                ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p);
+                ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct);
                 switch (b.GetString("whenFound", "click"))
                 {
                     case "click" when method == "mouseMove":
@@ -129,7 +129,7 @@ internal static class DetectBlocks
     /// </summary>
     private static async Task CenterAsync(RunContext ctx, FoundTarget target, int tolerance, string method)
     {
-        var what = new LookFor(target.Kind, target.Value, target.ImageData, target.Tolerance, Region: null);
+        var what = new LookFor(target.Kind, target.Value, target.ImageData, target.Tolerance, target.ConfidencePct, Region: null, SizeTolerancePct: target.SizeTolerancePct);
         var view = ctx.AreaFor(null).Center;
         var point = target.Point;
         double ratioX = 1, ratioY = 1;
@@ -175,13 +175,13 @@ internal static class DetectBlocksLook
         Contains: b.GetString("match") == "contains", MatchCase: b.GetBool("matchCase") == true, Region: b.Params["region"]);
 
     public static LookFor Picture(Block b) => new("image", b.GetString("image", ""), ImageData: b.GetString("imageData"),
-        ConfidencePct: b.GetInt("confidencePct", 90), Region: b.Params["region"]);
+        ConfidencePct: b.GetInt("confidencePct", 90), Region: b.Params["region"], SizeTolerancePct: b.GetInt("sizeTolerancePct", 0));
 
     public static LookFor Target(Block b)
     {
         var kind = b.GetString("target", "text");
         return new LookFor(kind, b.GetString("value", ""), ImageData: b.GetString("imageData"),
             Tolerance: b.GetInt("tolerance", 10), ConfidencePct: b.GetInt("confidencePct", 90),
-            Contains: true, MatchCase: false, Region: b.Params["region"]);
+            Contains: true, MatchCase: false, Region: b.Params["region"], SizeTolerancePct: b.GetInt("sizeTolerancePct", 0));
     }
 }

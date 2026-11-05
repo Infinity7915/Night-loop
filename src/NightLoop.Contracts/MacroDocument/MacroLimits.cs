@@ -36,6 +36,8 @@ public static class MacroLimits
     public const int PathMaxPoints = 64;
     /// <summary>A small picture saved inside an image block (base64 text), about 40 KB.</summary>
     public const int ImageDataMaxLength = 56_000;
+    /// <summary>Picture blocks: how much smaller or bigger the picture may look on screen (60 = 40%–160% of its size).</summary>
+    public const int SizeToleranceMaxPct = 60;
     /// <summary>Program paths, process names and arguments (Windows' classic MAX_PATH).</summary>
     public const int PathMaxLength = 260;
     /// <summary>Gliding the mouse to a click point takes at most this long.</summary>

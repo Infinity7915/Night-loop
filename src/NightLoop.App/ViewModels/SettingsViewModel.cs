@@ -45,6 +45,9 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>Settings › Macros › Editor shortcuts: undo, redo, copy, cut, paste and delete keys.</summary>
+    public IReadOnlyList<EditorShortcut> EditorShortcuts => _shell.Macros?.EditorShortcuts ?? [];
+
     /// <summary>The block editor slides along beside a long timeline as the page scrolls. Kept on this PC.</summary>
     public bool EditorFollowsScroll
     {

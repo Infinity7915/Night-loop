@@ -14,7 +14,8 @@ internal sealed record LookFor(
     int ConfidencePct = 90,
     bool Contains = true,
     bool MatchCase = false,
-    JsonNode? Region = null);
+    JsonNode? Region = null,
+    int SizeTolerancePct = 0);
 
 /// <summary>Finds text, pictures and colors on screen for the detect blocks and conditions.</summary>
 internal static class Vision
@@ -34,7 +35,7 @@ internal static class Vision
 
             case "image":
                 var template = Template(what.ImageData);
-                var match = TemplateMatcher.Find(image, template);
+                var match = TemplateMatcher.Find(image, template, what.SizeTolerancePct);
                 return match is { } m && m.Score * 100 >= what.ConfidencePct ? (m.X, m.Y) : null;
 
             default:
@@ -44,6 +45,10 @@ internal static class Vision
                 return TextSearch.Find(lines, what.Value, what.Contains, what.MatchCase)?.Center;
         }
     }
+
+    /// <summary>The best spot for a picture right now, however poor, for the editor's test look to explain a miss.</summary>
+    public static TemplateMatcher.Match? BestImageMatch(RunContext ctx, LookFor what) =>
+        TemplateMatcher.Find(ctx.Capture(ctx.AreaFor(what.Region)), Template(what.ImageData), what.SizeTolerancePct);
 
     /// <summary>Looks again and again until found or the timeout passes (0 = no timeout). Returns null on timeout.</summary>
     public static async Task<(int X, int Y)?> WaitForAsync(RunContext ctx, LookFor what, int timeoutMs)

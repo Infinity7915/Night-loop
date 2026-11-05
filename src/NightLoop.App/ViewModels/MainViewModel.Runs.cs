@@ -118,6 +118,7 @@ public sealed partial class MainViewModel
         if (!recordKey && h == RecordHotkey) return $"{key} starts and stops recording. Pick another key, or change the record key in the loaded macro's options.";
         if (h == Hotkey.Panic) return $"{key} is the stop-everything key.";
         if (h == PlayHotkey) return $"{key} is the editor's Play key. Pick another key.";
+        if (ShortcutFor(h) is { } shortcut) return $"{key} is the editor's {shortcut.Label} shortcut. Pick another key, or change the shortcut in Settings › Macros.";
         // Macros may share a start key (it starts them together), but the record key can't be one of them.
         if (!recordKey) return null;
         var clash = _rows.FirstOrDefault(r => Hotkey.TryParse(r.Hotkey, out var other) && other == h);
@@ -139,8 +140,16 @@ public sealed partial class MainViewModel
         if (_macroId is null && !string.IsNullOrEmpty(EditorHotkey)) keys.Add((Guid.Empty, EditorHotkey));
         var byKey = keys
             .Select(k => (k.Id, Ok: Hotkey.TryParse(k.Key, out var parsed), Key: parsed))
-            .Where(k => k.Ok && k.Key != RecordHotkey && k.Key != PlayHotkey && k.Key != Hotkey.Panic)
+            .Where(k => k.Ok && k.Key != RecordHotkey && k.Key != PlayHotkey && k.Key != Hotkey.Panic && ShortcutFor(k.Key) is null)
             .GroupBy(k => k.Key, k => k.Id);
+        // A start key that is also an editor shortcut (Settings › Macros) doesn't start the macro until one changes.
+        foreach (var row in _rows)
+        {
+            if (ShortcutClash(row.Id == _macroId ? EditorHotkey : row.Hotkey) is { } clash) row.HotkeyError = clash;
+            else if (row.HotkeyError.Contains("editor's", StringComparison.Ordinal)) row.HotkeyError = "";
+        }
+        if (ShortcutClash(EditorHotkey) is { } mine) EditorHotkeyError = mine;
+        else if (EditorHotkeyError.Contains("editor's", StringComparison.Ordinal)) EditorHotkeyError = "";
         foreach (var group in byKey)
         {
             var ids = group.Distinct().ToList();
