@@ -72,7 +72,15 @@ public static class SmokeTest
             var games = new TargetGamesViewModel(new LocalData.GamesStore(Path.Combine(dir, "games.json")),
                 new LocalData.LocalSettings(Path.Combine(dir, "settings.json")));
             var macros = new MainViewModel(api, games, new LocalData.LocalSettings(Path.Combine(dir, "settings.json")));
-            macros.ShowSample(select);
+            var parts = select.Split('#');
+            macros.ShowSample(parts[0]);
+            // "#..." opens one more part of the page for the picture.
+            switch (parts.ElementAtOrDefault(1))
+            {
+                case "saved": macros.Sections.SelectMany(g => g.Rows).First().ShowOptions = true; break;
+                case "group": macros.NewGroupCommand.Execute(null); break;
+                case "options": macros.ShowEditorOptions = true; break;
+            }
             return samples[select] = macros;
         }
 
@@ -83,6 +91,14 @@ public static class SmokeTest
         SettingsViewModel SampleSettings() => settings ??= new SettingsViewModel(Shell());
         // The create-account screen, with its terms line.
         AuthViewModel SignUp() => new(Shell().Session, Shell().Local, null) { Mode = AuthMode.SignUp };
+        AuthViewModel AuthIn(AuthMode mode) => new(Shell().Session, Shell().Local, null) { Mode = mode };
+        // Settings with one of the account boxes open.
+        SettingsViewModel SettingsWith(Action<AccountViewModel> open)
+        {
+            var vm = new SettingsViewModel(Shell());
+            open(vm.Account);
+            return vm;
+        }
 
         // Pages render at the width they get in the window: 1060 at the default 1280 window (minus the 220 sidebar),
         // 740 at the smallest window. The narrow ones catch rows that overlap or get cut off when the window shrinks.
@@ -100,7 +116,19 @@ public static class SmokeTest
             // The loaded macro's options (record key) and a picture block with its preview.
             ("macros-picture", () => new MacrosView { DataContext = SampleMacros("image") }, 1060, 2100),
             ("macros-open-window", () => new MacrosView { DataContext = SampleMacros("open") }, 1060, 1300),
+            ("auth-code", () => new AuthView { DataContext = AuthIn(AuthMode.Code) }, 1280, 800),
+            ("auth-forgot", () => new AuthView { DataContext = AuthIn(AuthMode.Forgot) }, 1280, 800),
+            ("auth-reset", () => new AuthView { DataContext = AuthIn(AuthMode.Reset) }, 1280, 800),
+            // Each part of the Macros page opened: the loaded macro's options, a saved macro's options, a new group.
+            ("macros-options", () => new MacrosView { DataContext = SampleMacros("position#options") }, 1060, 1500),
+            ("macros-saved-options", () => new MacrosView { DataContext = SampleMacros("position#saved") }, 1060, 2700),
+            ("macros-new-group", () => new MacrosView { DataContext = SampleMacros("position#group") }, 1060, 2300),
             ("settings", () => new SettingsView { DataContext = SampleSettings() }, 1060, 1700),
+            ("settings-full", () => new SettingsView { DataContext = SampleSettings() }, 1060, 2600),
+            ("settings-username", () => new SettingsView { DataContext = SettingsWith(a => a.ChangeUsernameCommand.Execute(null)) }, 1060, 2600),
+            ("settings-email", () => new SettingsView { DataContext = SettingsWith(a => a.ChangeEmailCommand.Execute(null)) }, 1060, 2600),
+            ("settings-password", () => new SettingsView { DataContext = SettingsWith(a => a.ChangePasswordCommand.Execute(null)) }, 1060, 2600),
+            ("settings-delete", () => new SettingsView { DataContext = SettingsWith(a => a.DeleteAccountCommand.Execute(null)) }, 1060, 2600),
             ("settings-narrow", () => new SettingsView { DataContext = SampleSettings() }, 740, 1900),
             ("window", MainWindowContent, 1280, 800),
         };
