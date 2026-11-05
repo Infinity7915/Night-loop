@@ -104,6 +104,75 @@ internal static class WindowBlocks
         windows.Focus(waitFor);
     }
 
+    /// <summary>Programs a macro may never close: Night-loop itself and the parts of Windows that keep the desktop running.</summary>
+    internal static readonly HashSet<string> Protected = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "NightLoop.exe", "explorer.exe", "csrss.exe", "wininit.exe", "winlogon.exe", "lsass.exe", "services.exe",
+        "smss.exe", "svchost.exe", "dwm.exe", "System", "Registry", "fontdrvhost.exe", "sihost.exe",
+    };
+
+    /// <summary>
+    /// window.close: closes the program like clicking its X ("close"), then, for "closeThenEnd", ends it if it's still
+    /// open after the timeout. "end" ends it straight away, like End task in Task Manager.
+    /// </summary>
+    public static async Task CloseAsync(Block b, RunContext ctx)
+    {
+        var windows = ctx.Environment.Windows ?? throw new MacroFaultException("Closing programs isn't available here.");
+        var exe = ctx.ProcessFor(b);
+        if (exe is null)
+        {
+            ctx.Environment.Log?.Invoke("Close window: pick a program, or a target game for this macro, to close.");
+            return;
+        }
+        var name = FileName(exe);
+        if (!name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) name += ".exe";
+        if (Protected.Contains(name) || Protected.Contains(name[..^4]))
+            throw new MacroFaultException($"Night-loop won't close {name}: Windows (or Night-loop) needs it to keep running.");
+        ctx.DidWork = true;
+        if (!windows.IsProcessRunning(exe))
+        {
+            ctx.Environment.Log?.Invoke($"Close window: {name} isn't running.");
+            return;
+        }
+
+        var how = b.GetString("how", "close");
+        var timeoutMs = b.GetInt("timeoutMs", 10_000);
+        try
+        {
+            if (how != "end")
+            {
+                windows.CloseWindows(exe);
+                if (await WaitForExitAsync(ctx, windows, exe, timeoutMs)) return;
+                if (how == "close")
+                {
+                    ctx.Environment.Log?.Invoke($"Close window: {name} is still open (it may be asking to save). Pick \"Close, then force\" to end it anyway.");
+                    return;
+                }
+            }
+            windows.EndProcesses(exe);
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new MacroFaultException(ex.Message);
+        }
+        if (!await WaitForExitAsync(ctx, windows, exe, ForceWaitMs))
+            ctx.Environment.Log?.Invoke($"Close window: Windows wouldn't let Night-loop end {name} (it may be running as administrator).");
+    }
+
+    /// <summary>How long to wait for a forced close to finish.</summary>
+    private const int ForceWaitMs = 5_000;
+
+    /// <summary>True once the program has closed; false when the timeout passes first (0 = don't wait).</summary>
+    private static async Task<bool> WaitForExitAsync(RunContext ctx, IWindowService windows, string exe, int timeoutMs)
+    {
+        for (var waited = 0; windows.IsProcessRunning(exe); waited += PollMs)
+        {
+            if (waited >= timeoutMs) return false;
+            await ctx.Environment.Delay.DelayAsync(PollMs, ctx.Token);
+        }
+        return true;
+    }
+
     private static async Task WaitForWindowAsync(RunContext ctx, IWindowService windows, string exe, bool front, int timeoutMs,
         Func<string, string> timeoutMessage)
     {

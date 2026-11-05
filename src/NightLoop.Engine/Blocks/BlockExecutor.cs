@@ -74,6 +74,9 @@ internal static class BlockExecutor
             case BlockTypes.WindowOpen:
                 await WindowBlocks.OpenAsync(b, ctx);
                 return true;
+            case BlockTypes.WindowClose:
+                await WindowBlocks.CloseAsync(b, ctx);
+                return true;
 
             case BlockTypes.Notify:
                 var kind = b.GetString("kind", "toast");

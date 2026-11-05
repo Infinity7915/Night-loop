@@ -63,6 +63,11 @@ public static class BlockTypes
     /// wait (wait for its window, default true), timeoutMs.
     /// </summary>
     public const string WindowOpen = "window.open";
+    /// <summary>
+    /// Close a program. Params: process (optional, else the target game), how (close / closeThenEnd / end),
+    /// timeoutMs (how long to wait for it to close).
+    /// </summary>
+    public const string WindowClose = "window.close";
 
     public const string Comment = "utility.comment";
     public const string Description = "utility.description";
@@ -79,13 +84,14 @@ public static class BlockTypes
         Wait, WaitRandom, WaitForText, WaitForImage, WaitForImageGone, Pause, Resume, WaitForKey,
         DetectText, DetectImage, DetectPixelColor, DetectPixelColorGone, FindClick, ScanTurn,
         If, Else, End, Loop, RepeatUntil, Label, Goto, Stop,
-        WindowResize, WindowPosition, WindowFocus, WaitForWindow, WindowOpen,
+        WindowResize, WindowPosition, WindowFocus, WaitForWindow, WindowOpen, WindowClose,
         Comment, Description, Notify, PlaySound, RunMacro, Screenshot,
     };
 
-    /// <summary>Blocks with an "On fail" choice (continue, retry, go to label, stop).</summary>
     /// <summary>Blocks that act on what they found and have an "After found" choice (go on, leave the loop, go to a label, stop).</summary>
     public static bool HasAfterFound(string type) => type is FindClick or ScanTurn;
+
+    /// <summary>Blocks with an "On fail" choice (continue, retry, go to label, stop).</summary>
     public static bool HasOnFail(string type) => type is WaitForText or WaitForImage or WaitForImageGone or DetectPixelColor or DetectPixelColorGone or FindClick or ScanTurn;
 
     /// <summary>Blocks that open a section closed by logic.end.</summary>

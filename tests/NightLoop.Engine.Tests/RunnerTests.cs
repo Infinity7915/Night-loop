@@ -341,4 +341,55 @@ public class RunnerTests
             await Task.Delay(1);
         }
     }
+
+    private static async Task<(MacroRun Run, FakeWindows Windows, List<string> Log)> CloseAsync(JsonObject p, Action<FakeWindows>? setup = null)
+    {
+        var windows = new FakeWindows();
+        setup?.Invoke(windows);
+        var log = new List<string>();
+        var doc = new MacroBuilder().Add(BlockTypes.WindowClose, p).Build();
+        Assert.Empty(MacroValidator.Validate(doc));
+        var run = new MacroRun(MacroCompiler.Compile(doc),
+            new RunEnvironment { Input = new FakeInput(), Delay = new FakeDelay(), Windows = windows, Log = log.Add });
+        run.Start();
+        await run.Completion.WaitAsync(TimeSpan.FromSeconds(10));
+        return (run, windows, log);
+    }
+
+    [Fact]
+    public async Task Close_window_asks_the_program_to_close()
+    {
+        var (run, windows, _) = await CloseAsync(new() { ["process"] = "notepad.exe" }, w => w.OnClose = () => w.Running = false);
+        Assert.Equal(RunState.Stopped, run.State);
+        Assert.Equal(["close notepad.exe"], windows.Calls);
+    }
+
+    [Fact]
+    public async Task Close_window_leaves_a_program_that_wont_close_unless_told_to_force()
+    {
+        var (_, windows, log) = await CloseAsync(new() { ["process"] = "notepad.exe", ["timeoutMs"] = 1000 });
+        Assert.Equal(["close notepad.exe"], windows.Calls);
+        Assert.Contains(log, l => l.Contains("still open"));
+
+        var (_, forced, _) = await CloseAsync(new() { ["process"] = "notepad.exe", ["how"] = "closeThenEnd", ["timeoutMs"] = 1000 });
+        Assert.Equal(["close notepad.exe", "end notepad.exe"], forced.Calls);
+    }
+
+    [Fact]
+    public async Task Close_window_force_ends_it_straight_away()
+    {
+        var (_, windows, _) = await CloseAsync(new() { ["process"] = "game.exe", ["how"] = "end" });
+        Assert.Equal(["end game.exe"], windows.Calls);
+        Assert.False(windows.Running);
+    }
+
+    [Fact]
+    public async Task Close_window_never_closes_windows_or_night_loop()
+    {
+        var (run, windows, _) = await CloseAsync(new() { ["process"] = "explorer.exe", ["how"] = "end" });
+        Assert.Equal(RunState.Faulted, run.State);
+        Assert.Empty(windows.Calls);
+        var (self, _, _) = await CloseAsync(new() { ["process"] = "nightloop" });
+        Assert.Equal(RunState.Faulted, self.State);
+    }
 }

@@ -33,4 +33,10 @@ public interface IWindowService
     /// with a readable message when it can't be started.
     /// </summary>
     string? Launch(string path, string? arguments) => throw new InvalidOperationException("Opening programs isn't available here.");
+
+    /// <summary>Asks every window of the program to close, like clicking its X. Returns how many were asked.</summary>
+    int CloseWindows(string exeName) => throw new InvalidOperationException("Closing programs isn't available here.");
+
+    /// <summary>Ends the program at once, like End task in Task Manager (unsaved work is lost). Returns how many ended.</summary>
+    int EndProcesses(string exeName) => throw new InvalidOperationException("Closing programs isn't available here.");
 }

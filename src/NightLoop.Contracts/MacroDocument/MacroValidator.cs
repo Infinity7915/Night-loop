@@ -304,6 +304,11 @@ public static class MacroValidator
                 Need(OptBool("wait"), "Wait for its window must be yes or no.");
                 Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
                 break;
+            case BlockTypes.WindowClose:
+                Process();
+                Need(OneOf("how", ["close", "closeThenEnd", "end"], "close"), "Close must be close, close then force, or force.");
+                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
+                break;
             case BlockTypes.Screenshot:
                 Region();
                 Need(Text("file", MacroLimits.FileNameMaxLength, required: false)

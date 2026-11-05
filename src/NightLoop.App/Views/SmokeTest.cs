@@ -116,6 +116,8 @@ public static class SmokeTest
             // The loaded macro's options (record key) and a picture block with its preview.
             ("macros-picture", () => new MacrosView { DataContext = SampleMacros("image") }, 1060, 2100),
             ("macros-open-window", () => new MacrosView { DataContext = SampleMacros("open") }, 1060, 1300),
+            ("macros-close-window", () => new MacrosView { DataContext = SampleMacros("close") }, 1060, 2100),
+            ("macros-scan-turn", () => new MacrosView { DataContext = SampleMacros("scan") }, 1060, 2100),
             ("auth-code", () => new AuthView { DataContext = AuthIn(AuthMode.Code) }, 1280, 800),
             ("auth-forgot", () => new AuthView { DataContext = AuthIn(AuthMode.Forgot) }, 1280, 800),
             ("auth-reset", () => new AuthView { DataContext = AuthIn(AuthMode.Reset) }, 1280, 800),

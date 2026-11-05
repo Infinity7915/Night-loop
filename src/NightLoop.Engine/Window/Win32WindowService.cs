@@ -91,6 +91,34 @@ public sealed class Win32WindowService : IWindowService
         }
     }
 
+    public int CloseWindows(string exeName) => EachProcess(exeName, p => p.CloseMainWindow());
+
+    public int EndProcesses(string exeName) => EachProcess(exeName, p =>
+    {
+        p.Kill();
+        return true;
+    });
+
+    private static int EachProcess(string exeName, Func<Process, bool> action)
+    {
+        var count = 0;
+        foreach (var p in Process.GetProcessesByName(StripExe(exeName)))
+        {
+            using (p)
+            {
+                try
+                {
+                    if (action(p)) count++;
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
+                {
+                    // It already exited, or Windows won't let Night-loop touch it (another user's or an admin program).
+                }
+            }
+        }
+        return count;
+    }
+
     public ClientArea? GetWindowBounds(string exeName)
     {
         var hwnd = FindMainWindow(exeName);
