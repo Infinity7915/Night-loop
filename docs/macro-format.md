@@ -49,9 +49,9 @@ These are optional params, so existing macros are unaffected:
 | `utility.notify` | `kind`: `toast` is shown as "Notify" | Sends a Windows notification (from Night-loop's tray icon), not a message inside Night-loop |
 | `timing.waitForImage`, `timing.waitForImageGone`, `detect.findClick` / `detect.scanTurn` with `target: "image"`, `imageVisible` conditions | `sizeTolerancePct` (0–60, optional) | Missing (or 25, the 0.6.0 default) is automatic: any size from 30% to 160% of how it was captured. A number limits it to (100 − n)% to (100 + n)%; 0 is the exact size only |
 | same picture blocks and conditions | `matchColor` (bool, default true) | The colors must match as well as the shape. Pictures captured from 0.6.2 on are saved as `nl2:` (gray + a color copy up to 16×16); older `nl1:` pictures are shape-only |
-| `camera.center`, `detect.scanTurn` | — | Centering turns sideways only, never up or down. Scan & turn's click with `mouseMove` tilts to aim and tilts back after the click |
+| `camera.center`, `detect.scanTurn` | — | Centering turns sideways until the target is centered left to right, then tilts up or down to it, never both in the same turn. Scan & turn's click with `mouseMove` centers sideways only, tilts to aim and tilts back after the click |
 | same picture blocks and conditions | `matchColor` (bool, default true) | The colors must match as well as the shape. Pictures captured from 0.6.2 on are saved as `nl2:` (gray + a color copy up to 16×16); older `nl1:` pictures are shape-only |
-| `camera.center`, `detect.scanTurn` | — | Centering turns sideways only, never up or down. Scan & turn's click with `mouseMove` tilts to aim and tilts back after the click |
+| `camera.center`, `detect.scanTurn` | — | Centering turns sideways until the target is centered left to right, then tilts up or down to it, never both in the same turn. Scan & turn's click with `mouseMove` centers sideways only, tilts to aim and tilts back after the click |
 | any block | `note` (text, up to 200 characters) | A short note shown under the block in the editor; ignored when running |
 
 ## Disabled blocks
