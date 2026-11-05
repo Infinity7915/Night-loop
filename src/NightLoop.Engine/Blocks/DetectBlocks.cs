@@ -14,6 +14,7 @@ internal static class DetectBlocks
     private const int ScanSettleMs = 150;
     private const int CenterMaxSteps = 25;
     private const int CenterMaxMovePx = 400;
+    private const int CenterFirstMovePx = 150;
 
     /// <summary>Waits until the point has the color, or with <paramref name="gone"/> until it no longer has it.</summary>
     public static async Task<bool> WaitForPixelAsync(Block b, RunContext ctx, bool gone = false)
@@ -47,7 +48,7 @@ internal static class DetectBlocks
         var what = Target(b);
         var found = await Vision.WaitForAsync(ctx, what, b.GetInt("timeoutMs", 0));
         if (found is not { } p) return false;
-        ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct);
+        ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor);
         await ClickFoundAsync(b, ctx, p);
         return true;
     }
@@ -87,14 +88,15 @@ internal static class DetectBlocks
                 // Turning has stopped. Look once more after the view settles, so the click lands where the target is now.
                 await ctx.PauseExactAsync(ScanSettleMs);
                 if (await Vision.FindAsync(ctx, what) is { } settled) p = settled;
-                ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct);
+                ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor);
                 switch (b.GetString("whenFound", "click"))
                 {
                     case "click" when method == "mouseMove":
                         // The camera follows the mouse here, so gliding to the target would turn the view away from
-                        // it. Turn the target into the middle instead, then click without moving the mouse.
-                        await CenterAsync(ctx, ctx.LastFound, b.GetInt("tolerancePx", 40), method);
-                        await ClickInPlaceAsync(b, ctx);
+                        // it. Turn the target into the middle (sideways only), then click without moving the mouse.
+                        var tolerance = b.GetInt("tolerancePx", 40);
+                        var (at, ratio) = await CenterAsync(ctx, ctx.LastFound, tolerance, method);
+                        await ClickAimedAsync(b, ctx, at, ratio, tolerance, method);
                         break;
                     case "click":
                         await ClickFoundAsync(b, ctx, p);
@@ -124,38 +126,64 @@ internal static class DetectBlocks
     }
 
     /// <summary>
-    /// Turns toward the target, measuring how far it moved on screen for each pixel of turn, so it settles in a few
-    /// steps whatever the game's mouse sensitivity is.
+    /// Turns sideways toward the target until it is in the middle, measuring how far it moved on screen for each
+    /// pixel of turn, so it settles in a few steps whatever the game's mouse sensitivity is. It never tilts the
+    /// camera up or down: a target on the ground is always below the middle, and tilting toward it would point the
+    /// view at the floor. Returns where the target is now and the measured screen pixels per pixel of turn.
     /// </summary>
-    private static async Task CenterAsync(RunContext ctx, FoundTarget target, int tolerance, string method)
+    private static async Task<((int X, int Y) Point, double Ratio)> CenterAsync(RunContext ctx, FoundTarget target, int tolerance, string method)
     {
-        var what = new LookFor(target.Kind, target.Value, target.ImageData, target.Tolerance, target.ConfidencePct, Region: null, SizeTolerancePct: target.SizeTolerancePct);
+        var what = new LookFor(target.Kind, target.Value, target.ImageData, target.Tolerance, target.ConfidencePct, Region: null, SizeTolerancePct: target.SizeTolerancePct, MatchColor: target.MatchColor);
         var view = ctx.AreaFor(null).Center;
         var point = target.Point;
-        double ratioX = 1, ratioY = 1;
+        double? ratio = null;
 
         for (var i = 0; i < CenterMaxSteps; i++)
         {
             var dx = point.X - view.X;
-            var dy = point.Y - view.Y;
-            if (Math.Abs(dx) <= tolerance && Math.Abs(dy) <= tolerance) return;
+            if (Math.Abs(dx) <= tolerance) break;
 
-            var sendX = (int)Math.Clamp(dx / ratioX * 0.8, -CenterMaxMovePx, CenterMaxMovePx);
-            var sendY = (int)Math.Clamp(dy / ratioY * 0.8, -CenterMaxMovePx, CenterMaxMovePx);
-            await ctx.InputAsync(() => InputBlocks.TurnAsync(ctx, method, sendX, sendY, InputBlocks.DefaultTurnMs(Math.Max(Math.Abs(sendX), Math.Abs(sendY)))));
+            // Until the game's sensitivity is known, the first turn is a small, safe one to measure it.
+            var send = ratio is { } r
+                ? (int)Math.Clamp(dx / r * 0.85, -CenterMaxMovePx, CenterMaxMovePx)
+                : (int)Math.Clamp(dx * 0.4, -CenterFirstMovePx, CenterFirstMovePx);
+            if (send == 0) send = Math.Sign(dx);
+            await ctx.InputAsync(() => InputBlocks.TurnAsync(ctx, method, send, 0, InputBlocks.DefaultTurnMs(send)));
             await ctx.PauseExactAsync(ScanSettleMs);
 
             if (await Vision.FindAsync(ctx, what) is not { } next)
             {
                 ctx.Environment.Log?.Invoke("Center on target: lost sight of the target while turning.");
-                return;
+                break;
             }
             // How many screen pixels the target moved per pixel of turn (it moves the opposite way to the turn).
-            if (sendX != 0 && Math.Abs(point.X - next.X) > 2) ratioX = Math.Clamp((point.X - next.X) / (double)sendX, 0.05, 20);
-            if (sendY != 0 && Math.Abs(point.Y - next.Y) > 2) ratioY = Math.Clamp((point.Y - next.Y) / (double)sendY, 0.05, 20);
+            // A reading that went the wrong way (the target itself moved) is ignored.
+            var moved = point.X - next.X;
+            if (Math.Abs(moved) > 2 && Math.Sign(moved) == Math.Sign(send))
+                ratio = Math.Clamp(moved / (double)send, 0.05, 20);
             point = next;
             ctx.LastFound = target with { Point = next };
         }
+        return (point, ratio ?? 1);
+    }
+
+    /// <summary>
+    /// Clicks a centered target in a game whose camera follows the mouse. When the target is above or below the
+    /// middle, it tilts just enough to aim, clicks, and tilts back by the same amount, so the view ends up level
+    /// where it was.
+    /// </summary>
+    private static async Task ClickAimedAsync(Block b, RunContext ctx, (int X, int Y) at, double ratio, int tolerance, string method)
+    {
+        var dy = at.Y - ctx.AreaFor(null).Center.Y;
+        if (Math.Abs(dy) <= tolerance)
+        {
+            await ClickInPlaceAsync(b, ctx);
+            return;
+        }
+        var tilt = (int)Math.Clamp(dy / ratio, -CenterMaxMovePx, CenterMaxMovePx);
+        await ctx.InputAsync(() => InputBlocks.TurnAsync(ctx, method, 0, tilt, InputBlocks.DefaultTurnMs(tilt)));
+        try { await ClickInPlaceAsync(b, ctx); }
+        finally { await ctx.InputAsync(() => InputBlocks.TurnAsync(ctx, method, 0, -tilt, InputBlocks.DefaultTurnMs(tilt))); }
     }
 
     /// <summary>The block's turn method, else right-drag for Roblox (its camera needs it) and mouse move for other games.</summary>
@@ -181,13 +209,13 @@ internal static class DetectBlocksLook
         Contains: b.GetString("match") == "contains", MatchCase: b.GetBool("matchCase") == true, Region: b.Params["region"]);
 
     public static LookFor Picture(Block b) => new("image", b.GetString("image", ""), ImageData: b.GetString("imageData"),
-        ConfidencePct: b.GetInt("confidencePct", 90), Region: b.Params["region"], SizeTolerancePct: SizeTolerance(b.GetInt("sizeTolerancePct")));
+        ConfidencePct: b.GetInt("confidencePct", 90), Region: b.Params["region"], SizeTolerancePct: SizeTolerance(b.GetInt("sizeTolerancePct")), MatchColor: b.GetBool("matchColor") != false);
 
     public static LookFor Target(Block b)
     {
         var kind = b.GetString("target", "text");
         return new LookFor(kind, b.GetString("value", ""), ImageData: b.GetString("imageData"),
             Tolerance: b.GetInt("tolerance", 10), ConfidencePct: b.GetInt("confidencePct", 90),
-            Contains: true, MatchCase: false, Region: b.Params["region"], SizeTolerancePct: SizeTolerance(b.GetInt("sizeTolerancePct")));
+            Contains: true, MatchCase: false, Region: b.Params["region"], SizeTolerancePct: SizeTolerance(b.GetInt("sizeTolerancePct")), MatchColor: b.GetBool("matchColor") != false);
     }
 }

@@ -15,7 +15,8 @@ internal sealed record LookFor(
     bool Contains = true,
     bool MatchCase = false,
     JsonNode? Region = null,
-    int? SizeTolerancePct = 0);
+    int? SizeTolerancePct = 0,
+    bool MatchColor = false);
 
 /// <summary>Finds text, pictures and colors on screen for the detect blocks and conditions.</summary>
 internal static class Vision
@@ -35,8 +36,8 @@ internal static class Vision
 
             case "image":
                 var template = Template(what.ImageData);
-                var match = TemplateMatcher.Find(image, template, what.SizeTolerancePct);
-                return match is { } m && m.Score * 100 >= what.ConfidencePct ? (m.X, m.Y) : null;
+                var match = TemplateMatcher.Find(image, template, what.SizeTolerancePct, what.MatchColor);
+                return match is { } m && m.ColorOk && m.Score * 100 >= what.ConfidencePct ? (m.X, m.Y) : null;
 
             default:
                 var reader = ctx.Environment.Text
@@ -48,7 +49,7 @@ internal static class Vision
 
     /// <summary>The best spot for a picture right now, however poor, for the editor's test look to explain a miss.</summary>
     public static TemplateMatcher.Match? BestImageMatch(RunContext ctx, LookFor what) =>
-        TemplateMatcher.Find(ctx.Capture(ctx.AreaFor(what.Region)), Template(what.ImageData), what.SizeTolerancePct);
+        TemplateMatcher.Find(ctx.Capture(ctx.AreaFor(what.Region)), Template(what.ImageData), what.SizeTolerancePct, what.MatchColor);
 
     /// <summary>Looks again and again until found or the timeout passes (0 = no timeout). Returns null on timeout.</summary>
     public static async Task<(int X, int Y)?> WaitForAsync(RunContext ctx, LookFor what, int timeoutMs)
@@ -80,6 +81,9 @@ internal static class Vision
             waited += Math.Max(1, step);
         }
     }
+
+    /// <summary>Whether a saved picture has its colors (pictures captured before 0.6.2 are gray only).</summary>
+    public static bool HasColor(string? data) => !string.IsNullOrEmpty(data) && ImageTemplate.TryDecode(data, out var t) && t!.HasColor;
 
     private static ImageTemplate Template(string? data)
     {

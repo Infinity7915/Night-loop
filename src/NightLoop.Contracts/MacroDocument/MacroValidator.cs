@@ -170,6 +170,7 @@ public static class MacroValidator
             Need(Text("imageData", MacroLimits.ImageDataMaxLength, required: false) && Text("image", 120, required: false),
                 "The saved picture is too large. Capture a smaller area.");
             Need(OptIntIn("sizeTolerancePct", 0, MacroLimits.SizeToleranceMaxPct), $"Size tolerance must be 0–{MacroLimits.SizeToleranceMaxPct}%.");
+            Need(OptBool("matchColor"), "Match colors must be on or off.");
         }
         void OnFail() => Need(OneOf("onFail", FailActions, "continue"), "On fail must be continue, retry, go to label or stop.");
         void AfterFound() => Need(OneOf("afterFound", FoundActions, "next"), "After found must be next block, leave loop, go to label or stop.");
@@ -433,6 +434,8 @@ public static class MacroValidator
                     issues.Add(new(blockId, "The saved picture is too large. Capture a smaller area."));
                 if (c["confidencePct"] is not null && BlockParams.AsInt(c["confidencePct"]) is not (>= 1 and <= 100))
                     issues.Add(new(blockId, "Confidence must be 1–100%."));
+                if (c["matchColor"] is not null && (c["matchColor"] as JsonValue)?.TryGetValue(out bool _) != true)
+                    issues.Add(new(blockId, "Match colors must be on or off."));
                 if (c["sizeTolerancePct"] is not null && BlockParams.AsInt(c["sizeTolerancePct"]) is not (>= 0 and <= MacroLimits.SizeToleranceMaxPct))
                     issues.Add(new(blockId, $"Size tolerance must be 0–{MacroLimits.SizeToleranceMaxPct}%."));
                 break;
