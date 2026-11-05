@@ -95,19 +95,35 @@ public static class TemplateMatcher
     private const int CoarseTarget = 8;
     private const int MaxFactor = 8;
     private const int Candidates = 5;
-    private const int MinSide = 4;
+    /// <summary>Smaller than this, a picture has too little detail to tell apart from anything else.</summary>
+    private const int MinSide = 8;
 
     /// <param name="Scale">The size it was found at, 1 = as captured.</param>
     public readonly record struct Match(int X, int Y, double Score, double Scale = 1);
 
+    /// <summary>Automatic size: from this much of the captured size (far away)…</summary>
+    public const double AutoMinScale = 0.3;
+    /// <summary>…up to this much (close up).</summary>
+    public const double AutoMaxScale = 1.6;
+
     /// <summary>
     /// Best match as the screen point at the middle of the found area, or null when the template doesn't fit.
-    /// <paramref name="sizeTolerancePct"/>: how much smaller or bigger it may look (0 = only the captured size).
+    /// <paramref name="sizeTolerancePct"/>: how much smaller or bigger it may look (0 = only the captured size);
+    /// null looks at every size from <see cref="AutoMinScale"/> to <see cref="AutoMaxScale"/>.
     /// </summary>
-    public static Match? Find(ScreenImage screen, ImageTemplate template, int sizeTolerancePct = 0)
+    public static Match? Find(ScreenImage screen, ImageTemplate template, int? sizeTolerancePct = 0)
+    {
+        var (min, max) = sizeTolerancePct is { } pct
+            ? (1 - Math.Clamp(pct, 0, MaxSizeTolerancePct) / 100.0, 1 + Math.Clamp(pct, 0, MaxSizeTolerancePct) / 100.0)
+            : (AutoMinScale, AutoMaxScale);
+        return Find(screen, template, min, max);
+    }
+
+    /// <summary>Best match at any size between <paramref name="minScale"/> and <paramref name="maxScale"/> of the captured one.</summary>
+    public static Match? Find(ScreenImage screen, ImageTemplate template, double minScale, double maxScale)
     {
         var hay = new Haystack(ImageTemplate.ToGray(screen), screen.Width, screen.Height);
-        var scales = Scales(template, Math.Clamp(sizeTolerancePct, 0, MaxSizeTolerancePct), out var step);
+        var scales = Scales(template, minScale, maxScale, out var step);
 
         var results = new Found?[scales.Count];
         void Try(int i) => results[i] = FindAtScale(hay, template, scales[i]);
@@ -125,7 +141,7 @@ public static class TemplateMatcher
             foreach (var d in new[] { -step / 2, step / 2, -step / 4, step / 4 })
             {
                 var s = b.Scale + d;
-                if (s < 1 - sizeTolerancePct / 100.0 - 1e-9 || s > 1 + sizeTolerancePct / 100.0 + 1e-9) continue;
+                if (s < minScale - 1e-9 || s > maxScale + 1e-9) continue;
                 if (Polish(hay, template, b, s) is { } p && p.Score > b.Score) b = p;
             }
         }
@@ -133,18 +149,16 @@ public static class TemplateMatcher
     }
 
     /// <summary>Sizes to try: 1 first, then outwards in steps small enough that the edges are off by ~2 px at most.</summary>
-    internal static List<double> Scales(ImageTemplate t, int tolerancePct, out double step)
+    internal static List<double> Scales(ImageTemplate t, double minScale, double maxScale, out double step)
     {
         step = Math.Clamp(2.5 / Math.Max(t.Width, t.Height), 0.04, 0.12);
         var list = new List<double> { 1 };
-        var r = tolerancePct / 100.0;
-        if (r <= 0) return list;
-        var n = (int)Math.Ceiling(r / step);
-        step = r / n;
-        for (var i = 1; i <= n; i++)
+        minScale = Math.Min(1, minScale);
+        maxScale = Math.Max(1, maxScale);
+        for (var i = 1; 1 + i * step <= maxScale + 1e-9 || 1 - i * step >= minScale - 1e-9; i++)
         {
-            list.Add(1 + i * step);
-            list.Add(1 - i * step);
+            if (1 + i * step <= maxScale + 1e-9) list.Add(1 + i * step);
+            if (1 - i * step >= minScale - 1e-9) list.Add(1 - i * step);
         }
         return list;
     }

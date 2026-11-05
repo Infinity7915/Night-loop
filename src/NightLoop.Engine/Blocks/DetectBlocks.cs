@@ -171,17 +171,23 @@ internal static class DetectBlocks
 /// <summary>What each detect block looks for, shared with the editor's test look.</summary>
 internal static class DetectBlocksLook
 {
+    /// <summary>
+    /// A block's size tolerance: blank is automatic (any size from 30% to 160%). 25 was the default in 0.6.0 and
+    /// counts as automatic too, so those blocks find small, far-away targets as well.
+    /// </summary>
+    public static int? SizeTolerance(int? stored) => stored is null or 25 ? null : stored;
+
     public static LookFor Text(Block b) => new("text", b.GetString("text", ""),
         Contains: b.GetString("match") == "contains", MatchCase: b.GetBool("matchCase") == true, Region: b.Params["region"]);
 
     public static LookFor Picture(Block b) => new("image", b.GetString("image", ""), ImageData: b.GetString("imageData"),
-        ConfidencePct: b.GetInt("confidencePct", 90), Region: b.Params["region"], SizeTolerancePct: b.GetInt("sizeTolerancePct", 0));
+        ConfidencePct: b.GetInt("confidencePct", 90), Region: b.Params["region"], SizeTolerancePct: SizeTolerance(b.GetInt("sizeTolerancePct")));
 
     public static LookFor Target(Block b)
     {
         var kind = b.GetString("target", "text");
         return new LookFor(kind, b.GetString("value", ""), ImageData: b.GetString("imageData"),
             Tolerance: b.GetInt("tolerance", 10), ConfidencePct: b.GetInt("confidencePct", 90),
-            Contains: true, MatchCase: false, Region: b.Params["region"], SizeTolerancePct: b.GetInt("sizeTolerancePct", 0));
+            Contains: true, MatchCase: false, Region: b.Params["region"], SizeTolerancePct: SizeTolerance(b.GetInt("sizeTolerancePct")));
     }
 }

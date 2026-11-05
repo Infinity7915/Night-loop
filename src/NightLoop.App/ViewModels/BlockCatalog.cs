@@ -95,8 +95,6 @@ public static class BlockCatalog
     private static readonly Choice[] PauseWhen = [new("now", "Right away"), new("afterBlock", "After its current block")];
     private static readonly Choice[] ResumeFrom = [new("paused", "Where it paused"), new("start", "The start")];
     private static readonly Choice[] Matches = [new("exact", "Exact"), new("contains", "Contains")];
-    /// <summary>New picture blocks find the picture from 75% to 125% of its captured size.</summary>
-    private const int DefaultSizeTolerance = 25;
     private static readonly Choice[] FindTargets = [new("text", "Text"), new("image", "Image"), new("pixel", "Pixel color")];
     private static readonly Choice[] WhenFound = [new("click", "Click it"), new("center", "Center camera on it"), new("continue", "Continue")];
     private static readonly Choice[] Monitors = [new("1", "Primary"), new("2", "Monitor 2"), new("3", "Monitor 3"), new("0", "Current")];
@@ -209,7 +207,7 @@ public static class BlockCatalog
              F.OnFail(), F.FailLabel()],
             b => $"\"{b.GetString("text", "")}\" · {b.GetString("match", "exact")} · {b.GetInt("timeoutMs", 10_000)} ms"),
         new("waitimage", BlockTypes.WaitForImage, "Wait for image", "IMG", "Detect", "Wait until a saved picture shows up on screen.",
-            () => new() { ["confidencePct"] = 90, ["sizeTolerancePct"] = DefaultSizeTolerance, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
+            () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
             [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.Region(),
              F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
              F.OnFail(), F.FailLabel()],
@@ -221,7 +219,7 @@ public static class BlockCatalog
              F.OnFail(), F.FailLabel()],
             b => $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)} = {b.GetString("color", "")} · {b.GetInt("timeoutMs", 5000)} ms"),
         new("imagegone", BlockTypes.WaitForImageGone, "Image gone", "!IMG", "Detect", "Wait until a saved picture is no longer on screen.",
-            () => new() { ["confidencePct"] = 90, ["sizeTolerancePct"] = DefaultSizeTolerance, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
+            () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
             [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.Region(),
              F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
              F.OnFail(), F.FailLabel()],
@@ -233,12 +231,12 @@ public static class BlockCatalog
              F.OnFail(), F.FailLabel()],
             b => $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)} ≠ {b.GetString("color", "")} · {b.GetInt("timeoutMs", 5000)} ms"),
         new("findclick", BlockTypes.FindClick, "Find & click", "FND", "Detect", "Find text, an image or a color and click it.",
-            () => new() { ["target"] = "text", ["value"] = "Claim", ["button"] = "left", ["timeoutMs"] = 5000, ["onFail"] = "continue", ["sizeTolerancePct"] = DefaultSizeTolerance },
+            () => new() { ["target"] = "text", ["value"] = "Claim", ["button"] = "left", ["timeoutMs"] = 5000, ["onFail"] = "continue" },
             [F.Pick("target", "Find", FindTargets, "text"), F.FindValue(), .. F.LookTuning(), F.Pick("button", "Button", Buttons, "left"),
              F.IntPick("clicks", "Clicks", ClickCounts, 1), F.Region(), F.AfterFound(), F.FoundLabel(), F.OnFail(), F.FailLabel()],
             b => $"{Label(FindTargets, b.GetString("target", "text"))} \"{b.GetString("value", "")}\" → {b.GetString("button", "left")} click"),
         new("scan", BlockTypes.ScanTurn, "Scan & turn", "SCN", "Detect", "Turn the camera step by step until a target is seen.",
-            () => new() { ["target"] = "text", ["value"] = "Collect", ["method"] = "rightDrag", ["direction"] = "right", ["stepPx"] = 120, ["maxTurns"] = 12, ["whenFound"] = "click", ["button"] = "left", ["clicks"] = 1, ["onFail"] = "continue", ["sizeTolerancePct"] = DefaultSizeTolerance },
+            () => new() { ["target"] = "text", ["value"] = "Collect", ["method"] = "rightDrag", ["direction"] = "right", ["stepPx"] = 120, ["maxTurns"] = 12, ["whenFound"] = "click", ["button"] = "left", ["clicks"] = 1, ["onFail"] = "continue" },
             [F.Pick("target", "Look for", FindTargets, "text"), F.FindValue(), .. F.LookTuning(), F.Pick("method", "Turn with", ScanMethods, "rightDrag"), F.Pick("direction", "Turn", RightLeft, "right"),
              F.Int("stepPx", "Step (px)", 1, 10_000), F.Int("maxTurns", "Max turns", 1, MacroLimits.ScanTurnsMax),
              F.Pick("whenFound", "When found", WhenFound, "click"),
@@ -580,12 +578,16 @@ internal static class F
             Hint: null, MaxLength: 120);
 
     private const string SizeToleranceHint =
-        "How much smaller or bigger the picture may look than when you captured it, like a thing farther away in a game. " +
-        "25 finds it from 75% to 125% of its size. 0 only finds the exact size. Higher looks slower.";
+        "Leave blank (Auto) to find the picture at any size, from 30% to 160% of how you captured it, like a thing far " +
+        "away in a game. A number limits it: 10 finds it from 90% to 110%, 0 only at the exact size.";
 
     /// <summary>Picture blocks: how much smaller or bigger the picture may look on screen.</summary>
     public static FieldDef SizeTolerance() =>
-        Int("sizeTolerancePct", "Size tolerance %", 0, MacroLimits.SizeToleranceMaxPct, optional: true, placeholder: "0", hint: SizeToleranceHint);
+        Int("sizeTolerancePct", "Size tolerance %", 0, MacroLimits.SizeToleranceMaxPct, optional: true, placeholder: "Auto", hint: SizeToleranceHint)
+            with { Get = b => AutoSize(b.GetInt("sizeTolerancePct")) };
+
+    /// <summary>25 was 0.6.0's default and now means Auto, so it shows as blank.</summary>
+    private static string AutoSize(int? stored) => stored is null or 25 ? "" : stored.Value.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>Find &amp; click / Scan &amp; turn: how close a picture or color has to be, shown for the kind being looked for.</summary>
     public static FieldDef[] LookTuning()
@@ -608,7 +610,8 @@ internal static class F
         return
         [
             ConditionInt("confidencePct", "Confidence %", 1, 100, "90", null) with { ShowIf = IsImage },
-            ConditionInt("sizeTolerancePct", "Size tolerance %", 0, MacroLimits.SizeToleranceMaxPct, "0", SizeToleranceHint) with { ShowIf = IsImage },
+            ConditionInt("sizeTolerancePct", "Size tolerance %", 0, MacroLimits.SizeToleranceMaxPct, "Auto", SizeToleranceHint)
+                with { ShowIf = IsImage, Get = b => AutoSize(BlockParams.AsInt(Conditions.Inner(b.GetObject("condition"))?["sizeTolerancePct"])) },
         ];
     }
 

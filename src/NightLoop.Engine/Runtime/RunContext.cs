@@ -8,7 +8,7 @@ namespace NightLoop.Engine.Runtime;
 
 /// <summary>What the last Find &amp; click or Scan &amp; turn found, so Center on target can find it again.</summary>
 public sealed record FoundTarget(string Kind, string Value, string? ImageData, int Tolerance, JsonNode? Region, (int X, int Y) Point,
-    int ConfidencePct = 90, int SizeTolerancePct = 0);
+    int ConfidencePct = 90, int? SizeTolerancePct = 0);
 
 /// <summary>What block executors see while a run is in progress.</summary>
 public sealed class RunContext

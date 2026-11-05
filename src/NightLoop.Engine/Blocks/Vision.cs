@@ -15,7 +15,7 @@ internal sealed record LookFor(
     bool Contains = true,
     bool MatchCase = false,
     JsonNode? Region = null,
-    int SizeTolerancePct = 0);
+    int? SizeTolerancePct = 0);
 
 /// <summary>Finds text, pictures and colors on screen for the detect blocks and conditions.</summary>
 internal static class Vision

@@ -54,7 +54,7 @@ public class BasicConditionEvaluator : IConditionEvaluator
             case "imageVisible":
                 return await Vision.FindAsync(context, new LookFor("image", Str(condition, "image") ?? "", ImageData: Str(condition, "imageData"),
                     ConfidencePct: BlockParams.AsInt(condition["confidencePct"]) ?? 90, Region: condition["region"],
-                    SizeTolerancePct: BlockParams.AsInt(condition["sizeTolerancePct"]) ?? 0)) is not null;
+                    SizeTolerancePct: DetectBlocksLook.SizeTolerance(BlockParams.AsInt(condition["sizeTolerancePct"])))) is not null;
             default:
                 throw Bad($"\"{kind}\" conditions can't be checked in this version of Night-loop.");
         }
