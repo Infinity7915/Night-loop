@@ -789,8 +789,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (Application.Current?.MainWindow is not { IsVisible: true } window || window.WindowState == WindowState.Minimized) return;
         _hiddenForRecording = true;
         _stateBeforeRecording = window.WindowState;
-        window.WindowState = WindowState.Minimized;
+        // SW_MINIMIZE, not WindowState = Minimized: WPF minimizes with SW_SHOWMINIMIZED, which leaves Night-loop the
+        // active window, so the keys typed next went to (minimized) Night-loop and Record skipped them as its own.
+        // SW_MINIMIZE hands focus to the next window, the app the person is about to use.
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero || !ShowWindow(hwnd, SwMinimize)) window.WindowState = WindowState.Minimized;
     }
+
+    private const int SwMinimize = 6;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
     /// <summary>Recording stopped: Night-loop comes back with the new blocks in view.</summary>
     private void ShowAfterRecording()

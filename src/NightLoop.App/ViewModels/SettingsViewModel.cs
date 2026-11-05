@@ -70,6 +70,23 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>Reopen the window at the size and spot it was closed at. On by default. Kept on this PC.</summary>
+    public bool RememberWindow
+    {
+        get => _shell.Local.RememberWindow;
+        set
+        {
+            if (_shell.Local.RememberWindow == value) return;
+            _shell.Local.RememberWindow = value;
+            if (!value) _shell.Local.WindowBounds = null;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Puts the window back to its default size, centered, whatever the switch above says.</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void ResetWindow() => (System.Windows.Application.Current?.MainWindow as Views.MainWindow)?.ResetPlacement();
+
     /// <summary>Keeps the window above all others. Kept on this PC.</summary>
     public bool AlwaysOnTop
     {

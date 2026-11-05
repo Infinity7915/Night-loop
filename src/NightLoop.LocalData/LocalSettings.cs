@@ -96,6 +96,36 @@ public sealed class LocalSettings(string path)
         set => WriteNode("closeToTray", value);
     }
 
+    /// <summary>
+    /// Settings › Appearance: reopen the window where it was, at the size it was, when Night-loop was last closed.
+    /// On unless turned off.
+    /// </summary>
+    public bool RememberWindow
+    {
+        get => Read()?["rememberWindow"] is not JsonValue v || !v.TryGetValue(out bool on) || on;
+        set => WriteNode("rememberWindow", value);
+    }
+
+    /// <summary>Where the window was when Night-loop was last closed (device-independent pixels), or null.</summary>
+    public WindowBounds? WindowBounds
+    {
+        get => Read()?["window"] is JsonObject o
+               && o["left"] is JsonValue l && l.TryGetValue(out double left)
+               && o["top"] is JsonValue t && t.TryGetValue(out double top)
+               && o["width"] is JsonValue w && w.TryGetValue(out double width)
+               && o["height"] is JsonValue h && h.TryGetValue(out double height)
+            ? new WindowBounds(left, top, width, height, o["maximized"] is JsonValue m && m.TryGetValue(out bool max) && max)
+            : null;
+        set => WriteNode("window", value is not { } b ? null : new JsonObject
+        {
+            ["left"] = Math.Round(b.Left, 1),
+            ["top"] = Math.Round(b.Top, 1),
+            ["width"] = Math.Round(b.Width, 1),
+            ["height"] = Math.Round(b.Height, 1),
+            ["maximized"] = b.Maximized,
+        });
+    }
+
     /// <summary>The start / stop recording key, like "F9" or "Ctrl+Shift+R". Null means the default (F9).</summary>
     public string? RecordHotkey
     {
@@ -146,5 +176,24 @@ public sealed class LocalSettings(string path)
         {
             // A preference that can't be saved isn't worth interrupting anyone over.
         }
+    }
+}
+
+/// <summary>A saved window position and size (device-independent pixels; the size is the normal, unmaximized one).</summary>
+public sealed record WindowBounds(double Left, double Top, double Width, double Height, bool Maximized)
+{
+    /// <summary>
+    /// Whether the window can go back there: a sane size, and enough of its title bar on the screens that exist now
+    /// to grab it (a monitor may have been unplugged since).
+    /// </summary>
+    public bool FitsOn(double screenLeft, double screenTop, double screenWidth, double screenHeight, double minWidth, double minHeight)
+    {
+        if (!double.IsFinite(Left) || !double.IsFinite(Top) || !double.IsFinite(Width) || !double.IsFinite(Height)) return false;
+        if (Width < minWidth || Height < minHeight || screenWidth <= 0 || screenHeight <= 0) return false;
+        if (Width > screenWidth * 1.5 || Height > screenHeight * 1.5) return false;
+        const double grab = 80; // pixels of title bar that must be on screen
+        var visibleX = Math.Min(Left + Width, screenLeft + screenWidth) - Math.Max(Left, screenLeft);
+        var titleOnScreen = Top >= screenTop - 4 && Top + 30 <= screenTop + screenHeight;
+        return visibleX >= grab && titleOnScreen;
     }
 }

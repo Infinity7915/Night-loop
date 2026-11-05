@@ -118,7 +118,54 @@ public static class SmokeTest
             Themes.ThemeManager.Preview(Themes.ThemeManager.Dark, palette.Accent, palette.Id);
             failures += Draw(app, folder, palette.Id, themed);
         }
+        CheckMinimizeFocus(folder);
         return failures == 0 ? 0 : 1;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int cmd);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    /// <summary>
+    /// Report only (never fails the run): after minimizing for Record, is Night-loop still the foreground window?
+    /// It must not be, or the keys typed next go to Night-loop. Compares WPF's WindowState = Minimized with the
+    /// SW_MINIMIZE that Record uses, with another window behind to take focus. Written to minimize-check.txt.
+    /// </summary>
+    private static void CheckMinimizeFocus(string folder)
+    {
+        var lines = new List<string>();
+        try
+        {
+            void Pump() => Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+            void Wait() { for (var i = 0; i < 10; i++) { Pump(); Thread.Sleep(30); } }
+            var behind = new Window { Title = "Behind", Width = 300, Height = 200, Left = 50, Top = 50, ShowActivated = true };
+            behind.Show();
+            var main = new Window { Title = "Night-loop check", Width = 400, Height = 300, Left = 100, Top = 100 };
+            main.Show();
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(main).Handle;
+            foreach (var (name, minimize) in new (string, Action)[]
+                     {
+                         ("WindowState = Minimized", () => main.WindowState = WindowState.Minimized),
+                         ("ShowWindow(SW_MINIMIZE)", () => ShowWindow(hwnd, 6)),
+                     })
+            {
+                main.WindowState = WindowState.Normal;
+                main.Activate();
+                SetForegroundWindow(hwnd);
+                Wait();
+                var before = GetForegroundWindow() == hwnd;
+                minimize();
+                Wait();
+                lines.Add($"{name}: in front before={before}, still in front after minimize={GetForegroundWindow() == hwnd}");
+            }
+            main.Close();
+            behind.Close();
+        }
+        catch (Exception ex)
+        {
+            lines.Add("check failed: " + ex.Message);
+        }
+        File.WriteAllLines(Path.Combine(folder, "minimize-check.txt"), lines);
     }
 
     private static int Draw(Application app, string folder, string mode, (string Name, Func<FrameworkElement> Make, int Width, int Height)[] screens)

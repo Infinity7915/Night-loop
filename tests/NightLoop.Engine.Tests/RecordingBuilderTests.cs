@@ -241,3 +241,13 @@ public class RecordingBuilderTests
         Assert.InRange(delay.TotalMs, 2450, 2550);
     }
 }
+
+public sealed class OwnInputRuleTests
+{
+    [Theory]
+    [InlineData(true, false, true)]   // Night-loop on screen: clicks on it are skipped
+    [InlineData(true, true, false)]   // minimized (may still be the "active" window): input is the user's other app
+    [InlineData(false, false, false)] // hidden in the system tray
+    public void Only_a_visible_unminimized_window_counts_as_Night_loop_itself(bool visible, bool minimized, bool skipped) =>
+        Assert.Equal(skipped, NightLoop.Engine.Recording.OwnInputRule.Counts(visible, minimized));
+}

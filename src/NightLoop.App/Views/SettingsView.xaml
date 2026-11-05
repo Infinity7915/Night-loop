@@ -151,6 +151,17 @@
                            Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
               </StackPanel>
             </DockPanel>
+            <DockPanel Margin="0,20,0,0">
+              <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding RememberWindow}" VerticalAlignment="Center"
+                        ToolTip="Remember window size and position" Margin="16,0,0,0" />
+              <StackPanel>
+                <TextBlock Text="Remember window size and position" FontWeight="SemiBold" FontSize="14" />
+                <TextBlock Text="Night-loop opens where it was, at the size it was, when you last closed it. Off: it opens centered at the default size."
+                           Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+            </DockPanel>
+            <Button Content="Reset to default size and position" Command="{Binding ResetWindowCommand}" HorizontalAlignment="Left"
+                    Margin="0,12,0,0" Padding="14,8" FontSize="13" ToolTip="Moves Night-loop back to the middle of the screen at its default size" />
           </StackPanel>
         </Border>
 
