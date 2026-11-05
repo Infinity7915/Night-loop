@@ -701,8 +701,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private void StopRecording()
     {
         IsRecording = false;
-        ShowAfterRecording();
         SyncDoc();
+        // Stop (which finishes sorting the last inputs) before Night-loop comes back to the front, so nothing typed
+        // into the other app is mistaken for input aimed at Night-loop.
         var result = _recorder.Stop(new RecordingOptions
         {
             RecordMouseMoves = RecordMouseMoves,
@@ -711,6 +712,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             MaxBlocks = Math.Max(0, MacroLimits.MaxBlocks - _doc.Blocks.Count),
             MaxBytes = Math.Max(0, MacroLimits.MaxDocumentBytes * 9 / 10 - MacroJson.ByteSize(_doc)),
         });
+
+        ShowAfterRecording();
 
         var at = _recordAfter is { } after && _doc.Blocks.IndexOf(after) is var i and >= 0 ? i + 1 : _doc.Blocks.Count;
         _recordAfter = null;

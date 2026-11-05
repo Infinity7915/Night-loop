@@ -114,6 +114,10 @@ public sealed class InputRecorder : IDisposable
             throw new InvalidOperationException("Windows refused the input hooks, so recording can't start.");
         }
         _clock.Restart();
+        // Accept before the worker starts: its loop runs while _accepting is true, and starting it first let it see
+        // false and quit at once. Everything then waited until Stop, by which time Night-loop was back in front, so
+        // every key and click was judged "aimed at Night-loop" and skipped.
+        _accepting = true;
         _worker = new Thread(Work) { IsBackground = true, Name = "Night-loop recorder worker" };
         _worker.Start();
         // Where the cursor starts, so the first click glides from the right place on replay.
@@ -124,7 +128,6 @@ public sealed class InputRecorder : IDisposable
             Add(RawInputEvent.Move(0, p.X, p.Y, p.Game, hidden: IsCursorHidden()));
         }
         IsRecording = true;
-        _accepting = true;
     }
 
     /// <summary>Stops recording and turns what was captured into blocks.</summary>
