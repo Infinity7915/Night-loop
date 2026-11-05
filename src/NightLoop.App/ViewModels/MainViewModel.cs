@@ -265,7 +265,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     partial void OnMouseJitterPxChanged(int value) => MarkChanged();
     partial void OnSpeedPctChanged(int value) => MarkChanged();
     partial void OnRecordMouseMovesChanged(bool value) => MarkChanged();
-    partial void OnEditorHotkeyChanged(string value) => OnEditorOptionChanged();
+    partial void OnEditorHotkeyChanged(string value)
+    {
+        // A macro already on the account saves its key straight away (SaveEditorHotkeyAsync), into both the saved
+        // copy and the draft, so changing only the key doesn't leave unsaved changes behind.
+        if (_macroId is not null && !_loading)
+        {
+            RefreshHotkeys();
+            return;
+        }
+        OnEditorOptionChanged();
+    }
     partial void OnEditorTriggerModeChanged(string value) => OnEditorOptionChanged();
     partial void OnEditorRunAlongsideChanged(bool value) => OnEditorOptionChanged();
 
@@ -775,7 +785,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Night-loop gets out of the way while recording: minimized, so nothing lands on it.</summary>
     private void HideWhileRecording()
     {
-        if (Application.Current?.MainWindow is not { } window || window.WindowState == WindowState.Minimized) return;
+        // Already out of the way: minimized, or hidden in the system tray (stays there, and comes back only from the tray).
+        if (Application.Current?.MainWindow is not { IsVisible: true } window || window.WindowState == WindowState.Minimized) return;
         _hiddenForRecording = true;
         _stateBeforeRecording = window.WindowState;
         window.WindowState = WindowState.Minimized;
@@ -786,6 +797,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (!_hiddenForRecording || Application.Current?.MainWindow is not { } window) return;
         _hiddenForRecording = false;
+        if (!window.IsVisible) return; // sent to the tray while recording: leave it there
         window.WindowState = _stateBeforeRecording;
         window.Activate();
     }
@@ -946,6 +958,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (clear)
         {
             EditorHotkey = "";
+            _ = SaveEditorHotkeyAsync();
             return;
         }
         if (hotkey is not { } h) return;
@@ -956,6 +969,29 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         EditorHotkeyError = "";
         EditorHotkey = h.ToString();
+        _ = SaveEditorHotkeyAsync();
+    }
+
+    /// <summary>
+    /// A new start key is saved to the account straight away (into the saved copy too), so there's no need to
+    /// press Save just for the key. A macro that isn't on the account yet gets it when it's created.
+    /// </summary>
+    private async Task SaveEditorHotkeyAsync()
+    {
+        if (_macroId is not { } id) return;
+        var key = EditorHotkey;
+        try
+        {
+            await FlushAsync();
+            var updated = await _api.UpdateMacroAsync(id, new UpdateMacroRequest(HotkeyStart: key, HotkeyStop: key));
+            if (_macroId == id) _autosaver?.Adopt(updated);
+            Status = key.Length == 0 ? "Start key removed and saved." : $"Start key {KeyText(key)} saved.";
+            await RefreshAsync();
+        }
+        catch (Exception ex) when (ex is ApiException or ServerUnreachableException)
+        {
+            Status = $"Couldn't save the start key: {ex.Message}";
+        }
     }
 
     // ---------------- Record key ----------------

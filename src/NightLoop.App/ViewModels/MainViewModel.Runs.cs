@@ -17,7 +17,7 @@ namespace NightLoop.App.ViewModels;
 public sealed partial class MainViewModel
 {
     private readonly Dictionary<Guid, MacroRun> _runsById = [];
-    private readonly Dictionary<Guid, IDisposable> _macroHotkeys = [];
+    private readonly List<IDisposable> _macroHotkeys = [];
     private readonly Dictionary<Guid, DispatcherTimer> _holdWatchers = [];
     private IReadOnlyDictionary<string, Guid> _nameToId = new Dictionary<string, Guid>();
 
@@ -118,50 +118,56 @@ public sealed partial class MainViewModel
         if (!recordKey && h == RecordHotkey) return $"{key} starts and stops recording. Pick another key, or change the record key in the loaded macro's options.";
         if (h == Hotkey.Panic) return $"{key} is the stop-everything key.";
         if (h == PlayHotkey) return $"{key} is the editor's Play key. Pick another key.";
-        var clash = _rows.FirstOrDefault(r => (recordKey || r.Id != forMacro) && Hotkey.TryParse(r.Hotkey, out var other) && other == h);
+        // Macros may share a start key (it starts them together), but the record key can't be one of them.
+        if (!recordKey) return null;
+        var clash = _rows.FirstOrDefault(r => Hotkey.TryParse(r.Hotkey, out var other) && other == h);
         if (clash is not null) return $"{key} already starts \"{clash.Name}\".";
-        var editorClash = recordKey || (forMacro != _macroId && _macroId is not null);
-        if (editorClash && Hotkey.TryParse(EditorHotkey, out var editorKey) && editorKey == h)
+        if (Hotkey.TryParse(EditorHotkey, out var editorKey) && editorKey == h)
             return $"{key} already starts \"{MacroName}\".";
         return null;
     }
 
-    /// <summary>Registers every macro's start key (the open macro uses the editor's current key).</summary>
+    /// <summary>
+    /// Registers every macro's start key (the open macro uses the editor's current key). Several macros may share a
+    /// key: Windows takes one registration per combo, so the key starts (or stops) all of them together.
+    /// </summary>
     private void RefreshHotkeys()
     {
         DisposeMacroHotkeys();
         if (IsCapturingKey) return; // picking a key: OnCaptureChanged registers them again after
         var keys = _rows.Select(r => (r.Id, Key: r.Id == _macroId ? EditorHotkey : r.Hotkey)).ToList();
         if (_macroId is null && !string.IsNullOrEmpty(EditorHotkey)) keys.Add((Guid.Empty, EditorHotkey));
-        foreach (var (id, text) in keys)
+        var byKey = keys
+            .Select(k => (k.Id, Ok: Hotkey.TryParse(k.Key, out var parsed), Key: parsed))
+            .Where(k => k.Ok && k.Key != RecordHotkey && k.Key != PlayHotkey && k.Key != Hotkey.Panic)
+            .GroupBy(k => k.Key, k => k.Id);
+        foreach (var group in byKey)
         {
-            if (!Hotkey.TryParse(text, out var key) || key == RecordHotkey || key == PlayHotkey || key == Hotkey.Panic) continue;
-            var row = _rows.FirstOrDefault(r => r.Id == id);
+            var ids = group.Distinct().ToList();
+            var rows = _rows.Where(r => ids.Contains(r.Id)).ToList();
             try
             {
-                var macroId = id;
-                _macroHotkeys[id] = _hotkeys.Register(key, () => OnUi(() =>
+                _macroHotkeys.Add(_hotkeys.Register(group.Key, () => OnUi(() =>
                 {
-                    if (macroId == Guid.Empty) TogglePlay();
-                    else ToggleMacro(macroId);
-                }));
-                if (row is not null) row.HotkeyError = "";
+                    foreach (var macroId in ids)
+                    {
+                        if (macroId == Guid.Empty) TogglePlay();
+                        else ToggleMacro(macroId);
+                    }
+                })));
+                foreach (var row in rows) row.HotkeyError = "";
             }
             catch (HotkeyTakenException ex)
             {
-                if (row is not null) row.HotkeyError = ex.Message;
-                else EditorHotkeyError = ex.Message;
-            }
-            catch (ArgumentException)
-            {
-                // Same key listed twice (shouldn't happen; HotkeyProblem prevents it).
+                foreach (var row in rows) row.HotkeyError = ex.Message;
+                if (ids.Contains(Guid.Empty) || (_macroId is { } open && ids.Contains(open))) EditorHotkeyError = ex.Message;
             }
         }
     }
 
     private void DisposeMacroHotkeys()
     {
-        foreach (var r in _macroHotkeys.Values) r.Dispose();
+        foreach (var r in _macroHotkeys) r.Dispose();
         _macroHotkeys.Clear();
     }
 

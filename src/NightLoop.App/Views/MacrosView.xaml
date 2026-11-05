@@ -365,7 +365,7 @@
                           ToolTip="Click, then press a key. Backspace clears it." />
                   <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="Start / stop key" FontWeight="SemiBold" />
-                    <TextBlock Text="Plays this macro from any window, even when another one is open here." Style="{StaticResource SmallLabel}"
+                    <TextBlock Text="Plays this macro from any window, even when another one is open here. Saved as soon as you pick it. Macros can share a key; it starts them together." Style="{StaticResource SmallLabel}"
                                Margin="0,2,0,0" TextWrapping="Wrap" />
                     <TextBlock Text="{Binding EditorHotkeyError}" FontSize="12" Foreground="{DynamicResource Warning}" Margin="0,2,0,0"
                                TextWrapping="Wrap" Visibility="{Binding EditorHotkeyError, Converter={StaticResource TextToVisible}}" />
@@ -1176,6 +1176,9 @@
                        Visibility="{Binding HasNoMatch, Converter={StaticResource BoolToVisible}}">
               <Run Text="No saved macros match &#x201C;" /><Run Text="{Binding SearchText, Mode=OneWay}" /><Run Text="&#x201D;." />
             </TextBlock>
+            <TextBlock Text="Macros created and stored in Night-loop are assets of Night-loop and aren't owned by the user. See the Terms of Service, section 5."
+                       Style="{StaticResource Muted}" FontSize="12" Margin="20,12,20,16" HorizontalAlignment="Center" TextAlignment="Center"
+                       TextWrapping="Wrap" />
           </StackPanel>
         </Border>
       </StackPanel>

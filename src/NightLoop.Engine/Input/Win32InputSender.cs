@@ -31,9 +31,15 @@ public sealed class Win32InputSender : IInputSender
         var top = PInvoke.GetSystemMetrics(SYSTEM_METRICS_INDEX.SM_YVIRTUALSCREEN);
         var width = Math.Max(2, PInvoke.GetSystemMetrics(SYSTEM_METRICS_INDEX.SM_CXVIRTUALSCREEN));
         var height = Math.Max(2, PInvoke.GetSystemMetrics(SYSTEM_METRICS_INDEX.SM_CYVIRTUALSCREEN));
-        var nx = (int)Math.Round((x - left) * 65535.0 / (width - 1));
-        var ny = (int)Math.Round((y - top) * 65535.0 / (height - 1));
+        // Aim at the middle of the pixel: the 0–65535 scale doesn't divide evenly into pixels, and aiming at an edge
+        // lands one pixel short on some screen sizes.
+        var nx = (int)Math.Clamp(((long)(x - left) * 65536 + 32768) / width, 0, 65535);
+        var ny = (int)Math.Clamp(((long)(y - top) * 65536 + 32768) / height, 0, 65535);
         SendMouse(MOUSE_EVENT_FLAGS.MOUSEEVENTF_MOVE | MOUSE_EVENT_FLAGS.MOUSEEVENTF_ABSOLUTE | MOUSE_EVENT_FLAGS.MOUSEEVENTF_VIRTUALDESK, nx, ny, 0);
+        // Still a pixel off (unusual monitor layouts): put the cursor exactly where the recording had it.
+        if (PInvoke.GetCursorPos(out var now) && (now.X != x || now.Y != y)
+            && x >= left && y >= top && x < left + width && y < top + height)
+            PInvoke.SetCursorPos(x, y);
     }
 
     public void MoveBy(int dx, int dy) => SendMouse(MOUSE_EVENT_FLAGS.MOUSEEVENTF_MOVE, dx, dy, 0);

@@ -59,6 +59,13 @@ public sealed class RunContext
     /// <summary>A short wait that never changes with speed or jitter (key holds, settle time between input events).</summary>
     public Task PauseExactAsync(int ms) => WaitAsync(ms, jitter: false, scale: false);
 
+    /// <summary>
+    /// Paces the steps of one movement so it takes exactly <paramref name="totalMs"/>: each step waits until its
+    /// own moment on a real clock instead of "8 ms after the last one", so time spent sending input doesn't add up
+    /// and replay keeps the recorded speed.
+    /// </summary>
+    public MotionPacer Pace(int totalMs, int steps) => new(this, totalMs, Math.Max(1, steps));
+
     /// <summary>The block's own process (Focus window and friends), else the macro's target game.</summary>
     public string? ProcessFor(Block b) =>
         b.GetString("process") is { Length: > 0 } p ? p.Trim() : Settings.TargetExe;
@@ -138,4 +145,33 @@ public sealed class RunContext
 
     internal static MacroFaultException NoScreen() => new("Reading the screen isn't available here.");
 
+}
+
+/// <summary>See <see cref="RunContext.Pace"/>.</summary>
+public sealed class MotionPacer
+{
+    private readonly RunContext _ctx;
+    private readonly double _stepMs;
+    private readonly long _start = System.Diagnostics.Stopwatch.GetTimestamp();
+    private readonly bool _realClock;
+    private int _step;
+
+    internal MotionPacer(RunContext ctx, int totalMs, int steps)
+    {
+        _ctx = ctx;
+        _stepMs = Math.Max(0, totalMs) / (double)steps;
+        // Tests use a fake delay that returns at once; wall-clock catch-up would make no sense there.
+        _realClock = ctx.Environment.Delay is PreciseDelay;
+    }
+
+    /// <summary>Waits until the next step's moment.</summary>
+    public Task NextAsync()
+    {
+        _step++;
+        var due = _stepMs * _step;
+        if (!_realClock)
+            return _ctx.PauseExactAsync((int)Math.Round(due) - (int)Math.Round(_stepMs * (_step - 1)));
+        var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(_start).TotalMilliseconds;
+        return _ctx.PauseExactAsync((int)Math.Max(0, Math.Round(due - elapsed)));
+    }
 }
