@@ -48,13 +48,28 @@ internal static class DetectBlocks
         var found = await Vision.WaitForAsync(ctx, what, b.GetInt("timeoutMs", 0));
         if (found is not { } p) return false;
         ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p);
+        await ClickFoundAsync(b, ctx, p);
+        return true;
+    }
+
+    /// <summary>Glides to what was found and clicks it the block's number of times (1–3).</summary>
+    private static Task ClickFoundAsync(Block b, RunContext ctx, (int X, int Y) p)
+    {
         MouseButtons.TryParse(b.GetString("button"), out var button);
-        await ctx.InputAsync(async () =>
+        var clicks = Math.Clamp(b.GetInt("clicks", 1), MacroLimits.ClicksMin, MacroLimits.ClicksMax);
+        return ctx.InputAsync(async () =>
         {
             await InputBlocks.GlideForClickAsync(ctx, ctx.ToScreen(p.X, p.Y, null), null);
-            await InputBlocks.PressAsync(ctx, button);
+            await InputBlocks.PressAsync(ctx, button, clicks);
         });
-        return true;
+    }
+
+    /// <summary>Clicks where the cursor already is, without moving the mouse (moving it would turn the camera).</summary>
+    private static Task ClickInPlaceAsync(Block b, RunContext ctx)
+    {
+        MouseButtons.TryParse(b.GetString("button"), out var button);
+        var clicks = Math.Clamp(b.GetInt("clicks", 1), MacroLimits.ClicksMin, MacroLimits.ClicksMax);
+        return ctx.InputAsync(() => InputBlocks.PressAsync(ctx, button, clicks));
     }
 
     /// <summary>Looks, turns one step, looks again… until found or out of turns.</summary>
@@ -69,16 +84,20 @@ internal static class DetectBlocks
         {
             if (await Vision.FindAsync(ctx, what) is { } p)
             {
+                // Turning has stopped. Look once more after the view settles, so the click lands where the target is now.
+                await ctx.PauseExactAsync(ScanSettleMs);
+                if (await Vision.FindAsync(ctx, what) is { } settled) p = settled;
                 ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p);
                 switch (b.GetString("whenFound", "click"))
                 {
+                    case "click" when method == "mouseMove":
+                        // The camera follows the mouse here, so gliding to the target would turn the view away from
+                        // it. Turn the target into the middle instead, then click without moving the mouse.
+                        await CenterAsync(ctx, ctx.LastFound, b.GetInt("tolerancePx", 40), method);
+                        await ClickInPlaceAsync(b, ctx);
+                        break;
                     case "click":
-                        MouseButtons.TryParse(b.GetString("button"), out var button);
-                        await ctx.InputAsync(async () =>
-                        {
-                            await InputBlocks.GlideForClickAsync(ctx, ctx.ToScreen(p.X, p.Y, null), null);
-                            await InputBlocks.PressAsync(ctx, button);
-                        });
+                        await ClickFoundAsync(b, ctx, p);
                         break;
                     case "center":
                         await CenterAsync(ctx, ctx.LastFound, b.GetInt("tolerancePx", 40), method);

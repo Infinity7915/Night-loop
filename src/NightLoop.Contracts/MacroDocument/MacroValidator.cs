@@ -272,6 +272,7 @@ public static class MacroValidator
                 Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
                 Image();
                 Region();
+                Need(OptIntIn("clicks", MacroLimits.ClicksMin, MacroLimits.ClicksMax), "Clicks must be 1–3.");
                 OnFail();
                 AfterFound();
                 if (b.GetString("target") == "pixel") Need(IsColor(b.GetString("value")), "For a pixel color, the value must look like #RRGGBB.");
@@ -287,6 +288,8 @@ public static class MacroValidator
                 Need(OptIntIn("tolerance", 0, 255), "Tolerance must be 0–255.");
                 Image();
                 Region();
+                Need(OneOf("button", Buttons, "left"), "Button must be left, right, middle, x1 or x2.");
+                Need(OptIntIn("clicks", MacroLimits.ClicksMin, MacroLimits.ClicksMax), "Clicks must be 1–3.");
                 OnFail();
                 AfterFound();
                 if (b.GetString("target") == "pixel") Need(IsColor(b.GetString("value")), "For a pixel color, the value must look like #RRGGBB.");

@@ -86,6 +86,8 @@ public static class BlockCatalog
     private static readonly Choice[] ClickCounts = [new("1", "1"), new("2", "2"), new("3", "3")];
     private static readonly Choice[] MoveModes = [new("absolute", "Absolute"), new("relative", "Relative")];
     private static readonly Choice[] UpDown = [new("up", "Up"), new("down", "Down")];
+    private static readonly Choice[] ScanMethods =
+        [new("rightDrag", "Mouse (right-drag)"), new("mouseMove", "Mouse (camera follows mouse)"), new("arrowKeys", "Arrow keys")];
     private static readonly Choice[] TurnMethods = [new("rightDrag", "Right-drag"), new("arrowKeys", "Arrow keys"), new("mouseMove", "Mouse move")];
     private static readonly Choice[] Directions = [new("right", "Right"), new("left", "Left"), new("up", "Up"), new("down", "Down")];
     private static readonly Choice[] RightLeft = [new("right", "Right"), new("left", "Left")];
@@ -231,13 +233,16 @@ public static class BlockCatalog
         new("findclick", BlockTypes.FindClick, "Find & click", "FND", "Detect", "Find text, an image or a color and click it.",
             () => new() { ["target"] = "text", ["value"] = "Claim", ["button"] = "left", ["timeoutMs"] = 5000, ["onFail"] = "continue" },
             [F.Pick("target", "Find", FindTargets, "text"), F.FindValue(), F.Pick("button", "Button", Buttons, "left"),
-             F.Region(), F.AfterFound(), F.FoundLabel(), F.OnFail(), F.FailLabel()],
+             F.IntPick("clicks", "Clicks", ClickCounts, 1), F.Region(), F.AfterFound(), F.FoundLabel(), F.OnFail(), F.FailLabel()],
             b => $"{Label(FindTargets, b.GetString("target", "text"))} \"{b.GetString("value", "")}\" → {b.GetString("button", "left")} click"),
         new("scan", BlockTypes.ScanTurn, "Scan & turn", "SCN", "Detect", "Turn the camera step by step until a target is seen.",
-            () => new() { ["target"] = "text", ["value"] = "Collect", ["direction"] = "right", ["stepPx"] = 120, ["maxTurns"] = 12, ["whenFound"] = "click", ["onFail"] = "continue" },
-            [F.Pick("target", "Look for", FindTargets, "text"), F.FindValue(), F.Pick("direction", "Turn", RightLeft, "right"),
+            () => new() { ["target"] = "text", ["value"] = "Collect", ["method"] = "rightDrag", ["direction"] = "right", ["stepPx"] = 120, ["maxTurns"] = 12, ["whenFound"] = "click", ["button"] = "left", ["clicks"] = 1, ["onFail"] = "continue" },
+            [F.Pick("target", "Look for", FindTargets, "text"), F.FindValue(), F.Pick("method", "Turn with", ScanMethods, "rightDrag"), F.Pick("direction", "Turn", RightLeft, "right"),
              F.Int("stepPx", "Step (px)", 1, 10_000), F.Int("maxTurns", "Max turns", 1, MacroLimits.ScanTurnsMax),
-             F.Pick("whenFound", "When found", WhenFound, "click"), F.AfterFound(), F.FoundLabel(), F.OnFail(), F.FailLabel()],
+             F.Pick("whenFound", "When found", WhenFound, "click"),
+             F.Pick("button", "Button", Buttons, "left") with { ShowIf = b => b.GetString("whenFound", "click") == "click" },
+             F.IntPick("clicks", "Clicks", ClickCounts, 1) with { ShowIf = b => b.GetString("whenFound", "click") == "click" },
+             F.AfterFound(), F.FoundLabel(), F.OnFail(), F.FailLabel()],
             b => $"{Label(FindTargets, b.GetString("target", "text"))} \"{b.GetString("value", "")}\" · {b.GetString("direction", "right")} {b.GetInt("stepPx", 120)}px ×{b.GetInt("maxTurns", 12)}"),
 
         // ---- Logic (9) ----
