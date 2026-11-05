@@ -47,6 +47,7 @@ These are optional params, so existing macros are unaffected:
 | `timing.waitForImageGone` (new, "Image gone") | same params as `timing.waitForImage` | Waits until the picture is no longer on screen (a loading screen closing, a popup going away) |
 | `detect.pixelColorGone` (new, "Pixel gone") | same params as `detect.pixelColor` | Waits until the point no longer has the color |
 | `utility.notify` | `kind`: `toast` is shown as "Notify" | Sends a Windows notification (from Night-loop's tray icon), not a message inside Night-loop |
+| `timing.waitForImage`, `timing.waitForImageGone`, `detect.findClick` / `detect.scanTurn` with `target: "image"`, `imageVisible` conditions | `sizeTolerancePct` (0–60, default 0 when missing; new blocks get 25) | Also finds the picture smaller or bigger than captured, from (100 − n)% to (100 + n)% of its size, like a thing farther away in a game |
 | any block | `note` (text, up to 200 characters) | A short note shown under the block in the editor; ignored when running |
 
 ## Disabled blocks

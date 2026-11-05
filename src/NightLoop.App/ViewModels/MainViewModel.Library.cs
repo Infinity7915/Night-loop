@@ -193,6 +193,21 @@ public sealed partial class MainViewModel
         if (DraftCount == 0) Status = "Saved every draft.";
     }
 
+    /// <summary>
+    /// Turns every "Delete?" and "Delete group?" back into the plain delete button, except <paramref name="keep"/>
+    /// (the one being pressed right now). Clicking anything else, a key, another tab or another window all do this,
+    /// so a delete pressed by accident doesn't stay armed.
+    /// </summary>
+    public void CancelDeleteConfirms(object? keep = null)
+    {
+        foreach (var section in Sections)
+        {
+            if (!ReferenceEquals(section, keep)) section.ConfirmingDelete = false;
+            foreach (var row in section.Rows)
+                if (!ReferenceEquals(row, keep)) row.ConfirmingDelete = false;
+        }
+    }
+
     internal Task DeleteRowAsync(SavedMacroRow row) => DeleteMacroAsync(row.Id, row.Name);
 
     private async Task DeleteMacroAsync(Guid id, string name)
@@ -526,6 +541,11 @@ public sealed partial class SavedMacroRow : ObservableObject
 
     [RelayCommand]
     private void ToggleOptions() => ShowOptions = !ShowOptions;
+
+    partial void OnShowOptionsChanged(bool value)
+    {
+        if (!value) ConfirmingDelete = false;
+    }
 
     [RelayCommand]
     private void CaptureHotkey()

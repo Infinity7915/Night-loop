@@ -95,6 +95,8 @@ public static class BlockCatalog
     private static readonly Choice[] PauseWhen = [new("now", "Right away"), new("afterBlock", "After its current block")];
     private static readonly Choice[] ResumeFrom = [new("paused", "Where it paused"), new("start", "The start")];
     private static readonly Choice[] Matches = [new("exact", "Exact"), new("contains", "Contains")];
+    /// <summary>New picture blocks find the picture from 75% to 125% of its captured size.</summary>
+    private const int DefaultSizeTolerance = 25;
     private static readonly Choice[] FindTargets = [new("text", "Text"), new("image", "Image"), new("pixel", "Pixel color")];
     private static readonly Choice[] WhenFound = [new("click", "Click it"), new("center", "Center camera on it"), new("continue", "Continue")];
     private static readonly Choice[] Monitors = [new("1", "Primary"), new("2", "Monitor 2"), new("3", "Monitor 3"), new("0", "Current")];
@@ -207,8 +209,8 @@ public static class BlockCatalog
              F.OnFail(), F.FailLabel()],
             b => $"\"{b.GetString("text", "")}\" · {b.GetString("match", "exact")} · {b.GetInt("timeoutMs", 10_000)} ms"),
         new("waitimage", BlockTypes.WaitForImage, "Wait for image", "IMG", "Detect", "Wait until a saved picture shows up on screen.",
-            () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
-            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.Region(),
+            () => new() { ["confidencePct"] = 90, ["sizeTolerancePct"] = DefaultSizeTolerance, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
+            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.Region(),
              F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
              F.OnFail(), F.FailLabel()],
             b => $"{ImageName(b)} · {b.GetInt("confidencePct", 90)}% · {b.GetInt("timeoutMs", 10_000)} ms"),
@@ -219,8 +221,8 @@ public static class BlockCatalog
              F.OnFail(), F.FailLabel()],
             b => $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)} = {b.GetString("color", "")} · {b.GetInt("timeoutMs", 5000)} ms"),
         new("imagegone", BlockTypes.WaitForImageGone, "Image gone", "!IMG", "Detect", "Wait until a saved picture is no longer on screen.",
-            () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
-            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.Region(),
+            () => new() { ["confidencePct"] = 90, ["sizeTolerancePct"] = DefaultSizeTolerance, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
+            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.Region(),
              F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
              F.OnFail(), F.FailLabel()],
             b => $"{ImageName(b)} gone · {b.GetInt("confidencePct", 90)}% · {b.GetInt("timeoutMs", 10_000)} ms"),
@@ -231,13 +233,13 @@ public static class BlockCatalog
              F.OnFail(), F.FailLabel()],
             b => $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)} ≠ {b.GetString("color", "")} · {b.GetInt("timeoutMs", 5000)} ms"),
         new("findclick", BlockTypes.FindClick, "Find & click", "FND", "Detect", "Find text, an image or a color and click it.",
-            () => new() { ["target"] = "text", ["value"] = "Claim", ["button"] = "left", ["timeoutMs"] = 5000, ["onFail"] = "continue" },
-            [F.Pick("target", "Find", FindTargets, "text"), F.FindValue(), F.Pick("button", "Button", Buttons, "left"),
+            () => new() { ["target"] = "text", ["value"] = "Claim", ["button"] = "left", ["timeoutMs"] = 5000, ["onFail"] = "continue", ["sizeTolerancePct"] = DefaultSizeTolerance },
+            [F.Pick("target", "Find", FindTargets, "text"), F.FindValue(), .. F.LookTuning(), F.Pick("button", "Button", Buttons, "left"),
              F.IntPick("clicks", "Clicks", ClickCounts, 1), F.Region(), F.AfterFound(), F.FoundLabel(), F.OnFail(), F.FailLabel()],
             b => $"{Label(FindTargets, b.GetString("target", "text"))} \"{b.GetString("value", "")}\" → {b.GetString("button", "left")} click"),
         new("scan", BlockTypes.ScanTurn, "Scan & turn", "SCN", "Detect", "Turn the camera step by step until a target is seen.",
-            () => new() { ["target"] = "text", ["value"] = "Collect", ["method"] = "rightDrag", ["direction"] = "right", ["stepPx"] = 120, ["maxTurns"] = 12, ["whenFound"] = "click", ["button"] = "left", ["clicks"] = 1, ["onFail"] = "continue" },
-            [F.Pick("target", "Look for", FindTargets, "text"), F.FindValue(), F.Pick("method", "Turn with", ScanMethods, "rightDrag"), F.Pick("direction", "Turn", RightLeft, "right"),
+            () => new() { ["target"] = "text", ["value"] = "Collect", ["method"] = "rightDrag", ["direction"] = "right", ["stepPx"] = 120, ["maxTurns"] = 12, ["whenFound"] = "click", ["button"] = "left", ["clicks"] = 1, ["onFail"] = "continue", ["sizeTolerancePct"] = DefaultSizeTolerance },
+            [F.Pick("target", "Look for", FindTargets, "text"), F.FindValue(), .. F.LookTuning(), F.Pick("method", "Turn with", ScanMethods, "rightDrag"), F.Pick("direction", "Turn", RightLeft, "right"),
              F.Int("stepPx", "Step (px)", 1, 10_000), F.Int("maxTurns", "Max turns", 1, MacroLimits.ScanTurnsMax),
              F.Pick("whenFound", "When found", WhenFound, "click"),
              F.Pick("button", "Button", Buttons, "left") with { ShowIf = b => b.GetString("whenFound", "click") == "click" },
@@ -252,12 +254,12 @@ public static class BlockCatalog
             b => b.GetBool("forever") == true ? "Forever" : $"{b.GetInt("count", 1)} times"),
         new("until", BlockTypes.RepeatUntil, "Repeat until", "UNTL", "Logic", "Repeat the blocks inside until a condition is true.",
             () => new() { ["condition"] = new JsonObject { ["kind"] = "textVisible", ["text"] = "Done" }, ["maxIterations"] = 0 },
-            [F.ConditionKind(), F.ConditionValue(), F.ConditionProgram(), F.ConditionRegion(),
+            [F.ConditionKind(), F.ConditionValue(), F.ConditionProgram(), F.ConditionRegion(), .. F.ConditionPictureTuning(),
              F.Int("maxIterations", "Max tries (0 = no limit)", 0, MacroLimits.CountMax)],
             b => Conditions.Describe(b.GetObject("condition"))),
         new("ifb", BlockTypes.If, "If", "IF", "Logic", "Run the blocks inside only when a condition is true.",
             () => new() { ["condition"] = new JsonObject { ["kind"] = "textVisible", ["text"] = "Done" } },
-            [F.ConditionKind(), F.ConditionValue(), F.ConditionProgram(), F.ConditionRegion()],
+            [F.ConditionKind(), F.ConditionValue(), F.ConditionProgram(), F.ConditionRegion(), .. F.ConditionPictureTuning()],
             b => Conditions.Describe(b.GetObject("condition"))),
         new("elseb", BlockTypes.Else, "Else", "ELSE", "Logic", "Runs when the If above was false.", () => [], [], _ => ""),
         new("end", BlockTypes.End, "End", "END", "Logic", "Closes the nearest Loop, Repeat until or If.", () => [], [], _ => ""),
@@ -576,6 +578,56 @@ internal static class F
             },
             Placeholder: "Capture image from screen",
             Hint: null, MaxLength: 120);
+
+    private const string SizeToleranceHint =
+        "How much smaller or bigger the picture may look than when you captured it, like a thing farther away in a game. " +
+        "25 finds it from 75% to 125% of its size. 0 only finds the exact size. Higher looks slower.";
+
+    /// <summary>Picture blocks: how much smaller or bigger the picture may look on screen.</summary>
+    public static FieldDef SizeTolerance() =>
+        Int("sizeTolerancePct", "Size tolerance %", 0, MacroLimits.SizeToleranceMaxPct, optional: true, placeholder: "0", hint: SizeToleranceHint);
+
+    /// <summary>Find &amp; click / Scan &amp; turn: how close a picture or color has to be, shown for the kind being looked for.</summary>
+    public static FieldDef[] LookTuning()
+    {
+        static bool Is(Block b, string kind) => b.GetString("target", "text") == kind;
+        return
+        [
+            Int("confidencePct", "Confidence %", 1, 100, optional: true, placeholder: "90",
+                hint: "How alike the spot has to be. Lower finds it more easily but may click the wrong thing.") with { ShowIf = b => Is(b, "image") },
+            SizeTolerance() with { ShowIf = b => Is(b, "image") },
+            Int("tolerance", "Color tolerance", 0, 255, optional: true, placeholder: "10",
+                hint: "How far each color channel may be from the one picked.") with { ShowIf = b => Is(b, "pixel") },
+        ];
+    }
+
+    /// <summary>If / Repeat until with "Image visible": confidence and size tolerance, kept inside the condition.</summary>
+    public static FieldDef[] ConditionPictureTuning()
+    {
+        static bool IsImage(Block b) => Conditions.Read(b.GetObject("condition")).Kind.TrimStart('!') == "imageVisible";
+        return
+        [
+            ConditionInt("confidencePct", "Confidence %", 1, 100, "90", null) with { ShowIf = IsImage },
+            ConditionInt("sizeTolerancePct", "Size tolerance %", 0, MacroLimits.SizeToleranceMaxPct, "0", SizeToleranceHint) with { ShowIf = IsImage },
+        ];
+    }
+
+    private static FieldDef ConditionInt(string key, string label, int min, int max, string placeholder, string? hint) =>
+        new("condition." + key, label, FieldKind.Text,
+            b => P.Text(Conditions.Inner(b.GetObject("condition"))?[key]),
+            (b, text) =>
+            {
+                var condition = b.GetObject("condition")?.DeepClone() as JsonObject ?? [];
+                if (Conditions.Inner(condition) is not { } inner) return null;
+                var t = text.Trim();
+                if (t.Length == 0) inner.Remove(key);
+                else if (!int.TryParse(t, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var n)) return "Enter a whole number.";
+                else if (n < min || n > max) return $"Use {min:N0} to {max:N0}.";
+                else inner[key] = n;
+                b.Params["condition"] = condition;
+                return null;
+            },
+            Placeholder: placeholder, Hint: hint, MaxLength: 12);
 
     /// <summary>Find &amp; click / Scan &amp; turn: the text, the picture's name or the color to look for.</summary>
     public static FieldDef FindValue() =>

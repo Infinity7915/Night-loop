@@ -165,8 +165,12 @@ public static class MacroValidator
         bool OptBool(string name) => !b.Params.ContainsKey(name) || b.GetBool(name) is not null;
         void Region() => Need(IsRegion(b.Params["region"]), "Region must be x, y, width and height (or left as the full window).");
         void Process() => Need(Text("process", MacroLimits.PathMaxLength, required: false), "Process name is too long.");
-        void Image() => Need(Text("imageData", MacroLimits.ImageDataMaxLength, required: false) && Text("image", 120, required: false),
-            "The saved picture is too large. Capture a smaller area.");
+        void Image()
+        {
+            Need(Text("imageData", MacroLimits.ImageDataMaxLength, required: false) && Text("image", 120, required: false),
+                "The saved picture is too large. Capture a smaller area.");
+            Need(OptIntIn("sizeTolerancePct", 0, MacroLimits.SizeToleranceMaxPct), $"Size tolerance must be 0–{MacroLimits.SizeToleranceMaxPct}%.");
+        }
         void OnFail() => Need(OneOf("onFail", FailActions, "continue"), "On fail must be continue, retry, go to label or stop.");
         void AfterFound() => Need(OneOf("afterFound", FoundActions, "next"), "After found must be next block, leave loop, go to label or stop.");
 
@@ -427,6 +431,10 @@ public static class MacroValidator
             case "imageVisible":
                 if ((c["imageData"] as JsonValue)?.TryGetValue(out string? data) == true && data.Length > MacroLimits.ImageDataMaxLength)
                     issues.Add(new(blockId, "The saved picture is too large. Capture a smaller area."));
+                if (c["confidencePct"] is not null && BlockParams.AsInt(c["confidencePct"]) is not (>= 1 and <= 100))
+                    issues.Add(new(blockId, "Confidence must be 1–100%."));
+                if (c["sizeTolerancePct"] is not null && BlockParams.AsInt(c["sizeTolerancePct"]) is not (>= 0 and <= MacroLimits.SizeToleranceMaxPct))
+                    issues.Add(new(blockId, $"Size tolerance must be 0–{MacroLimits.SizeToleranceMaxPct}%."));
                 break;
         }
     }
