@@ -42,4 +42,8 @@ public static class MacroLimits
     public const int PathMaxLength = 260;
     /// <summary>Gliding the mouse to a click point takes at most this long.</summary>
     public const int MoveMaxMs = 10_000;
+    /// <summary>Block ids (the app makes short ones like "b12").</summary>
+    public const int BlockIdMaxLength = 64;
+    /// <summary>The most text any one block setting can hold, apart from pictures, descriptions and conditions.</summary>
+    public const int ParamMaxLength = 4096;
 }

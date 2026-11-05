@@ -102,3 +102,13 @@ The Macros screen builds this document block by block:
 - Saved macros can be put in groups (name and color), searched, given their own start/stop key, and switched
   on and off from the list. The record key (F9 unless changed, next to Record), F6 and Ctrl+Alt+End are
   reserved for Record, Play and Stop all.
+
+## What the server keeps
+
+The app is open source, so the server never trusts what a client sends:
+
+- Block settings and condition settings the app doesn't use are removed before a macro is stored (`MacroSanitizer`).
+  Settings that older versions wrote and nothing reads any more go too; they never changed how a macro runs.
+- Every setting is bounded on every block: notes at most 200 characters, `imageData` must be a real saved picture
+  (`nl1:` or `nl2:` then base64, at most 56,000 characters), descriptions 5,000, anything else 4,096. Block ids are
+  at most 64 characters and `targetGame` at most 260.
