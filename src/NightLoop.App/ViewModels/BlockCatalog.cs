@@ -80,6 +80,8 @@ public static class BlockCatalog
     private static readonly Choice[] KeyActions = [new("press", "Press"), new("down", "Hold down"), new("up", "Let go")];
     private static readonly Choice[] ClickActions = [new("press", "Click"), new("down", "Hold down"), new("up", "Let go")];
     private static readonly Choice[] WaitUntil = [new("front", "Open and in front"), new("open", "Open")];
+    private static readonly Choice[] CloseHow =
+        [new("close", "Close (like clicking X)"), new("closeThenEnd", "Close, then force if it's still open"), new("end", "Force close now (unsaved work is lost)")];
     private static readonly Choice[] IfRunning = [new("focus", "Bring it to the front"), new("new", "Open another one")];
     private static readonly Choice[] ClickCounts = [new("1", "1"), new("2", "2"), new("3", "3")];
     private static readonly Choice[] MoveModes = [new("absolute", "Absolute"), new("relative", "Relative")];
@@ -262,7 +264,7 @@ public static class BlockCatalog
             () => new() { ["macroName"] = "" }, [F.MacroName("macroName", "Macro", all: false)], b => b.GetString("macroName", "")),
         new("stop", BlockTypes.Stop, "Stop macro", "STOP", "Logic", "End the run here.", () => [], [], _ => ""),
 
-        // ---- Window (5) ----
+        // ---- Window (6) ----
         new("open", BlockTypes.WindowOpen, "Open window", "OPEN", "Window", "Start a program and wait for its window. If it's already running, bring it to the front.",
             () => new() { ["path"] = "", ["ifRunning"] = "focus", ["wait"] = true, ["timeoutMs"] = 30_000 },
             [F.Program("path", "Program", fullPath: true),
@@ -273,6 +275,11 @@ public static class BlockCatalog
              F.Program("process", "Window to wait for (optional)", placeholder: "The program above",
                  hint: "Only for launchers that open a different program, like a game launcher.") with { ShowIf = b => b.GetBool("wait") != false }],
             b => b.GetString("path") is { Length: > 0 } path ? WindowFileName(path) + (b.GetString("args") is { Length: > 0 } a ? $" {a}" : "") : "pick a program"),
+        new("close", BlockTypes.WindowClose, "Close window", "CLOSE", "Window", "Close a program, like clicking its X. It can also force it closed.",
+            () => new() { ["how"] = "close", ["timeoutMs"] = 10_000 },
+            [F.Process(), F.Pick("how", "How", CloseHow, "close"),
+             F.Int("timeoutMs", "Wait for it to close (ms)", 0, MacroLimits.WaitMaxMs) with { ShowIf = b => b.GetString("how") != "end" }],
+            b => $"{ProcessName(b)} · {Label(CloseHow, b.GetString("how", "close"))}"),
         new("focus", BlockTypes.WindowFocus, "Focus window", "WIN", "Window", "Bring a game or app to the front.",
             () => [], [F.Process()], b => ProcessName(b)),
         new("waitwin", BlockTypes.WaitForWindow, "Wait for window", "WWN", "Window", "Pause until a window opens, or opens and comes to the front.",

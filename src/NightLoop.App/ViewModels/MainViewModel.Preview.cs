@@ -11,7 +11,7 @@ namespace NightLoop.App.ViewModels;
 /// </summary>
 public sealed partial class MainViewModel
 {
-    /// <summary><paramref name="select"/>: which block the inspector shows ("position", "image" or "open").</summary>
+    /// <summary><paramref name="select"/>: which block the inspector shows ("position", "image", "open", "close" or "scan").</summary>
     internal void ShowSample(string select = "position")
     {
         var coin = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -56,6 +56,7 @@ public sealed partial class MainViewModel
             (BlockTypes.End, null),
             (BlockTypes.End, null),
             (BlockTypes.Notify, new() { ["kind"] = "both", ["message"] = "Farm done" }),
+            (BlockTypes.WindowClose, new() { ["process"] = "RobloxPlayerBeta.exe", ["how"] = "closeThenEnd", ["timeoutMs"] = 10_000 }),
         };
         foreach (var (type, p) in blocks)
             doc.Blocks.Add(Block.Create(NextId(), type, p ?? BlockCatalog.For(type)?.Defaults()));
@@ -66,6 +67,8 @@ public sealed partial class MainViewModel
         {
             "image" => BlockTypes.WaitForImage,
             "open" => BlockTypes.WindowOpen,
+            "close" => BlockTypes.WindowClose,
+            "scan" => BlockTypes.ScanTurn,
             _ => BlockTypes.WindowPosition,
         };
         SelectedBlock = Blocks.FirstOrDefault(r => r.Block.Type == pick);

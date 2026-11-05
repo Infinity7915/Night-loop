@@ -73,6 +73,23 @@ internal sealed class FakeWindows : IWindowService
     /// <summary>What a launch does; by default the program opens its window at once.</summary>
     public Func<string, string?>? OnLaunch { get; set; }
 
+    /// <summary>What asking it to close does; by default the program ignores it.</summary>
+    public Action? OnClose { get; set; }
+
+    public int CloseWindows(string exeName)
+    {
+        Calls.Add($"close {exeName}");
+        OnClose?.Invoke();
+        return 1;
+    }
+
+    public int EndProcesses(string exeName)
+    {
+        Calls.Add($"end {exeName}");
+        Running = false;
+        return 1;
+    }
+
     public string? Launch(string path, string? arguments)
     {
         Calls.Add($"launch {path}{(string.IsNullOrEmpty(arguments) ? "" : " " + arguments)}");
