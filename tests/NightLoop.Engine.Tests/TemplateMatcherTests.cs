@@ -60,10 +60,31 @@ public class TemplateMatcherTests
         Assert.InRange(loose.Scale, shown / 48.0 - 0.05, shown / 48.0 + 0.05);
     }
 
+    [Theory]
+    [InlineData(20)] // far away: about 40% of the captured size
+    [InlineData(31)]
+    [InlineData(72)] // close up: 150%
+    public void Automatic_size_finds_it_at_any_size(int shown)
+    {
+        var m = TemplateMatcher.Find(Draw(400, 300, (150, 90, shown)), Captured(48), sizeTolerancePct: null)!.Value;
+        Assert.True(m.Score >= 0.9, $"score {m.Score:0.000} at scale {m.Scale:0.00}");
+        Assert.InRange(m.X, 150 + shown / 2 - 3, 150 + shown / 2 + 3);
+        Assert.InRange(m.Y, 90 + shown / 2 - 3, 90 + shown / 2 + 3);
+    }
+
+    [Fact]
+    public void Blank_or_old_default_size_tolerance_means_automatic()
+    {
+        Assert.Null(Blocks.DetectBlocksLook.SizeTolerance(null));
+        Assert.Null(Blocks.DetectBlocksLook.SizeTolerance(25));
+        Assert.Equal(0, Blocks.DetectBlocksLook.SizeTolerance(0));
+        Assert.Equal(10, Blocks.DetectBlocksLook.SizeTolerance(10));
+    }
+
     [Fact]
     public void Not_there_stays_a_miss_with_a_size_tolerance()
     {
-        var m = TemplateMatcher.Find(Draw(400, 300, null), Captured(48), sizeTolerancePct: 60);
+        var m = TemplateMatcher.Find(Draw(400, 300, null), Captured(48), sizeTolerancePct: null);
         Assert.True(m is null || m.Value.Score < 0.9, $"score {m?.Score}");
     }
 

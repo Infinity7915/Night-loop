@@ -63,9 +63,9 @@ public static class DetectProbe
         var size = Math.Abs(m.Scale - 1) < 0.005 ? "" : $" at {Math.Round(m.Scale * 100)}% of its size";
         if (score >= what.ConfidencePct)
             return new ProbeResult(true, $"Found the picture at {m.X}, {m.Y}{size} ({score}% alike).", (m.X, m.Y));
-        var hint = what.SizeTolerancePct == 0
-            ? " If it looks smaller or bigger in the game than when you captured it, raise Size tolerance."
-            : " Try a lower Confidence, a higher Size tolerance, or capture a smaller, more distinctive part.";
+        var hint = what.SizeTolerancePct is not null
+            ? " If it looks smaller or bigger in the game than when you captured it, clear Size tolerance so it's automatic."
+            : " Try a lower Confidence, or capture a smaller, more distinctive part.";
         return new ProbeResult(false, $"Didn't find the picture. The closest spot was {score}% alike{size} (needs {what.ConfidencePct}%).{hint}", (m.X, m.Y));
     }
 
