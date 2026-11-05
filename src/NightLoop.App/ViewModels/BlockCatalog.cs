@@ -229,13 +229,13 @@ public static class BlockCatalog
         new("findclick", BlockTypes.FindClick, "Find & click", "FND", "Detect", "Find text, an image or a color and click it.",
             () => new() { ["target"] = "text", ["value"] = "Claim", ["button"] = "left", ["timeoutMs"] = 5000, ["onFail"] = "continue" },
             [F.Pick("target", "Find", FindTargets, "text"), F.FindValue(), F.Pick("button", "Button", Buttons, "left"),
-             F.Region(), F.OnFail(), F.FailLabel()],
+             F.Region(), F.AfterFound(), F.FoundLabel(), F.OnFail(), F.FailLabel()],
             b => $"{Label(FindTargets, b.GetString("target", "text"))} \"{b.GetString("value", "")}\" → {b.GetString("button", "left")} click"),
         new("scan", BlockTypes.ScanTurn, "Scan & turn", "SCN", "Detect", "Turn the camera step by step until a target is seen.",
             () => new() { ["target"] = "text", ["value"] = "Collect", ["direction"] = "right", ["stepPx"] = 120, ["maxTurns"] = 12, ["whenFound"] = "click", ["onFail"] = "continue" },
             [F.Pick("target", "Look for", FindTargets, "text"), F.FindValue(), F.Pick("direction", "Turn", RightLeft, "right"),
              F.Int("stepPx", "Step (px)", 1, 10_000), F.Int("maxTurns", "Max turns", 1, MacroLimits.ScanTurnsMax),
-             F.Pick("whenFound", "When found", WhenFound, "click"), F.OnFail(), F.FailLabel()],
+             F.Pick("whenFound", "When found", WhenFound, "click"), F.AfterFound(), F.FoundLabel(), F.OnFail(), F.FailLabel()],
             b => $"{Label(FindTargets, b.GetString("target", "text"))} \"{b.GetString("value", "")}\" · {b.GetString("direction", "right")} {b.GetInt("stepPx", 120)}px ×{b.GetInt("maxTurns", 12)}"),
 
         // ---- Logic (9) ----
@@ -393,6 +393,7 @@ public static class BlockCatalog
 /// <summary>Builders for the inspector fields.</summary>
 internal static class F
 {
+    private static readonly Choice[] FoundActions = [new("next", "Go on to next block"), new("exitLoop", "Leave the loop"), new("goto", "Go to label"), new("stop", "Stop macro")];
     private static readonly Choice[] FailActions = [new("continue", "Continue"), new("retry", "Retry"), new("goto", "Go to label"), new("stop", "Stop macro")];
     private static readonly char[] BadFileChars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
 
@@ -587,6 +588,11 @@ internal static class F
             MaxLength: MacroLimits.TypeTextMaxLength);
 
     public static FieldDef OnFail() => Pick("onFail", "On fail", FailActions, "continue");
+
+    public static FieldDef AfterFound() => Pick("afterFound", "After found", FoundActions, "next");
+
+    public static FieldDef FoundLabel() =>
+        LabelName("foundLabel", "Label to go to") with { ShowIf = b => b.GetString("afterFound") == "goto" };
 
     public static FieldDef FailLabel() =>
         LabelName("failLabel", "Label to go to") with { ShowIf = b => b.GetString("onFail") == "goto" };

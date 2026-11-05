@@ -84,6 +84,8 @@ public static class BlockTypes
     };
 
     /// <summary>Blocks with an "On fail" choice (continue, retry, go to label, stop).</summary>
+    /// <summary>Blocks that act on what they found and have an "After found" choice (go on, leave the loop, go to a label, stop).</summary>
+    public static bool HasAfterFound(string type) => type is FindClick or ScanTurn;
     public static bool HasOnFail(string type) => type is WaitForText or WaitForImage or WaitForImageGone or DetectPixelColor or DetectPixelColorGone or FindClick or ScanTurn;
 
     /// <summary>Blocks that open a section closed by logic.end.</summary>

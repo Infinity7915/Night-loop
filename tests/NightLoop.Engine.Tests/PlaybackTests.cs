@@ -354,6 +354,83 @@ public class PlaybackTests
         Assert.Equal(["mdown Left", "mup Left"], input.Log[^2..]);
     }
 
+    private static JsonObject GreenFind(string afterFound) => new()
+    {
+        ["target"] = "pixel", ["value"] = "#00C800", ["tolerance"] = 8, ["afterFound"] = afterFound,
+    };
+
+    private static FakeScreen GreenScreen()
+    {
+        var screen = new FakeScreen(400, 300);
+        screen.Paint(100, 100, 6, 6, new Rgb(0, 200, 0));
+        return screen;
+    }
+
+    private static int Clicks(FakeInput input) => input.Log.Count(l => l == "mdown Left");
+
+    [Fact]
+    public async Task After_found_stop_ends_a_forever_loop_after_one_click()
+    {
+        var doc = new MacroBuilder()
+            .Add(BlockTypes.Loop, new() { ["forever"] = true })
+            .Add(BlockTypes.FindClick, GreenFind("stop")).Wait(50)
+            .End().Forever().Build();
+        var r = await RunAsync(doc, screen: GreenScreen());
+        Assert.Equal(RunState.Stopped, r.Run.State);
+        Assert.Equal(1, Clicks(r.Input));
+    }
+
+    [Fact]
+    public async Task After_found_leave_loop_goes_on_after_the_loop()
+    {
+        var doc = new MacroBuilder()
+            .Add(BlockTypes.Loop, new() { ["forever"] = true })
+            .Add(BlockTypes.Loop, new() { ["count"] = 2 }).Wait(10).End()
+            .Add(BlockTypes.ScanTurn, new()
+            {
+                ["target"] = "pixel", ["value"] = "#00C800", ["tolerance"] = 8, ["method"] = "mouseMove", ["afterFound"] = "exitLoop",
+            })
+            .Wait(50)
+            .End()
+            .Press("A").Build();
+        var r = await RunAsync(doc, screen: GreenScreen());
+        Assert.Equal(RunState.Stopped, r.Run.State);
+        Assert.Equal(1, Clicks(r.Input));
+        Assert.Equal(["down A", "up A"], r.Input.Log[^2..]);
+    }
+
+    [Fact]
+    public async Task After_found_go_to_label_jumps_there()
+    {
+        var doc = new MacroBuilder()
+            .Add(BlockTypes.FindClick, GreenFind("goto").Also("foundLabel", "done"))
+            .Press("B")
+            .Label("done").Press("A").Build();
+        var r = await RunAsync(doc, screen: GreenScreen());
+        Assert.DoesNotContain("down B", r.Input.Log);
+        Assert.Equal(["down A", "up A"], r.Input.Log[^2..]);
+    }
+
+    [Fact]
+    public async Task After_found_defaults_to_the_next_block()
+    {
+        var doc = new MacroBuilder()
+            .Add(BlockTypes.FindClick, new() { ["target"] = "pixel", ["value"] = "#00C800", ["tolerance"] = 8 })
+            .Press("A").Build();
+        var r = await RunAsync(doc, screen: GreenScreen());
+        Assert.Equal(1, Clicks(r.Input));
+        Assert.Equal(["down A", "up A"], r.Input.Log[^2..]);
+    }
+
+    [Fact]
+    public void After_found_goto_needs_a_real_label()
+    {
+        var doc = new MacroBuilder().Add(BlockTypes.FindClick, GreenFind("goto").Also("foundLabel", "nowhere")).Build();
+        Assert.Contains(MacroValidator.Validate(doc), i => i.Message.Contains("After found") && i.Message.Contains("nowhere"));
+        var bad = new MacroBuilder().Add(BlockTypes.FindClick, GreenFind("again")).Build();
+        Assert.Contains(MacroValidator.Validate(bad), i => i.Message.Contains("After found"));
+    }
+
     [Fact]
     public async Task Picture_saved_in_the_block_is_found_on_screen()
     {
@@ -524,5 +601,14 @@ public class PlaybackTests
             if (DateTime.UtcNow > until) throw new TimeoutException();
             await Task.Delay(1);
         }
+    }
+}
+
+internal static class JsonObjectTestExtensions
+{
+    public static JsonObject Also(this JsonObject o, string key, string value)
+    {
+        o[key] = value;
+        return o;
     }
 }
