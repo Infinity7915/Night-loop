@@ -133,6 +133,24 @@ public sealed class LocalSettings(string path)
         set => Write("recordHotkey", value);
     }
 
+    /// <summary>
+    /// Settings › Macros › Editor shortcuts: keys picked for undo, copy, paste and so on, by action name, like
+    /// { "undo": "Ctrl+Z" }. Actions left out use their default.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> EditorShortcuts
+    {
+        get => Read()?["editorShortcuts"] is JsonObject o
+            ? o.Where(p => p.Value is JsonValue v && v.TryGetValue(out string? _))
+               .ToDictionary(p => p.Key, p => p.Value!.GetValue<string>(), StringComparer.Ordinal)
+            : new Dictionary<string, string>(StringComparer.Ordinal);
+        set
+        {
+            var o = new JsonObject();
+            foreach (var (k, v) in value) o[k] = v;
+            WriteNode("editorShortcuts", value.Count == 0 ? null : o);
+        }
+    }
+
     public static bool IsHexColor(string s) =>
         s.Length == 7 && s[0] == '#' && s.Skip(1).All(Uri.IsHexDigit);
 

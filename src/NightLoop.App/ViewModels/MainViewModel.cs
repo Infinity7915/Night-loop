@@ -190,7 +190,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public string RecordHotkeyLabel => IsCapturingRecordHotkey ? "Press a key combo… (Esc cancels)" : $"{RecordHotkeyText}  ·  Change";
 
     /// <summary>Waiting for a key press to use as a start/stop key (the app's own keys are let go meanwhile).</summary>
-    public bool IsCapturingKey => IsCapturingEditorHotkey || IsCapturingRecordHotkey || CapturingRow is not null;
+    public bool IsCapturingKey => IsCapturingEditorHotkey || IsCapturingRecordHotkey || CapturingRow is not null || CapturingShortcut is not null;
 
     partial void OnIsCapturingEditorHotkeyChanged(bool value)
     {

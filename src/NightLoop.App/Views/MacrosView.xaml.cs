@@ -122,6 +122,7 @@ public partial class MacrosView : UserControl
         if (!onDelete) vm.CancelDeleteConfirms();
 
         // Capturing a start/stop key for the loaded macro or a saved one, or the record key.
+        if (vm.CapturingShortcut is not null) return; // Settings is picking an editor shortcut
         if (vm.IsCapturingKey)
         {
             var key = e.Key == Key.System ? e.SystemKey : e.Key;
@@ -158,43 +159,18 @@ public partial class MacrosView : UserControl
             return;
         }
 
-        // Delete removes the ticked blocks (or the highlighted one), unless you're typing in a field.
-        if (e.Key == Key.Delete && Keyboard.Modifiers == ModifierKeys.None && !IsTyping(e.OriginalSource))
-        {
-            vm.DeleteSelected();
-            e.Handled = true;
-            return;
-        }
-
-        // Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) undo and redo, Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste blocks.
-        // In a text field they keep their usual meaning there.
-        if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control) || Keyboard.Modifiers.HasFlag(ModifierKeys.Alt) || IsTyping(e.OriginalSource)) return;
-        var shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
-        switch (e.Key)
-        {
-            case Key.Z when shift:
-            case Key.Y when !shift:
-                vm.Redo();
-                break;
-            case Key.Z:
-                vm.Undo();
-                break;
-            case Key.C when !shift:
-                vm.CopyBlocks();
-                break;
-            case Key.X when !shift:
-                vm.CutBlocks();
-                break;
-            case Key.V when !shift:
-                vm.PasteBlocks();
-                break;
-            default:
-                return;
-        }
+        // Undo, redo, copy, cut, paste and delete, with the keys from Settings › Macros. In a text field the keys
+        // keep their usual meaning there.
+        if (IsTyping(e.OriginalSource)) return;
+        var pressed = e.Key == Key.System ? e.SystemKey : e.Key;
+        var code = KeyInterop.VirtualKeyFromKey(pressed);
+        if (KeyCatalog.IsModifier(code) || pressed is Key.None or Key.ImeProcessed) return;
+        if (vm.ShortcutAction(new Hotkey(CurrentModifiers(), code)) is not { } action) return;
+        vm.RunShortcut(action);
         e.Handled = true;
     }
 
-    private static HotkeyModifiers CurrentModifiers()
+    internal static HotkeyModifiers CurrentModifiers()
     {
         var mods = HotkeyModifiers.None;
         var m = Keyboard.Modifiers;

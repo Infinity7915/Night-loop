@@ -3,12 +3,12 @@ using NightLoop.Contracts.MacroDocument;
 namespace NightLoop.App.ViewModels;
 
 /// <summary>
-/// Editor shortcuts: Ctrl+Z / Ctrl+Y undo and redo block changes, Ctrl+C / Ctrl+X / Ctrl+V copy, cut and paste
+/// Editor shortcuts (keys changeable in Settings › Macros): undo and redo block changes, copy, cut and paste
 /// blocks. Copied blocks stay inside Night-loop (never on the Windows clipboard), so macros can't leave the app.
 /// </summary>
 public sealed partial class MainViewModel
 {
-    private const int UndoLimit = 50;
+    private const int UndoLimit = 200;
     /// <summary>Typing into the same field within this long counts as one change to undo.</summary>
     private static readonly TimeSpan UndoMergeWindow = TimeSpan.FromSeconds(1.5);
 
@@ -27,6 +27,9 @@ public sealed partial class MainViewModel
     private static int s_copiedCount;
 
     public bool CanUndo => _undo.Count > 0;
+
+    /// <summary>The key picked for an editor action, like "Ctrl + Z".</summary>
+    private string KeyOf(EditAction action) => EditorShortcuts.First(s => s.Action == action).KeyText;
     public bool CanRedo => _redo.Count > 0;
 
     private EditorState Capture() => new(
@@ -83,7 +86,7 @@ public sealed partial class MainViewModel
         }
         _redo.Push(Capture());
         Restore(_undo.Pop());
-        Status = "Undone. Ctrl+Y puts it back.";
+        Status = $"Undone. {KeyOf(EditAction.Redo)} puts it back.";
     }
 
     /// <summary>Ctrl+Y or Ctrl+Shift+Z: does the undone change again.</summary>
@@ -133,7 +136,8 @@ public sealed partial class MainViewModel
         var blocks = picked.Select(i => _doc.Blocks[i]).ToList();
         s_copied = MacroJson.Serialize(new MacroDoc { Name = "x", Blocks = blocks });
         s_copiedCount = blocks.Count;
-        Status = blocks.Count == 1 ? "Copied 1 block. Ctrl+V pastes it under the highlighted block." : $"Copied {blocks.Count} blocks. Ctrl+V pastes them under the highlighted block.";
+        var paste = KeyOf(EditAction.Paste);
+        Status = blocks.Count == 1 ? $"Copied 1 block. {paste} pastes it under the highlighted block." : $"Copied {blocks.Count} blocks. {paste} pastes them under the highlighted block.";
         return true;
 
         static SortedSet<int> Range((int From, int To) r) => new(Enumerable.Range(r.From, r.To - r.From + 1));
@@ -146,7 +150,7 @@ public sealed partial class MainViewModel
         if (!CopyBlocks()) return;
         var count = s_copiedCount;
         DeleteSelected();
-        Status = count == 1 ? "Cut 1 block. Ctrl+V pastes it." : $"Cut {count} blocks. Ctrl+V pastes them.";
+        Status = count == 1 ? $"Cut 1 block. {KeyOf(EditAction.Paste)} pastes it." : $"Cut {count} blocks. {KeyOf(EditAction.Paste)} pastes them.";
     }
 
     /// <summary>Ctrl+V: puts the copied blocks under the highlighted block (or at the end when none is highlighted).</summary>
@@ -155,7 +159,7 @@ public sealed partial class MainViewModel
         if (IsRecording || IsPlaying) return;
         if (s_copied is null)
         {
-            Status = "Nothing copied yet. Tick some blocks and press Ctrl+C.";
+            Status = $"Nothing copied yet. Tick some blocks and press {KeyOf(EditAction.Copy)}.";
             return;
         }
         var copies = MacroJson.Deserialize(s_copied).Blocks;

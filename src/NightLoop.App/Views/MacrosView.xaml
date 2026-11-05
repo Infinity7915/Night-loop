@@ -528,7 +528,7 @@
                               Command="{Binding MoveCheckedUpCommand}" IsEnabled="{Binding HasChecked}" />
                       <Button Style="{StaticResource IconButton}" Width="32" Height="32" Content="&#xE70D;" ToolTip="Move the selected blocks down"
                               Command="{Binding MoveCheckedDownCommand}" IsEnabled="{Binding HasChecked}" />
-                      <Button Style="{StaticResource IconButton}" Width="32" Height="32" Content="&#xE74D;" ToolTip="Delete the selected blocks (Delete). Ctrl+C copies them, Ctrl+V pastes under the highlighted block, Ctrl+Z undoes."
+                      <Button Style="{StaticResource IconButton}" Width="32" Height="32" Content="&#xE74D;" ToolTip="Delete the selected blocks. Keys for delete, copy, paste and undo are in Settings › Macros."
                               Command="{Binding DeleteCheckedCommand}" IsEnabled="{Binding HasChecked}" />
                     </StackPanel>
                   </Border>
