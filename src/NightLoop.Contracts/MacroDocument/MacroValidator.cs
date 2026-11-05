@@ -15,6 +15,7 @@ public static class MacroValidator
     private static readonly HashSet<string> ConditionKinds = ["textVisible", "imageVisible", "pixelColor", "windowFocused", "processRunning", "keyHeld", "not", "all", "any"];
     private static readonly HashSet<string> MoveModes = ["absolute", "relative"];
     private static readonly HashSet<string> FailActions = ["continue", "retry", "goto", "stop"];
+    private static readonly HashSet<string> FoundActions = ["next", "exitLoop", "goto", "stop"];
     private static readonly HashSet<string> FindTargets = ["text", "image", "pixel"];
     private static readonly HashSet<string> TurnMethods = ["rightDrag", "arrowKeys", "mouseMove"];
     private static readonly HashSet<string> Anchors = ["center", "topLeft", "topRight", "bottomLeft", "bottomRight", "custom"];
@@ -59,6 +60,13 @@ public static class MacroValidator
             var label = block.GetString("failLabel");
             if (string.IsNullOrWhiteSpace(label) || !structure.Labels.ContainsKey(label))
                 issues.Add(new(block.Id, $"On fail goes to label \"{label}\", but there's no Label block with that name."));
+        }
+        foreach (var block in doc.Blocks)
+        {
+            if (!BlockTypes.HasAfterFound(block.Type) || block.GetString("afterFound") != "goto") continue;
+            var label = block.GetString("foundLabel");
+            if (string.IsNullOrWhiteSpace(label) || !structure.Labels.ContainsKey(label))
+                issues.Add(new(block.Id, $"After found goes to label \"{label}\", but there's no Label block with that name."));
         }
         return issues;
     }
@@ -160,6 +168,7 @@ public static class MacroValidator
         void Image() => Need(Text("imageData", MacroLimits.ImageDataMaxLength, required: false) && Text("image", 120, required: false),
             "The saved picture is too large. Capture a smaller area.");
         void OnFail() => Need(OneOf("onFail", FailActions, "continue"), "On fail must be continue, retry, go to label or stop.");
+        void AfterFound() => Need(OneOf("afterFound", FoundActions, "next"), "After found must be next block, leave loop, go to label or stop.");
 
         switch (b.Type)
         {
@@ -264,6 +273,7 @@ public static class MacroValidator
                 Image();
                 Region();
                 OnFail();
+                AfterFound();
                 if (b.GetString("target") == "pixel") Need(IsColor(b.GetString("value")), "For a pixel color, the value must look like #RRGGBB.");
                 break;
             case BlockTypes.ScanTurn:
@@ -278,6 +288,7 @@ public static class MacroValidator
                 Image();
                 Region();
                 OnFail();
+                AfterFound();
                 if (b.GetString("target") == "pixel") Need(IsColor(b.GetString("value")), "For a pixel color, the value must look like #RRGGBB.");
                 break;
             case BlockTypes.WaitForWindow:

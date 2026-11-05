@@ -228,6 +228,26 @@ public sealed class MacroRun
                             next = pc; // paused right away: run this block again on resume
                             ctx.DidWork = true;
                             break;
+                        case BlockEnd.Done when BlockTypes.HasAfterFound(step.Block.Type):
+                            switch (step.Block.GetString("afterFound", "next"))
+                            {
+                                case "exitLoop":
+                                    if (EnclosingLoopEnd(steps, pc) is not { } loopEnd)
+                                    {
+                                        _env.Log?.Invoke($"{Name}: \"{step.Block.Type}\" found its target outside a loop, so the macro stopped (After found: leave loop).");
+                                        return PassEnd.Stopped;
+                                    }
+                                    loopCounters.Remove(steps[loopEnd].Jump);
+                                    next = loopEnd + 1;
+                                    break;
+                                case "goto" when step.Block.GetString("foundLabel") is { } label && Macro.Labels.TryGetValue(label, out var target):
+                                    next = target;
+                                    break;
+                                case "stop":
+                                    _env.Log?.Invoke($"{Name}: \"{step.Block.Type}\" found its target, so the macro stopped (After found: stop).");
+                                    return PassEnd.Stopped;
+                            }
+                            break;
                         case BlockEnd.Failed:
                             switch (step.Block.GetString("onFail", "continue"))
                             {
@@ -294,6 +314,15 @@ public sealed class MacroRun
             pc = next;
         }
         return PassEnd.Finished;
+    }
+
+    /// <summary>The End of the innermost Loop or Repeat until around <paramref name="pc"/>, or null when it isn't in one.</summary>
+    private static int? EnclosingLoopEnd(System.Collections.Immutable.ImmutableArray<Step> steps, int pc)
+    {
+        // Loops nest, so the first loop end after pc that opened before pc is the innermost one around it.
+        for (var i = pc + 1; i < steps.Length; i++)
+            if (steps[i].Kind is StepKind.LoopEnd or StepKind.RepeatEnd && steps[i].Jump < pc) return i;
+        return null;
     }
 
     private const int Forever = -1;
