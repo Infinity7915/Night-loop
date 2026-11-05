@@ -346,7 +346,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Turning the camera depends on the game: Roblox turns with a right-drag, most others with the mouse.</summary>
     private void ApplyTargetDefaults(Block block)
     {
-        if (block.Type != BlockTypes.CameraTurn) return;
+        if (block.Type is not (BlockTypes.CameraTurn or BlockTypes.ScanTurn)) return;
         var roblox = SelectedGame.Exe?.Contains("Roblox", StringComparison.OrdinalIgnoreCase) == true;
         block.Params["method"] = SelectedGame.Exe is null || roblox ? "rightDrag" : "mouseMove";
     }

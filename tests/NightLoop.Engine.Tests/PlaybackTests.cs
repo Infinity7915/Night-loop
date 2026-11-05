@@ -331,7 +331,7 @@ public class PlaybackTests
         var turns = 0;
         screen.OnCapture = s =>
         {
-            if (turns >= 3) s.Paint(200, 100, 6, 6, new Rgb(255, 255, 0));
+            if (turns >= 3) s.Paint(197, 147, 6, 6, new Rgb(255, 255, 0)); // lands in the middle of the view
         };
         var doc = new MacroBuilder().Add(BlockTypes.ScanTurn, new()
         {
@@ -352,6 +352,62 @@ public class PlaybackTests
         Assert.Equal(RunState.Stopped, run.State);
         Assert.Equal(270, input.Log.Where(l => l.StartsWith("rel ", StringComparison.Ordinal)).Sum(l => int.Parse(l[4..].Split(',')[0])));
         Assert.Equal(["mdown Left", "mup Left"], input.Log[^2..]);
+    }
+
+    [Fact]
+    public async Task Scan_and_turn_with_the_camera_on_the_mouse_never_moves_the_mouse_to_click()
+    {
+        // Target off-center: it turns it into the middle (relative moves) and clicks there, with no absolute glide.
+        var screen = new FakeScreen(400, 300);
+        screen.Paint(250, 147, 6, 6, new Rgb(255, 255, 0));
+        var input = new FakeInput();
+        var moved = 0;
+        screen.OnCapture = s =>
+        {
+            var sent = input.Log.Where(l => l.StartsWith("rel ", StringComparison.Ordinal)).Sum(l => int.Parse(l[4..].Split(',')[0]));
+            if (sent == moved) return;
+            moved = sent;
+            s.Clear();
+            s.Paint(250 - sent, 147, 6, 6, new Rgb(255, 255, 0));
+        };
+        var doc = new MacroBuilder().Add(BlockTypes.ScanTurn, new()
+        {
+            ["target"] = "pixel", ["value"] = "#FFFF00", ["method"] = "mouseMove", ["clicks"] = 2,
+        }).Build();
+        var run = new MacroRun(MacroCompiler.Compile(doc), new RunEnvironment { Input = input, Delay = new FakeDelay(), Screen = screen });
+        run.Start();
+        await run.Completion.WaitAsync(Timeout);
+
+        Assert.Equal(RunState.Stopped, run.State);
+        Assert.DoesNotContain(input.Log, l => l.StartsWith("move ", StringComparison.Ordinal));
+        Assert.True(moved > 0);
+        Assert.Equal(2, input.Log.Count(l => l == "mdown Left"));
+    }
+
+    [Fact]
+    public async Task Scan_and_turn_with_right_drag_glides_to_the_target_and_clicks_three_times()
+    {
+        var screen = new FakeScreen(400, 300);
+        screen.Paint(300, 60, 6, 6, new Rgb(255, 255, 0));
+        var doc = new MacroBuilder().Add(BlockTypes.ScanTurn, new()
+        {
+            ["target"] = "pixel", ["value"] = "#FFFF00", ["method"] = "rightDrag", ["clicks"] = 3, ["button"] = "right",
+        }).Press("A").Build();
+        var r = await RunAsync(doc, screen: screen);
+        Assert.Equal((302, 62), Moves(r.Input)[^1]);
+        Assert.Equal(3, r.Input.Log.Count(l => l == "mdown Right"));
+        Assert.Equal(["down A", "up A"], r.Input.Log[^2..]);
+    }
+
+    [Fact]
+    public async Task Find_and_click_clicks_up_to_three_times()
+    {
+        var doc = new MacroBuilder()
+            .Add(BlockTypes.FindClick, new() { ["target"] = "pixel", ["value"] = "#00C800", ["tolerance"] = 8, ["clicks"] = 2 }).Build();
+        var r = await RunAsync(doc, screen: GreenScreen());
+        Assert.Equal(2, Clicks(r.Input));
+        var bad = new MacroBuilder().Add(BlockTypes.FindClick, new() { ["target"] = "pixel", ["value"] = "#00C800", ["clicks"] = 4 }).Build();
+        Assert.Contains(MacroValidator.Validate(bad), i => i.Message.Contains("Clicks"));
     }
 
     private static JsonObject GreenFind(string afterFound) => new()
