@@ -36,20 +36,28 @@ public static class MacroValidator
             issues.Add(new(null, $"A macro can have at most {MacroLimits.MaxBlocks} blocks."));
         if (MacroJson.ByteSize(doc) > MacroLimits.MaxDocumentBytes)
             issues.Add(new(null, "The macro is larger than 200 KB."));
+        if (doc.TargetGame is { Length: > MacroLimits.PathMaxLength })
+            issues.Add(new(null, "The game's program name is too long."));
 
         ValidateOptions(doc.Options, issues);
 
         var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var block in doc.Blocks)
         {
-            if (string.IsNullOrWhiteSpace(block.Id) || !ids.Add(block.Id))
-                issues.Add(new(block.Id, "Block ids must be present and unique."));
+            if (string.IsNullOrWhiteSpace(block.Id) || block.Id.Length > MacroLimits.BlockIdMaxLength || !ids.Add(block.Id))
+                issues.Add(new(block.Id, "Block ids must be present, unique and at most 64 characters."));
+            if (block.Params is null)
+            {
+                issues.Add(new(block.Id, "Block settings are missing."));
+                continue;
+            }
             if (!BlockTypes.All.Contains(block.Type))
             {
                 issues.Add(new(block.Id, $"Unknown block type \"{block.Type}\"."));
                 continue;
             }
             ValidateParams(block, issues);
+            ValidateCommon(block, issues);
         }
 
         var structure = MacroStructure.Analyze(doc.Blocks);
@@ -150,6 +158,48 @@ public static class MacroValidator
     /// <summary>"#RRGGBB".</summary>
     public static bool IsColor(string? text) =>
         text is { Length: 7 } && text[0] == '#' && text.Skip(1).All(Uri.IsHexDigit);
+
+    /// <summary>
+    /// Limits that hold on every block, whatever its type: a short note, a real saved picture, and no setting holding
+    /// more text than the app can ever put there. This stops a changed app storing other data inside a macro.
+    /// </summary>
+    private static void ValidateCommon(Block b, List<MacroIssue> issues)
+    {
+        if (b.Params["note"] is { } note && !(note is JsonValue v && v.TryGetValue(out string? n) && n.Length <= MacroLimits.CommentMaxLength))
+            issues.Add(new(b.Id, "Note must be at most 200 characters."));
+        if (!IsImageData(b.Params["imageData"]))
+            issues.Add(new(b.Id, "The saved picture is damaged. Capture it again."));
+        foreach (var (key, node) in b.Params)
+        {
+            if (node is null) continue;
+            var max = key switch
+            {
+                "imageData" => MacroLimits.ImageDataMaxLength,
+                "text" => MacroLimits.DescriptionMaxLength,
+                "condition" => MacroLimits.MaxDocumentBytes,
+                _ => MacroLimits.ParamMaxLength,
+            };
+            var size = node is JsonValue val && val.TryGetValue(out string? s) ? s.Length : node.ToJsonString().Length;
+            if (size > max)
+            {
+                issues.Add(new(b.Id, $"The \"{key}\" setting is too long."));
+                break;
+            }
+        }
+    }
+
+    /// <summary>A saved picture: "nl1:" or "nl2:" then base64, or nothing.</summary>
+    public static bool IsImageData(JsonNode? node)
+    {
+        if (node is null) return true;
+        if (node is not JsonValue v || !v.TryGetValue(out string? text)) return false;
+        if (text.Length == 0) return true;
+        if (text.Length > MacroLimits.ImageDataMaxLength || !(text.StartsWith("nl1:", StringComparison.Ordinal) || text.StartsWith("nl2:", StringComparison.Ordinal)))
+            return false;
+        var body = text.AsSpan(4);
+        var buffer = new byte[body.Length];
+        return Convert.TryFromBase64Chars(body, buffer, out _);
+    }
 
     private static void ValidateParams(Block b, List<MacroIssue> issues)
     {
@@ -410,8 +460,12 @@ public static class MacroValidator
                     ValidateCondition(child as JsonObject, blockId, issues, depth + 1);
                 break;
             case "processRunning":
-                if ((c["name"] as JsonValue)?.TryGetValue(out string? process) != true || string.IsNullOrWhiteSpace(process))
-                    issues.Add(new(blockId, "Process running needs a process name."));
+                if ((c["name"] as JsonValue)?.TryGetValue(out string? process) != true || string.IsNullOrWhiteSpace(process) || process.Length > MacroLimits.PathMaxLength)
+                    issues.Add(new(blockId, "Process running needs a process name (at most 260 characters)."));
+                break;
+            case "windowFocused":
+                if (c["name"] is { } focused && !((focused as JsonValue)?.TryGetValue(out string? window) == true && window.Length <= MacroLimits.PathMaxLength))
+                    issues.Add(new(blockId, "The window's program name is too long."));
                 break;
             case "keyHeld":
                 if ((c["key"] as JsonValue)?.TryGetValue(out string? key) != true || key is null || !KeyCatalog.IsKnown(key))
@@ -430,8 +484,12 @@ public static class MacroValidator
                     issues.Add(new(blockId, "Region must have x, y, width and height."));
                 break;
             case "imageVisible":
-                if ((c["imageData"] as JsonValue)?.TryGetValue(out string? data) == true && data.Length > MacroLimits.ImageDataMaxLength)
-                    issues.Add(new(blockId, "The saved picture is too large. Capture a smaller area."));
+                if (!IsImageData(c["imageData"]))
+                    issues.Add(new(blockId, "The saved picture is damaged or too large. Capture it again."));
+                if (c["image"] is { } image && !((image as JsonValue)?.TryGetValue(out string? imageName) == true && imageName.Length <= 120))
+                    issues.Add(new(blockId, "The picture's name is too long."));
+                if (!IsRegion(c["region"]))
+                    issues.Add(new(blockId, "Region must have x, y, width and height."));
                 if (c["confidencePct"] is not null && BlockParams.AsInt(c["confidencePct"]) is not (>= 1 and <= 100))
                     issues.Add(new(blockId, "Confidence must be 1–100%."));
                 if (c["matchColor"] is not null && (c["matchColor"] as JsonValue)?.TryGetValue(out bool _) != true)
