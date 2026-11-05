@@ -72,7 +72,15 @@ public static class SmokeTest
             var games = new TargetGamesViewModel(new LocalData.GamesStore(Path.Combine(dir, "games.json")),
                 new LocalData.LocalSettings(Path.Combine(dir, "settings.json")));
             var macros = new MainViewModel(api, games, new LocalData.LocalSettings(Path.Combine(dir, "settings.json")));
-            macros.ShowSample(select);
+            var parts = select.Split('#');
+            macros.ShowSample(parts[0]);
+            // "#..." opens one more part of the page for the picture.
+            switch (parts.ElementAtOrDefault(1))
+            {
+                case "saved": macros.Sections.SelectMany(g => g.Rows).First().ShowOptions = true; break;
+                case "group": macros.NewGroupCommand.Execute(null); break;
+                case "options": macros.ShowEditorOptions = true; break;
+            }
             return samples[select] = macros;
         }
 
@@ -83,6 +91,14 @@ public static class SmokeTest
         SettingsViewModel SampleSettings() => settings ??= new SettingsViewModel(Shell());
         // The create-account screen, with its terms line.
         AuthViewModel SignUp() => new(Shell().Session, Shell().Local, null) { Mode = AuthMode.SignUp };
+        AuthViewModel AuthIn(AuthMode mode) => new(Shell().Session, Shell().Local, null) { Mode = mode };
+        // Settings with one of the account boxes open.
+        SettingsViewModel SettingsWith(Action<AccountViewModel> open)
+        {
+            var vm = new SettingsViewModel(Shell());
+            open(vm.Account);
+            return vm;
+        }
 
         // Pages render at the width they get in the window: 1060 at the default 1280 window (minus the 220 sidebar),
         // 740 at the smallest window. The narrow ones catch rows that overlap or get cut off when the window shrinks.
@@ -100,7 +116,19 @@ public static class SmokeTest
             // The loaded macro's options (record key) and a picture block with its preview.
             ("macros-picture", () => new MacrosView { DataContext = SampleMacros("image") }, 1060, 2100),
             ("macros-open-window", () => new MacrosView { DataContext = SampleMacros("open") }, 1060, 1300),
+            ("auth-code", () => new AuthView { DataContext = AuthIn(AuthMode.Code) }, 1280, 800),
+            ("auth-forgot", () => new AuthView { DataContext = AuthIn(AuthMode.Forgot) }, 1280, 800),
+            ("auth-reset", () => new AuthView { DataContext = AuthIn(AuthMode.Reset) }, 1280, 800),
+            // Each part of the Macros page opened: the loaded macro's options, a saved macro's options, a new group.
+            ("macros-options", () => new MacrosView { DataContext = SampleMacros("position#options") }, 1060, 1500),
+            ("macros-saved-options", () => new MacrosView { DataContext = SampleMacros("position#saved") }, 1060, 2700),
+            ("macros-new-group", () => new MacrosView { DataContext = SampleMacros("position#group") }, 1060, 2300),
             ("settings", () => new SettingsView { DataContext = SampleSettings() }, 1060, 1700),
+            ("settings-full", () => new SettingsView { DataContext = SampleSettings() }, 1060, 2600),
+            ("settings-username", () => new SettingsView { DataContext = SettingsWith(a => a.ChangeUsernameCommand.Execute(null)) }, 1060, 2600),
+            ("settings-email", () => new SettingsView { DataContext = SettingsWith(a => a.ChangeEmailCommand.Execute(null)) }, 1060, 2600),
+            ("settings-password", () => new SettingsView { DataContext = SettingsWith(a => a.ChangePasswordCommand.Execute(null)) }, 1060, 2600),
+            ("settings-delete", () => new SettingsView { DataContext = SettingsWith(a => a.DeleteAccountCommand.Execute(null)) }, 1060, 2600),
             ("settings-narrow", () => new SettingsView { DataContext = SampleSettings() }, 740, 1900),
             ("window", MainWindowContent, 1280, 800),
         };
@@ -118,7 +146,54 @@ public static class SmokeTest
             Themes.ThemeManager.Preview(Themes.ThemeManager.Dark, palette.Accent, palette.Id);
             failures += Draw(app, folder, palette.Id, themed);
         }
+        CheckMinimizeFocus(folder);
         return failures == 0 ? 0 : 1;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int cmd);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    /// <summary>
+    /// Report only (never fails the run): after minimizing for Record, is Night-loop still the foreground window?
+    /// It must not be, or the keys typed next go to Night-loop. Compares WPF's WindowState = Minimized with the
+    /// SW_MINIMIZE that Record uses, with another window behind to take focus. Written to minimize-check.txt.
+    /// </summary>
+    private static void CheckMinimizeFocus(string folder)
+    {
+        var lines = new List<string>();
+        try
+        {
+            void Pump() => Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+            void Wait() { for (var i = 0; i < 10; i++) { Pump(); Thread.Sleep(30); } }
+            var behind = new Window { Title = "Behind", Width = 300, Height = 200, Left = 50, Top = 50, ShowActivated = true };
+            behind.Show();
+            var main = new Window { Title = "Night-loop check", Width = 400, Height = 300, Left = 100, Top = 100 };
+            main.Show();
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(main).Handle;
+            foreach (var (name, minimize) in new (string, Action)[]
+                     {
+                         ("WindowState = Minimized", () => main.WindowState = WindowState.Minimized),
+                         ("ShowWindow(SW_MINIMIZE)", () => ShowWindow(hwnd, 6)),
+                     })
+            {
+                main.WindowState = WindowState.Normal;
+                main.Activate();
+                SetForegroundWindow(hwnd);
+                Wait();
+                var before = GetForegroundWindow() == hwnd;
+                minimize();
+                Wait();
+                lines.Add($"{name}: in front before={before}, still in front after minimize={GetForegroundWindow() == hwnd}");
+            }
+            main.Close();
+            behind.Close();
+        }
+        catch (Exception ex)
+        {
+            lines.Add("check failed: " + ex.Message);
+        }
+        File.WriteAllLines(Path.Combine(folder, "minimize-check.txt"), lines);
     }
 
     private static int Draw(Application app, string folder, string mode, (string Name, Func<FrameworkElement> Make, int Width, int Height)[] screens)

@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest</AnalysisLevel>
-    <Version>0.5.0</Version>
+    <Version>0.5.1</Version>
     <Authors>Night-loop contributors</Authors>
     <Product>Night-loop</Product>
     <!-- Lets the WPF app build on non-Windows CI and dev boxes. It still only runs on Windows. -->

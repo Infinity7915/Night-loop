@@ -114,6 +114,10 @@ public sealed class InputRecorder : IDisposable
             throw new InvalidOperationException("Windows refused the input hooks, so recording can't start.");
         }
         _clock.Restart();
+        // Accept before the worker starts: its loop runs while _accepting is true, and starting it first let it see
+        // false and quit at once. Everything then waited until Stop, by which time Night-loop was back in front, so
+        // every key and click was judged "aimed at Night-loop" and skipped.
+        _accepting = true;
         _worker = new Thread(Work) { IsBackground = true, Name = "Night-loop recorder worker" };
         _worker.Start();
         // Where the cursor starts, so the first click glides from the right place on replay.
@@ -124,7 +128,6 @@ public sealed class InputRecorder : IDisposable
             Add(RawInputEvent.Move(0, p.X, p.Y, p.Game, hidden: IsCursorHidden()));
         }
         IsRecording = true;
-        _accepting = true;
     }
 
     /// <summary>Stops recording and turns what was captured into blocks.</summary>
@@ -222,10 +225,23 @@ public sealed class InputRecorder : IDisposable
     }
 
     private bool IsOwnWindowAt(Point pt) =>
-        _settings.IgnoreOwnWindows && Win32WindowService.ProcessIdOf(PInvoke.WindowFromPoint(pt)) == _ownPid;
+        _settings.IgnoreOwnWindows && IsOwnAndShowing(PInvoke.WindowFromPoint(pt));
 
     private bool IsOwnWindowInFront() =>
-        _settings.IgnoreOwnWindows && Win32WindowService.ProcessIdOf(PInvoke.GetForegroundWindow()) == _ownPid;
+        _settings.IgnoreOwnWindows && IsOwnAndShowing(PInvoke.GetForegroundWindow());
+
+    /// <summary>
+    /// A Night-loop window the person can actually see and use. A minimized window can stay the "foreground" window
+    /// (Windows keeps it active after SW_SHOWMINIMIZED), and a window hidden in the tray can still own focus for a
+    /// moment; neither can be typed or clicked into, so input then belongs to whatever app is really in use.
+    /// </summary>
+    private bool IsOwnAndShowing(HWND hwnd)
+    {
+        if (hwnd.IsNull || Win32WindowService.ProcessIdOf(hwnd) != _ownPid) return false;
+        var root = PInvoke.GetAncestor(hwnd, GET_ANCESTOR_FLAGS.GA_ROOT);
+        if (root.IsNull) root = hwnd;
+        return OwnInputRule.Counts(isVisible: PInvoke.IsWindowVisible(root), isMinimized: PInvoke.IsIconic(root));
+    }
 
     private void OnKey(uint message, uint vk, long t)
     {
@@ -420,4 +436,10 @@ public sealed class InputRecorder : IDisposable
             StopWorker();
         }
     }
+}
+
+/// <summary>Whether input aimed at one of Night-loop's own windows is skipped. Pure, so it can be tested anywhere.</summary>
+public static class OwnInputRule
+{
+    public static bool Counts(bool isVisible, bool isMinimized) => isVisible && !isMinimized;
 }

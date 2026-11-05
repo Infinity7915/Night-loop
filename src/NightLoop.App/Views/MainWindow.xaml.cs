@@ -27,6 +27,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = _shell;
         FitToScreen();
+        RestorePlacement();
         SizeChanged += (_, _) => UpdateScale();
         // Signing out of Windows or shutting down must never be held up by the hide-to-tray close.
         if (Application.Current is { } app) app.SessionEnding += (_, _) => _exiting = true;
@@ -48,6 +49,46 @@ public partial class MainWindow : Window
         Width = Math.Max(MinWidth, Math.Min(1280, area.Width * 0.9));
         Height = Math.Max(MinHeight, Math.Min(800, area.Height * 0.9));
         UpdateScale();
+    }
+
+    /// <summary>Settings › Appearance › "Remember window size and position": back where it was last closed.</summary>
+    private void RestorePlacement()
+    {
+        if (!_shell.Local.RememberWindow || _shell.Local.WindowBounds is not { } b) return;
+        if (!b.FitsOn(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+                SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight, MinWidth, MinHeight)) return;
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Left = b.Left;
+        Top = b.Top;
+        Width = b.Width;
+        Height = b.Height;
+        if (b.Maximized) WindowState = WindowState.Maximized;
+        UpdateScale();
+    }
+
+    /// <summary>Remembers where the window is (its normal size, even when maximized) for the next launch.</summary>
+    private void SavePlacement()
+    {
+        if (!_shell.Local.RememberWindow || WindowState == WindowState.Minimized && RestoreBounds.IsEmpty) return;
+        var r = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
+        if (r.IsEmpty || r.Width <= 0 || r.Height <= 0) return;
+        _shell.Local.WindowBounds = new LocalData.WindowBounds(r.Left, r.Top, r.Width, r.Height, WindowState == WindowState.Maximized);
+    }
+
+    /// <summary>
+    /// Settings › Appearance › "Reset window": the default size for this screen, centered, and forgets the saved
+    /// spot (the next close saves the new one again when remembering is on).
+    /// </summary>
+    public void ResetPlacement()
+    {
+        _shell.Local.WindowBounds = null;
+        if (!IsVisible) Show();
+        WindowState = WindowState.Normal;
+        FitToScreen();
+        var area = SystemParameters.WorkArea;
+        Left = area.Left + (area.Width - Width) / 2;
+        Top = area.Top + (area.Height - Height) / 2;
+        Activate();
     }
 
     private void UpdateScale()
@@ -83,6 +124,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosing(CancelEventArgs e)
     {
+        SavePlacement();
         // Settings › Appearance › "Keep running in the tray": the X hides the window and Night-loop keeps going.
         if (!_exiting && TrayIcon.Current is not null && _shell.Local.CloseToTray)
         {

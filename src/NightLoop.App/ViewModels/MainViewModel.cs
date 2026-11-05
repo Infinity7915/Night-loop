@@ -701,8 +701,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private void StopRecording()
     {
         IsRecording = false;
-        ShowAfterRecording();
         SyncDoc();
+        // Stop (which finishes sorting the last inputs) before Night-loop comes back to the front, so nothing typed
+        // into the other app is mistaken for input aimed at Night-loop.
         var result = _recorder.Stop(new RecordingOptions
         {
             RecordMouseMoves = RecordMouseMoves,
@@ -711,6 +712,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             MaxBlocks = Math.Max(0, MacroLimits.MaxBlocks - _doc.Blocks.Count),
             MaxBytes = Math.Max(0, MacroLimits.MaxDocumentBytes * 9 / 10 - MacroJson.ByteSize(_doc)),
         });
+
+        ShowAfterRecording();
 
         var at = _recordAfter is { } after && _doc.Blocks.IndexOf(after) is var i and >= 0 ? i + 1 : _doc.Blocks.Count;
         _recordAfter = null;
@@ -789,8 +792,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (Application.Current?.MainWindow is not { IsVisible: true } window || window.WindowState == WindowState.Minimized) return;
         _hiddenForRecording = true;
         _stateBeforeRecording = window.WindowState;
-        window.WindowState = WindowState.Minimized;
+        // SW_MINIMIZE, not WindowState = Minimized: WPF minimizes with SW_SHOWMINIMIZED, which leaves Night-loop the
+        // active window, so the keys typed next went to (minimized) Night-loop and Record skipped them as its own.
+        // SW_MINIMIZE hands focus to the next window, the app the person is about to use.
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero || !ShowWindow(hwnd, SwMinimize)) window.WindowState = WindowState.Minimized;
     }
+
+    private const int SwMinimize = 6;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
     /// <summary>Recording stopped: Night-loop comes back with the new blocks in view.</summary>
     private void ShowAfterRecording()
