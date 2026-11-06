@@ -33,8 +33,8 @@ public sealed record PickResult(int X, int Y, int Width, int Height, ScreenImage
 /// Pick a point, a color or a rectangle on screen. Shows a frozen screenshot of every monitor in one topmost window,
 /// so clicks never reach the game, then maps the mouse back to real screen pixels. Esc or right-click cancels.
 /// Live picking (Settings › Macros) shows a see-through window instead, so the screen keeps moving underneath with
-/// a crosshair, the position and the outline drawn on top; the pixels are captured the moment the pick is confirmed.
-/// GDI captures leave out see-through (layered) windows, so the outline and labels never end up in the picture.
+/// a crosshair, the position and the outline drawn on top. The pixels are captured right after the pick is confirmed,
+/// once the overlay has closed, so the outline and labels never end up in a picture or color.
 /// </summary>
 public sealed class ScreenPicker : Window
 {
@@ -137,7 +137,12 @@ public sealed class ScreenPicker : Window
         Width = _area.Width / dpi.DpiScaleX;
         Height = _area.Height / dpi.DpiScaleY;
 
-        SourceInitialized += (_, _) => Cover();
+        SourceInitialized += (_, _) =>
+        {
+            Cover();
+            // Live: keep the overlay out of the color read under the mouse. Older Windows just ignores this.
+            if (_live) _ = SetWindowDisplayAffinity(new WindowInteropHelper(this).Handle, 0x11);
+        };
         ContentRendered += (_, _) => Cover();
         DpiChanged += (_, _) => Dispatcher.BeginInvoke(Cover);
         Loaded += (_, _) =>
@@ -164,12 +169,30 @@ public sealed class ScreenPicker : Window
         }
         var picker = new ScreenPicker(capture, shot, mode, hint, accent);
         picker.ShowDialog();
-        return picker.Result;
+        if (!live || picker._picked is not { } r) return picker.Result;
+
+        // Live: the overlay (outline, crosshair, labels) is closed now. Wait until Windows has drawn the screen
+        // without it, then take the pixels, so none of it ends up in a saved picture or color.
+        for (var i = 0; i < 2; i++)
+        {
+            _ = DwmFlush();
+            Thread.Sleep(16);
+        }
+        return new PickResult(r.X, r.Y, r.W, r.H, capture.Capture(r.X, r.Y, r.W, r.H));
     }
 
-    /// <summary>The picked pixels: from the frozen picture, or captured right now when picking live.</summary>
-    private PickResult Confirm(int x, int y, int width, int height) =>
-        new(x, y, width, height, _shot ?? _capture.Capture(x, y, width, height));
+    private (int X, int Y, int W, int H)? _picked;
+
+    /// <summary>
+    /// The picked spot. Frozen: the pixels come from the screenshot. Live: only the spot is kept here; the pixels are
+    /// captured once the overlay has closed (see <see cref="Pick"/>).
+    /// </summary>
+    private PickResult? Confirm(int x, int y, int width, int height)
+    {
+        if (_shot is { } shot) return new PickResult(x, y, width, height, shot);
+        _picked = (x, y, width, height);
+        return null;
+    }
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
@@ -292,6 +315,13 @@ public sealed class ScreenPicker : Window
         bitmap.Freeze();
         return bitmap;
     }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmFlush();
+
+    /// <summary>WDA_EXCLUDEFROMCAPTURE (Windows 10 2004+): screen captures see through this window.</summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint affinity);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
