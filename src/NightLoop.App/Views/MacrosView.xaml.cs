@@ -205,13 +205,14 @@ public partial class MacrosView : UserControl
         // Pinned top bars. The card's own top isn't moved by the shift, so measure from it.
         var headShift = 0.0;
         var head = MacroHead.ActualHeight;
-        var cardTop = LoadedCard.TranslatePoint(new Point(0, 0), Scroller).Y;
+        // The bars sit inside the card's 1 px border, so they start just below the card's top edge.
+        var cardTop = LoadedCard.TranslatePoint(new Point(0, 0), Scroller).Y + LoadedCard.BorderThickness.Top;
         if (vm.EditorFollowsScroll && head > 0 && head < view * 0.6)
         {
             var maxShift = Math.Max(0, EditorBody.ActualHeight - 80); // never past the card's last rows
-            headShift = Math.Round(Math.Clamp(-cardTop, 0, maxShift));
+            headShift = Math.Clamp(-cardTop, 0, maxShift); // not rounded: a rounded shift can leave a 1 px gap at the top
         }
-        if (Math.Abs(HeadShift.Y - headShift) >= 0.5) HeadShift.Y = headShift;
+        if (Math.Abs(HeadShift.Y - headShift) >= 0.01) HeadShift.Y = headShift;
         var cover = vm.EditorFollowsScroll ? Math.Clamp(cardTop + headShift + head, 0, view) : 0; // page hidden by the bars
 
         var room = Inspector.ActualHeight - Inspector.Padding.Top - Inspector.Padding.Bottom - InspectorPanel.ActualHeight;

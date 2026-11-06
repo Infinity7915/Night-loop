@@ -10,6 +10,10 @@
   Anything inside these comment marks is hidden. Delete everything else to show "Nothing new right now."
 -->
 
+# What's new in 0.6.6
+
+- Fixed: the pinned bars at the top of a long macro no longer leave a thin gap above them while scrolling.
+
 # What's new in 0.6.5
 
 - New: Pick on the live screen (Settings › Macros, off by default). Picking a click spot, color, area or picture no longer freezes the screen. A crosshair, the position and the outline show where you're picking, and pictures are taken the moment you let go.
