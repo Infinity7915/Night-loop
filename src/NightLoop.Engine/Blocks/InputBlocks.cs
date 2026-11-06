@@ -19,6 +19,12 @@ internal static class InputBlocks
     internal const int MoveStepMs = 8;
     /// <summary>Arrow-key camera turns hold the key this long per pixel of "amount".</summary>
     internal const double ArrowMsPerPx = 2.0;
+    /// <summary>Shorter taps can fall between two game frames and turn nothing.</summary>
+    internal const int ArrowMinHoldMs = 50;
+    /// <summary>The turn (in px) of the shortest arrow hold.</summary>
+    internal const int ArrowMinPx = (int)(ArrowMinHoldMs / ArrowMsPerPx);
+    /// <summary>Wait around a right-drag's press and release: about three frames at 60 fps.</summary>
+    private const int DragSettleMs = 50;
     /// <summary>Gives games a moment to see the button go down before the mouse moves (drags, right-drag turns).</summary>
     private const int SettleMs = 25;
     /// <summary>Rest on the target after gliding there, before clicking.</summary>
@@ -227,14 +233,7 @@ internal static class InputBlocks
                 break;
             }
             case "rightDrag":
-                ctx.Input.MouseDown(MouseButton.Right);
-                try
-                {
-                    await ctx.PauseExactAsync(SettleMs);
-                    await RelativeAsync(ctx, [(0, 0, 0), (dx, dy, durationMs)], dx, dy, durationMs);
-                    await ctx.PauseExactAsync(SettleMs);
-                }
-                finally { ctx.Input.MouseUp(MouseButton.Right); }
+                await RightDragAsync(ctx, dx, dy, durationMs);
                 break;
             default:
                 await RelativeAsync(ctx, [(0, 0, 0), (dx, dy, durationMs)], dx, dy, durationMs);
@@ -242,12 +241,35 @@ internal static class InputBlocks
         }
     }
 
+    /// <summary>
+    /// Holds the right button, moves, and lets go. The game gets a couple of frames to see the press before the
+    /// movement starts and after it ends, so it never misses the release (a missed release leaves the camera turning
+    /// whenever the mouse moves). The release is sent a second time once the game has had time to read the first:
+    /// an extra release of a button that is already up changes nothing, but it unsticks a game that dropped one.
+    /// </summary>
+    private static async Task RightDragAsync(RunContext ctx, int dx, int dy, int durationMs)
+    {
+        ctx.Input.MouseDown(MouseButton.Right);
+        try
+        {
+            await ctx.PauseExactAsync(DragSettleMs);
+            await RelativeAsync(ctx, [(0, 0, 0), (dx, dy, durationMs)], dx, dy, durationMs);
+            await ctx.PauseExactAsync(DragSettleMs);
+        }
+        finally { ctx.Input.MouseUp(MouseButton.Right); }
+        await ctx.PauseExactAsync(DragSettleMs);
+        ctx.Input.MouseUp(MouseButton.Right);
+    }
+
     private static async Task HoldArrowAsync(RunContext ctx, int vk, int amount)
     {
         ctx.Input.KeyDown(vk);
-        try { await ctx.WaitAsync((int)Math.Round(Math.Abs(amount) * ArrowMsPerPx), jitter: false); }
+        try { await ctx.WaitAsync(ArrowHoldMs(amount), jitter: false); }
         finally { ctx.Input.KeyUp(vk); }
     }
+
+    /// <summary>How long an arrow is held to turn about <paramref name="amountPx"/>, never shorter than a few game frames.</summary>
+    internal static int ArrowHoldMs(int amountPx) => Math.Max(ArrowMinHoldMs, (int)Math.Round(Math.Abs(amountPx) * ArrowMsPerPx));
 
     public static Task ZoomAsync(Block b, RunContext ctx)
     {

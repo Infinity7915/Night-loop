@@ -21,8 +21,9 @@ public sealed class TrackingInputSender(IInputSender inner) : IInputSender
 
     public void KeyUp(int virtualKey)
     {
-        lock (_gate) _keys.Remove(virtualKey);
+        // Forget the key only once Windows took the release, so a failed one is tried again by ReleaseAll.
         inner.KeyUp(virtualKey);
+        lock (_gate) _keys.Remove(virtualKey);
     }
 
     public void MouseDown(MouseButton button)
@@ -33,8 +34,8 @@ public sealed class TrackingInputSender(IInputSender inner) : IInputSender
 
     public void MouseUp(MouseButton button)
     {
-        lock (_gate) _buttons.Remove(button);
         inner.MouseUp(button);
+        lock (_gate) _buttons.Remove(button);
     }
 
     public void MoveTo(int x, int y) => inner.MoveTo(x, y);
@@ -55,7 +56,14 @@ public sealed class TrackingInputSender(IInputSender inner) : IInputSender
             _keys.Clear();
             _buttons.Clear();
         }
-        foreach (var b in buttons) inner.MouseUp(b);
-        foreach (var k in keys) inner.KeyUp(k);
+        // One release failing must not leave the rest held down.
+        foreach (var b in buttons) Try(() => inner.MouseUp(b));
+        foreach (var k in keys) Try(() => inner.KeyUp(k));
+    }
+
+    private static void Try(Action release)
+    {
+        try { release(); }
+        catch (InvalidOperationException) { }
     }
 }

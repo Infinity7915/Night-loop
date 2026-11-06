@@ -10,6 +10,11 @@
   Anything inside these comment marks is hidden. Delete everything else to show "Nothing new right now."
 -->
 
+# What's new in 0.6.4
+
+- Fixed: Turn with Arrow keys now really presses the arrow keys, so Scan & turn turns the camera and stops getting stuck.
+- Fixed: the right mouse button no longer stays held after Scan & turn finds its target.
+
 # What's new in 0.6.3
 
 - Center camera on it (Scan & turn) and Center on target now put the target right in the middle in two steps: first they turn sideways until it is centered left to right, then they look up or down at it. They never turn both ways at once.
