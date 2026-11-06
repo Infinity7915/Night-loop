@@ -10,6 +10,10 @@
   Anything inside these comment marks is hidden. Delete everything else to show "Nothing new right now."
 -->
 
+# What's new in 0.6.7
+
+- Fixed: with Pick on the live screen on, pictures no longer include the purple outline, so their colors match. Capture those pictures again.
+
 # What's new in 0.6.6
 
 - Fixed: the pinned bars at the top of a long macro no longer leave a thin gap above them while scrolling.
