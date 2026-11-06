@@ -10,6 +10,11 @@
   Anything inside these comment marks is hidden. Delete everything else to show "Nothing new right now."
 -->
 
+# What's new in 0.6.9
+
+- Fixed: a macro that stops on an error now always says why, as a Windows notification too.
+- If / Repeat until rows say "no picture yet" when Image visible has no captured picture.
+
 # What's new in 0.6.8
 
 - Fixed: opening one macro after another no longer swaps their names in Saved macros.
