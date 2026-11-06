@@ -23,6 +23,17 @@ public sealed class WindowBoundsTests : IDisposable
         Assert.Null(new LocalSettings(Path.Combine(_dir, "settings.json")).WindowBounds);
     }
 
+    [Fact]
+    public void Live_picking_is_off_by_default_and_saved()
+    {
+        var path = Path.Combine(_dir, "settings.json");
+        Assert.False(new LocalSettings(path).LivePicking);
+        new LocalSettings(path).LivePicking = true;
+        Assert.True(new LocalSettings(path).LivePicking);
+        new LocalSettings(path).LivePicking = false;
+        Assert.False(new LocalSettings(path).LivePicking);
+    }
+
     [Theory]
     [InlineData(100, 50, 1100, 700, true)]       // on the screen
     [InlineData(1800, 50, 1100, 700, true)]      // mostly off to the right, title bar still grabbable

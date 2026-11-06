@@ -87,6 +87,16 @@ public sealed class LocalSettings(string path)
     }
 
     /// <summary>
+    /// Settings › Macros: the on-screen pickers (click position, color, area, picture) leave the screen moving and
+    /// draw a crosshair, the position and the outline on top, instead of freezing a screenshot. Off unless turned on.
+    /// </summary>
+    public bool LivePicking
+    {
+        get => Read()?["livePicking"] is JsonValue v && v.TryGetValue(out bool on) && on;
+        set => WriteNode("livePicking", value);
+    }
+
+    /// <summary>
     /// Settings › Appearance: closing the window hides Night-loop to the notification area (system tray) so
     /// hotkeys and macros keep working. Right-click the tray icon › Exit quits. On unless turned off.
     /// </summary>

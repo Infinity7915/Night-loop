@@ -339,7 +339,10 @@ public sealed partial class MainViewModel
         return null;
     }
 
-    /// <summary>Hides Night-loop, brings the game forward, then shows the picker over a frozen screenshot.</summary>
+    /// <summary>
+    /// Hides Night-loop, brings the game forward, then shows the picker over a frozen screenshot (or over the moving
+    /// screen when Settings › Macros › Pick on the live screen is on).
+    /// </summary>
     private async Task<PickResult?> PickAsync(PickMode mode, string hint)
     {
         var window = Application.Current?.MainWindow;
@@ -356,7 +359,7 @@ public sealed partial class MainViewModel
             if (exe is not null) _windows.Focus(exe);
             await Task.Delay(350); // let the windows behind redraw before the screenshot
             var accent = Application.Current?.TryFindResource("Accent") is SolidColorBrush brush ? brush.Color : Color.FromRgb(0xA7, 0x8B, 0xFA);
-            return ScreenPicker.Pick(_screen, mode, hint, accent);
+            return ScreenPicker.Pick(_screen, mode, hint, accent, _settings.LivePicking);
         }
         finally
         {
