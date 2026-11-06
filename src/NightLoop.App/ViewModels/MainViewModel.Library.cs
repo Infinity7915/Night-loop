@@ -107,7 +107,9 @@ public sealed partial class MainViewModel
     {
         if (_rows.FirstOrDefault(r => r.Id == _macroId) is not { } row) return;
         row.HasDraft = hasDraft;
-        row.Name = string.IsNullOrWhiteSpace(MacroName) ? row.Name : MacroName.Trim();
+        // Only once the editor shows this macro: while opening one, the name box still holds the previous macro's
+        // name, and copying it here swapped the two names in the list (and in Run macro's name lookup).
+        if (!_opening && !_loading) row.Name = string.IsNullOrWhiteSpace(MacroName) ? row.Name : MacroName.Trim();
         row.BlockCount = _doc.Blocks.Count;
         row.UpdatedAt = DateTimeOffset.UtcNow;
         DraftCount = _rows.Count(r => r.HasDraft);

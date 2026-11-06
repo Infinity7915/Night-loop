@@ -54,6 +54,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private Guid? _macroId;
     private bool _loading;
     private bool _creating;
+    /// <summary>Between switching to another macro and showing its blocks and name.</summary>
+    private bool _opening;
 
     public MainViewModel(ApiClient api, TargetGamesViewModel games, LocalSettings? settings = null)
     {
@@ -1071,8 +1073,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             await CloseCurrentAsync();
             var macro = await _api.GetMacroAsync(id);
-            Attach(macro);
-            ApplyDoc(macro.Current ?? NewDoc(), starter: false);
+            _opening = true;
+            try
+            {
+                Attach(macro);
+                ApplyDoc(macro.Current ?? NewDoc(), starter: false);
+            }
+            finally
+            {
+                _opening = false;
+            }
             RefreshRows();
             Status = macro.DraftDoc is null ? $"Opened \"{macro.Name}\"." : $"Opened \"{macro.Name}\" with unsaved changes.";
         }
@@ -1116,9 +1126,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private void Attach(MacroDto macro)
     {
         _macroId = macro.Id;
-        _autosaver = new DraftAutosaver(_api, macro);
-        _autosaver.StateChanged += state => OnUi(() => OnSyncState(state));
-        OnSyncState(_autosaver.State);
+        var saver = new DraftAutosaver(_api, macro);
+        _autosaver = saver;
+        // A closed macro's saver can still report (its last save finishing): ignore it, or it would mark the newly
+        // opened macro's row with the old macro's name.
+        saver.StateChanged += state => OnUi(() =>
+        {
+            if (ReferenceEquals(saver, _autosaver)) OnSyncState(state);
+        });
+        OnSyncState(saver.State);
     }
 
     private async Task CloseCurrentAsync()
