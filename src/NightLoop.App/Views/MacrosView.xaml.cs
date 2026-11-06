@@ -190,19 +190,37 @@ public partial class MacrosView : UserControl
     private void OnScrollChanged(object sender, ScrollChangedEventArgs e) => FollowScroll();
 
     /// <summary>
-    /// Block editor follows scrolling (Settings › Macros). When the timeline is taller than the page, the editor
-    /// moves down its column by the same share the timeline has been scrolled: 0% scrolled keeps it at the top,
-    /// 100% puts it at the bottom. Because it moves by that share of the spare room, it stays on screen the whole way.
+    /// Block editor follows scrolling (Settings › Macros). When the timeline is taller than the page:
+    /// - The macro's top bars (Record, Play, Add block, ticked blocks row) stay pinned to the top of the page, inside
+    ///   the macro card, unless they are too tall (an open options panel or block list) to leave room.
+    /// - The editor moves down its column by the same share the timeline has been scrolled: 0% scrolled keeps it at
+    ///   the top, 100% puts it at the bottom. Because it moves by that share of the spare room (counting only the part
+    ///   of the page below the pinned bars), it stays on screen the whole way.
     /// </summary>
     private void FollowScroll()
     {
         if (!IsLoaded || Vm is not { } vm || EditorBody.ActualHeight <= 0) return;
+        var view = Scroller.ViewportHeight;
+
+        // Pinned top bars. The card's own top isn't moved by the shift, so measure from it.
+        var headShift = 0.0;
+        var head = MacroHead.ActualHeight;
+        var cardTop = LoadedCard.TranslatePoint(new Point(0, 0), Scroller).Y;
+        if (vm.EditorFollowsScroll && head > 0 && head < view * 0.6)
+        {
+            var maxShift = Math.Max(0, EditorBody.ActualHeight - 80); // never past the card's last rows
+            headShift = Math.Round(Math.Clamp(-cardTop, 0, maxShift));
+        }
+        if (Math.Abs(HeadShift.Y - headShift) >= 0.5) HeadShift.Y = headShift;
+        var cover = vm.EditorFollowsScroll ? Math.Clamp(cardTop + headShift + head, 0, view) : 0; // page hidden by the bars
+
         var room = Inspector.ActualHeight - Inspector.Padding.Top - Inspector.Padding.Bottom - InspectorPanel.ActualHeight;
         var offset = 0.0;
         if (vm.EditorFollowsScroll && room > 1)
         {
-            var top = EditorBody.TranslatePoint(new Point(0, 0), Scroller).Y; // < 0 once the timeline's top scrolls away
-            var travel = EditorBody.ActualHeight - Scroller.ViewportHeight;
+            // < 0 once the timeline's top scrolls under the pinned bars (or off the page)
+            var top = EditorBody.TranslatePoint(new Point(0, 0), Scroller).Y - cover;
+            var travel = EditorBody.ActualHeight - (view - cover);
             var share = travel > 1 ? Math.Clamp(-top / travel, 0, 1) : 0;
             offset = Math.Round(share * room);
         }

@@ -285,7 +285,16 @@
                         ToolTip="Block editor follows scrolling" Margin="16,0,0,0" />
               <StackPanel>
                 <TextBlock Text="Block editor follows scrolling" FontWeight="SemiBold" FontSize="14" />
-                <TextBlock Text="When a macro has more blocks than fit on screen, the block editor slides down beside the timeline as you scroll, so it's always in sight."
+                <TextBlock Text="When a macro has more blocks than fit on screen, the bars with Record, Play and Add block stay pinned to the top and the block editor slides down beside the timeline as you scroll, so they're always in sight."
+                           Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+            </DockPanel>
+            <DockPanel Margin="0,20,0,0">
+              <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding LivePicking}" VerticalAlignment="Center"
+                        ToolTip="Pick on the live screen" Margin="16,0,0,0" />
+              <StackPanel>
+                <TextBlock Text="Pick on the live screen" FontWeight="SemiBold" FontSize="14" />
+                <TextBlock Text="When you pick a click spot, color, area or picture on screen, the screen keeps moving instead of freezing. A crosshair, the position and the outline show where you're picking, and pictures are taken the moment you let go."
                            Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
               </StackPanel>
             </DockPanel>

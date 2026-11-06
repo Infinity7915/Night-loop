@@ -10,6 +10,11 @@
   Anything inside these comment marks is hidden. Delete everything else to show "Nothing new right now."
 -->
 
+# What's new in 0.6.5
+
+- New: Pick on the live screen (Settings › Macros, off by default). Picking a click spot, color, area or picture no longer freezes the screen. A crosshair, the position and the outline show where you're picking, and pictures are taken the moment you let go.
+- New: with a long macro, the bars with Record, Play and Add block stay pinned to the top as you scroll, like the block editor.
+
 # What's new in 0.6.4
 
 - Fixed: Turn with Arrow keys now really presses the arrow keys, so Scan & turn turns the camera and stops getting stuck.

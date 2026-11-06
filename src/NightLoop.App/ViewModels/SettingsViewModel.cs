@@ -61,6 +61,18 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>On-screen pickers keep the screen moving instead of freezing a screenshot. Off by default. Kept on this PC.</summary>
+    public bool LivePicking
+    {
+        get => _shell.Local.LivePicking;
+        set
+        {
+            if (_shell.Local.LivePicking == value) return;
+            _shell.Local.LivePicking = value;
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>Closing the window hides Night-loop to the tray instead of quitting. Kept on this PC.</summary>
     public bool CloseToTray
     {
