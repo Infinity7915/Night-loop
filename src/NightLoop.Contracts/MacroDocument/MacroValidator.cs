@@ -93,7 +93,7 @@ public static class MacroValidator
             case RepeatModes.Forever: break;
             case RepeatModes.Count when o.Repeat.Count is >= MacroLimits.CountMin and <= MacroLimits.CountMax: break;
             case RepeatModes.Duration when o.Repeat.Duration is >= MacroLimits.DurationMinSeconds and <= MacroLimits.DurationMaxSeconds: break;
-            default: issues.Add(new(null, "Repeat must be forever, a count of 1–100,000 or a duration of 1–86,400 seconds.")); break;
+            default: issues.Add(new(null, "Repeat must be Infinite, a count of 1–100,000 or a duration of 1–86,400 seconds.")); break;
         }
 
         if (o.Humanize.TimingJitterPct is < 0 or > MacroLimits.TimingJitterMaxPct)
@@ -292,19 +292,19 @@ public static class MacroValidator
                 break;
             case BlockTypes.WaitForKey:
                 Need(b.GetString("key") is { } wk && KeyCatalog.IsKnown(wk), $"Unknown key \"{b.GetString("key")}\".");
-                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
+                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be up to 1 hour, or Infinite.");
                 break;
             case BlockTypes.WaitForText:
                 Need(Text("text", MacroLimits.TypeTextMaxLength), "Wait for text needs the text to look for (1–200 characters).");
                 Need(OneOf("match", TextMatches, "exact"), "Match must be exact or contains.");
                 Need(OptBool("matchCase"), "Case must be on or off.");
-                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
+                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be up to 1 hour, or Infinite.");
                 Region();
                 OnFail();
                 break;
             case BlockTypes.WaitForImage:
             case BlockTypes.WaitForImageGone:
-                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
+                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be up to 1 hour, or Infinite.");
                 Need(OptIntIn("confidencePct", 1, 100), "Confidence must be 1–100%.");
                 Image();
                 Region();
@@ -315,7 +315,7 @@ public static class MacroValidator
                 Need(b.GetInt("x") is not null && b.GetInt("y") is not null, "Wait for pixel needs x and y.");
                 Need(IsColor(b.GetString("color")), "Color must look like #RRGGBB.");
                 Need(OptIntIn("tolerance", 0, 255), "Tolerance must be 0–255.");
-                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
+                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be up to 1 hour, or Infinite.");
                 OnFail();
                 Need(OneOf("relativeTo", RelativeTo, "screen"), "relativeTo must be screen or gameWindow.");
                 break;
@@ -324,7 +324,7 @@ public static class MacroValidator
                 Need(Text("value", MacroLimits.TypeTextMaxLength), "Say what to find (1–200 characters).");
                 Need(OneOf("button", Buttons, "left"), "Button must be left, right, middle, x1 or x2.");
                 Need(OptIntIn("tolerance", 0, 255), "Tolerance must be 0–255.");
-                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
+                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be up to 1 hour, or Infinite.");
                 Image();
                 Region();
                 Need(OptIntIn("clicks", MacroLimits.ClicksMin, MacroLimits.ClicksMax), "Clicks must be 1–3.");
@@ -352,7 +352,7 @@ public static class MacroValidator
             case BlockTypes.WaitForWindow:
                 Process();
                 Need(OneOf("until", ["front", "open"], "front"), "Wait until must be \"in front\" or \"open\".");
-                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
+                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be up to 1 hour, or Infinite.");
                 break;
             case BlockTypes.WindowOpen:
                 Process();
@@ -360,12 +360,12 @@ public static class MacroValidator
                 Need(Text("args", MacroLimits.PathMaxLength, required: false), "Arguments must be at most 260 characters.");
                 Need(OneOf("ifRunning", ["focus", "new"], "focus"), "If it's already running must be focus or open another.");
                 Need(OptBool("wait"), "Wait for its window must be yes or no.");
-                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
+                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be up to 1 hour, or Infinite.");
                 break;
             case BlockTypes.WindowClose:
                 Process();
                 Need(OneOf("how", ["close", "closeThenEnd", "end"], "close"), "Close must be close, close then force, or force.");
-                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be 0 ms – 1 hour.");
+                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Wait for it to close must be 0 ms – 1 hour.");
                 break;
             case BlockTypes.Screenshot:
                 Region();
@@ -393,11 +393,11 @@ public static class MacroValidator
             case BlockTypes.If or BlockTypes.RepeatUntil:
                 ValidateCondition(b.GetObject("condition"), b.Id, issues, 0);
                 if (b.Type == BlockTypes.RepeatUntil)
-                    Need(OptIntIn("maxIterations", 0, MacroLimits.CountMax), "Max tries must be 0 (no limit) to 100,000.");
+                    Need(OptIntIn("maxIterations", 0, MacroLimits.CountMax), "Max tries must be 1–100,000, or Infinite.");
                 break;
             case BlockTypes.Loop:
                 Need(b.GetBool("forever") == true || IntIn("count", MacroLimits.CountMin, MacroLimits.CountMax),
-                    "Loop count must be 1–100,000, or Forever.");
+                    "Loop count must be 1–100,000, or Infinite.");
                 break;
             case BlockTypes.Label or BlockTypes.Goto:
                 Need(Text("name", 40), "Label name must be 1–40 characters.");

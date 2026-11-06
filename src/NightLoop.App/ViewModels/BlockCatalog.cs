@@ -151,10 +151,10 @@ public static class BlockCatalog
              F.Int("from.x", "From X", -Coord, Coord), F.Int("from.y", "From Y", -Coord, Coord),
              F.Int("to.x", "To X", -Coord, Coord), F.Int("to.y", "To Y", -Coord, Coord)],
             b => b.GetPoint("from") is { } f && b.GetPoint("to") is { } t ? $"{f.X},{f.Y} → {t.X},{t.Y}" : ""),
-        new("scroll", BlockTypes.Scroll, "Scroll", "SCR", "Input", "Scroll the wheel up or down.",
+        new("scroll", BlockTypes.Scroll, "Scroll", "SCR", "Input", "Scroll the mouse wheel up or down a number of ticks.",
             () => new() { ["direction"] = "down", ["amount"] = 3 },
             [F.ScrollDirection(), F.ScrollAmount()],
-            b => $"{Label(UpDown, F.ScrollDir(b))} {Math.Abs(b.GetInt("amount", 0))}"),
+            b => $"{Label(UpDown, F.ScrollDir(b))} {F.Ticks(Math.Abs(b.GetInt("amount", 0)))}"),
         new("text", BlockTypes.Type, "Type text", "TXT", "Input", "Type a string, like a chat message.",
             () => new() { ["text"] = "gg", ["delayMs"] = 30 },
             [F.Text("text", "Text", MacroLimits.TypeTextMaxLength, mono: false), F.Int("delayMs", "Delay per key (ms)", 0, 10_000)],
@@ -203,33 +203,33 @@ public static class BlockCatalog
             () => new() { ["text"] = "Quest complete", ["match"] = "exact", ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
             [F.Text("text", "Text", MacroLimits.TypeTextMaxLength, mono: false), F.Pick("match", "Match", Matches, "exact"),
              F.YesNo("matchCase", "Case", fallback: false, yes: "Match case", no: "Ignore case"),
-             F.Region(), F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
+             F.Region(), F.Timeout(),
              F.OnFail(), F.FailLabel()],
-            b => $"\"{b.GetString("text", "")}\" · {b.GetString("match", "exact")} · {b.GetInt("timeoutMs", 10_000)} ms"),
+            b => $"\"{b.GetString("text", "")}\" · {b.GetString("match", "exact")} · {F.MsOrInfinite(b, "timeoutMs", 10_000)}"),
         new("waitimage", BlockTypes.WaitForImage, "Wait for image", "IMG", "Detect", "Wait until a saved picture shows up on screen.",
             () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
             [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.MatchColor(), F.Region(),
-             F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
+             F.Timeout(),
              F.OnFail(), F.FailLabel()],
-            b => $"{ImageName(b)} · {b.GetInt("confidencePct", 90)}% · {b.GetInt("timeoutMs", 10_000)} ms"),
+            b => $"{ImageName(b)} · {b.GetInt("confidencePct", 90)}% · {F.MsOrInfinite(b, "timeoutMs", 10_000)}"),
         new("waitpixel", BlockTypes.DetectPixelColor, "Wait for pixel", "PIX", "Detect", "Wait until one point turns a color, like a health bar.",
             () => new() { ["x"] = 0, ["y"] = 0, ["color"] = "#FFFFFF", ["tolerance"] = 10, ["timeoutMs"] = 5000, ["onFail"] = "continue", ["relativeTo"] = "gameWindow" },
             [F.Int("x", "X", -Coord, Coord), F.Int("y", "Y", -Coord, Coord), F.Color("color", "Color"),
-             F.Int("tolerance", "Tolerance", 0, 255), F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
+             F.Int("tolerance", "Tolerance", 0, 255), F.Timeout(),
              F.OnFail(), F.FailLabel()],
-            b => $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)} = {b.GetString("color", "")} · {b.GetInt("timeoutMs", 5000)} ms"),
+            b => $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)} = {b.GetString("color", "")} · {F.MsOrInfinite(b, "timeoutMs", 5000)}"),
         new("imagegone", BlockTypes.WaitForImageGone, "Image gone", "!IMG", "Detect", "Wait until a saved picture is no longer on screen.",
             () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
             [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.MatchColor(), F.Region(),
-             F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
+             F.Timeout(),
              F.OnFail(), F.FailLabel()],
-            b => $"{ImageName(b)} gone · {b.GetInt("confidencePct", 90)}% · {b.GetInt("timeoutMs", 10_000)} ms"),
+            b => $"{ImageName(b)} gone · {b.GetInt("confidencePct", 90)}% · {F.MsOrInfinite(b, "timeoutMs", 10_000)}"),
         new("pixelgone", BlockTypes.DetectPixelColorGone, "Pixel gone", "!PIX", "Detect", "Wait until one point is no longer a color, like a loading bar.",
             () => new() { ["x"] = 0, ["y"] = 0, ["color"] = "#FFFFFF", ["tolerance"] = 10, ["timeoutMs"] = 5000, ["onFail"] = "continue", ["relativeTo"] = "gameWindow" },
             [F.Int("x", "X", -Coord, Coord), F.Int("y", "Y", -Coord, Coord), F.Color("color", "Color"),
-             F.Int("tolerance", "Tolerance", 0, 255), F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes"),
+             F.Int("tolerance", "Tolerance", 0, 255), F.Timeout(),
              F.OnFail(), F.FailLabel()],
-            b => $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)} ≠ {b.GetString("color", "")} · {b.GetInt("timeoutMs", 5000)} ms"),
+            b => $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)} ≠ {b.GetString("color", "")} · {F.MsOrInfinite(b, "timeoutMs", 5000)}"),
         new("findclick", BlockTypes.FindClick, "Find & click", "FND", "Detect", "Find text, an image or a color and click it.",
             () => new() { ["target"] = "text", ["value"] = "Claim", ["button"] = "left", ["timeoutMs"] = 5000, ["onFail"] = "continue" },
             [F.Pick("target", "Find", FindTargets, "text"), F.FindValue(), .. F.LookTuning(), F.Pick("button", "Button", Buttons, "left"),
@@ -246,15 +246,15 @@ public static class BlockCatalog
             b => $"{Label(FindTargets, b.GetString("target", "text"))} \"{b.GetString("value", "")}\" · {b.GetString("direction", "right")} {b.GetInt("stepPx", 120)}px ×{b.GetInt("maxTurns", 12)}"),
 
         // ---- Logic (9) ----
-        new("loop", BlockTypes.Loop, "Loop", "LOOP", "Logic", "Repeat the blocks inside a set number of times, or forever.",
+        new("loop", BlockTypes.Loop, "Loop", "LOOP", "Logic", "Repeat the blocks inside a set number of times, or Infinite to never stop.",
             () => new() { ["count"] = 10 },
             [F.LoopCount()],
-            b => b.GetBool("forever") == true ? "Forever" : $"{b.GetInt("count", 1)} times"),
+            b => b.GetBool("forever") == true ? F.Infinite : $"{b.GetInt("count", 1)} times"),
         new("until", BlockTypes.RepeatUntil, "Repeat until", "UNTL", "Logic", "Repeat the blocks inside until a condition is true.",
             () => new() { ["condition"] = new JsonObject { ["kind"] = "textVisible", ["text"] = "Done" }, ["maxIterations"] = 0 },
             [F.ConditionKind(), F.ConditionValue(), F.ConditionProgram(), F.ConditionRegion(), .. F.ConditionPictureTuning(),
-             F.Int("maxIterations", "Max tries (0 = no limit)", 0, MacroLimits.CountMax)],
-            b => Conditions.Describe(b.GetObject("condition"))),
+             F.IntOrInfinite("maxIterations", "Max tries", MacroLimits.CountMax, "Infinite keeps going until the condition is true.")],
+            b => Conditions.Describe(b.GetObject("condition")) + (b.GetInt("maxIterations") is > 0 and var max ? $" · max {max:N0}" : "")),
         new("ifb", BlockTypes.If, "If", "IF", "Logic", "Run the blocks inside only when a condition is true.",
             () => new() { ["condition"] = new JsonObject { ["kind"] = "textVisible", ["text"] = "Done" } },
             [F.ConditionKind(), F.ConditionValue(), F.ConditionProgram(), F.ConditionRegion(), .. F.ConditionPictureTuning()],
@@ -276,7 +276,7 @@ public static class BlockCatalog
              F.Text("args", "Arguments (optional)", MacroLimits.PathMaxLength, optional: true, placeholder: "e.g. -windowed"),
              F.Pick("ifRunning", "If it's already running", IfRunning, "focus"),
              F.YesNo("wait", "Wait for its window", fallback: true, yes: "Wait, then bring it to the front", no: "Don't wait"),
-             F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes") with { ShowIf = b => b.GetBool("wait") != false },
+             F.Timeout() with { ShowIf = b => b.GetBool("wait") != false },
              F.Program("process", "Window to wait for (optional)", placeholder: "The program above",
                  hint: "Only for launchers that open a different program, like a game launcher.") with { ShowIf = b => b.GetBool("wait") != false }],
             b => b.GetString("path") is { Length: > 0 } path ? WindowFileName(path) + (b.GetString("args") is { Length: > 0 } a ? $" {a}" : "") : "pick a program"),
@@ -290,8 +290,8 @@ public static class BlockCatalog
         new("waitwin", BlockTypes.WaitForWindow, "Wait for window", "WWN", "Window", "Pause until a window opens, or opens and comes to the front.",
             () => new() { ["timeoutMs"] = 30_000 },
             [F.Process(), F.Pick("until", "Wait until it's", WaitUntil, "front"),
-             F.Int("timeoutMs", "Timeout (ms)", 0, MacroLimits.WaitMaxMs, hint: "0 waits for as long as it takes")],
-            b => $"{ProcessName(b)}{(b.GetString("until") == "open" ? " open" : " in front")} · {b.GetInt("timeoutMs", 30_000)} ms"),
+             F.Timeout()],
+            b => $"{ProcessName(b)}{(b.GetString("until") == "open" ? " open" : " in front")} · {F.MsOrInfinite(b, "timeoutMs", 30_000)}"),
         new("resize", BlockTypes.WindowResize, "Resize window", "SIZE", "Window", "Set the game window to an exact size so recorded positions line up every run.",
             () => new() { ["width"] = 1280, ["height"] = 720 },
             [F.Process(), F.Int("width", "Width (px)", 1, 16_384), F.Int("height", "Height (px)", 1, 16_384)],
@@ -724,26 +724,57 @@ internal static class F
             },
             Placeholder: "night-loop.png", Hint: "Saved in Pictures\\Night-loop", MaxLength: MacroLimits.FileNameMaxLength);
 
-    /// <summary>Loop: a number, or Forever.</summary>
-    public static FieldDef LoopCount() =>
-        new("count", "Times (number or Forever)", FieldKind.Text,
-            b => b.GetBool("forever") == true ? "Forever" : (b.GetInt("count") ?? 1).ToString(CultureInfo.InvariantCulture),
+    /// <summary>What every "no limit" setting shows and accepts: loops, max tries and timeouts.</summary>
+    public const string Infinite = "Infinite";
+
+    /// <summary>Infinite, plus the older words for it (Forever, ∞), in any case.</summary>
+    public static bool IsInfinite(string text) =>
+        text.Trim() is var t && (t.Equals(Infinite, StringComparison.OrdinalIgnoreCase) || t.Equals("inf", StringComparison.OrdinalIgnoreCase)
+                                 || t.Equals("forever", StringComparison.OrdinalIgnoreCase) || t == "∞");
+
+    /// <summary>A number where 0 means no limit. It shows as Infinite and takes Infinite (or 0) to mean it.</summary>
+    public static FieldDef IntOrInfinite(string path, string label, int max, string? hint = null) =>
+        new(path, label, FieldKind.Text,
+            b => P.Get(b, path) is JsonValue v && BlockParams.AsInt(v) == 0 ? Infinite : P.Text(P.Get(b, path)),
             (b, text) =>
             {
                 var t = text.Trim().Replace(",", "", StringComparison.Ordinal);
-                if (t.Equals("forever", StringComparison.OrdinalIgnoreCase) || t == "∞")
+                if (IsInfinite(t)) t = "0";
+                if (!int.TryParse(t, NumberStyles.None, CultureInfo.InvariantCulture, out var n) || n > max)
+                    return $"Use 1 to {max:N0}, or {Infinite}.";
+                P.Set(b, path, n);
+                return null;
+            },
+            Hint: hint, MaxLength: 12);
+
+    /// <summary>Wait blocks' timeout: Infinite waits for as long as it takes.</summary>
+    public static FieldDef Timeout() =>
+        IntOrInfinite("timeoutMs", "Timeout (ms)", MacroLimits.WaitMaxMs, $"{Infinite} waits for as long as it takes.");
+
+    /// <summary>"5000 ms", or Infinite for 0.</summary>
+    public static string MsOrInfinite(Block b, string key, int fallback) =>
+        b.GetInt(key, fallback) is var ms && ms == 0 ? Infinite : $"{ms} ms";
+
+    /// <summary>Loop: a number, or Infinite (stored as forever: true, like before).</summary>
+    public static FieldDef LoopCount() =>
+        new("count", "Times (number or Infinite)", FieldKind.Text,
+            b => b.GetBool("forever") == true ? Infinite : (b.GetInt("count") ?? 1).ToString(CultureInfo.InvariantCulture),
+            (b, text) =>
+            {
+                var t = text.Trim().Replace(",", "", StringComparison.Ordinal);
+                if (IsInfinite(t) || t == "0")
                 {
                     b.Params.Remove("count");
                     b.Params["forever"] = true;
                     return null;
                 }
                 if (!int.TryParse(t, NumberStyles.None, CultureInfo.InvariantCulture, out var n) || n < MacroLimits.CountMin || n > MacroLimits.CountMax)
-                    return $"Use {MacroLimits.CountMin:N0} to {MacroLimits.CountMax:N0}, or Forever.";
+                    return $"Use {MacroLimits.CountMin:N0} to {MacroLimits.CountMax:N0}, or {Infinite}.";
                 b.Params.Remove("forever");
                 b.Params["count"] = n;
                 return null;
             },
-            MaxLength: 12);
+            Hint: $"{Infinite} repeats until the macro stops.", MaxLength: 12);
 
     public static FieldDef ScrollDirection() =>
         new("direction", "Direction", FieldKind.Choice,
@@ -757,7 +788,7 @@ internal static class F
             [new("up", "Up"), new("down", "Down")]);
 
     public static FieldDef ScrollAmount() =>
-        new("amount", "Notches", FieldKind.Text,
+        new("amount", "Ticks", FieldKind.Text,
             b => Math.Abs(b.GetInt("amount", 0)).ToString(CultureInfo.InvariantCulture),
             (b, text) =>
             {
@@ -767,7 +798,9 @@ internal static class F
                 b.Params["amount"] = n;
                 return null;
             },
-            MaxLength: 3);
+            Hint: "One tick is one click of the scroll wheel.", MaxLength: 3);
+
+    public static string Ticks(int n) => n == 1 ? "1 tick" : $"{n} ticks";
 
     /// <summary>Older scroll blocks have a signed amount and no direction.</summary>
     public static string ScrollDir(Block b) => b.GetString("direction") ?? (b.GetInt("amount", 0) < 0 ? "down" : "up");

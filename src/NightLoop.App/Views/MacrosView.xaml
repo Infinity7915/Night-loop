@@ -408,7 +408,7 @@
                   <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBox Text="{Binding RepeatCount}" Style="{StaticResource SmallBox}" Width="70"
                              IsEnabled="{Binding RepeatForever, Converter={StaticResource Not}}" ToolTip="Times to run the whole macro" />
-                    <CheckBox Content="Forever" IsChecked="{Binding RepeatForever}" Margin="10,0,0,0" />
+                    <CheckBox Content="Infinite" IsChecked="{Binding RepeatForever}" Margin="10,0,0,0" />
                   </StackPanel>
                   <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="Repeat" FontWeight="SemiBold" />
