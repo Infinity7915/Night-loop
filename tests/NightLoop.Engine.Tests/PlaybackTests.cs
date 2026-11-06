@@ -131,6 +131,41 @@ public class PlaybackTests
     }
 
     [Fact]
+    public async Task A_short_arrow_turn_still_holds_the_key_for_a_few_frames()
+    {
+        var doc = new MacroBuilder().Add(BlockTypes.CameraTurn, new() { ["direction"] = "left", ["amountPx"] = 3, ["method"] = "arrowKeys" }).Build();
+        var r = await RunAsync(doc);
+        Assert.Equal(["down Left", "up Left"], r.Input.Log);
+        Assert.Equal(50, r.Delay.TotalMs);
+    }
+
+    [Fact]
+    public async Task Right_drag_lets_go_twice_so_a_game_that_missed_the_release_unsticks()
+    {
+        var doc = new MacroBuilder().Add(BlockTypes.CameraTurn, new() { ["direction"] = "right", ["amountPx"] = 60, ["method"] = "rightDrag" }).Build();
+        var r = await RunAsync(doc);
+        Assert.Equal(1, r.Input.Log.Count(l => l == "mdown Right"));
+        Assert.Equal(["mup Right", "mup Right"], r.Input.Log[^2..]);
+    }
+
+    [Fact]
+    public async Task Scan_and_turn_with_arrow_keys_turns_with_left_and_right_and_never_walks_with_up_or_down()
+    {
+        // Seen on the third look; centered left to right but high on the screen.
+        var screen = new FakeScreen(400, 300);
+        var looks = 0;
+        screen.OnCapture = s => { if (++looks == 3) s.Paint(198, 30, 6, 6, new Rgb(255, 255, 0)); };
+        var doc = new MacroBuilder().Add(BlockTypes.ScanTurn, new()
+        {
+            ["target"] = "pixel", ["value"] = "#FFFF00", ["method"] = "arrowKeys", ["whenFound"] = "center", ["stepPx"] = 100,
+        }).Build();
+        var r = await RunAsync(doc, screen: screen);
+        Assert.Contains("down Right", r.Input.Log);
+        Assert.DoesNotContain(r.Input.Log, l => l is "down Up" or "down Down" || l.StartsWith("mdown", StringComparison.Ordinal));
+        Assert.Equal(r.Input.Log.Count(l => l.StartsWith("down ", StringComparison.Ordinal)), r.Input.Log.Count(l => l.StartsWith("up ", StringComparison.Ordinal)));
+    }
+
+    [Fact]
     public async Task Combo_presses_in_order_and_releases_in_reverse()
     {
         var doc = new MacroBuilder().Add(BlockTypes.Combo, new() { ["keys"] = "Ctrl + Shift + E" }).Build();

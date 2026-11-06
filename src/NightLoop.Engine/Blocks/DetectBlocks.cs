@@ -127,7 +127,8 @@ internal static class DetectBlocks
 
     /// <summary>
     /// Puts the target in the middle of the screen in separate steps, never turning both ways at once: first it turns
-    /// sideways until the target is centered left to right, and only then (when <paramref name="tilt"/> is on) tilts
+    /// sideways until the target is centered left to right, and only then (when <paramref name="tilt"/> is on and the
+    /// method isn't arrow keys) tilts
     /// up or down until it is centered top to bottom. Each step measures how far the target moved on screen for each
     /// pixel of turn, so it settles in a few turns whatever the game's mouse sensitivity is. Returns where the target
     /// is now and the measured sideways screen pixels per pixel of turn.
@@ -137,8 +138,9 @@ internal static class DetectBlocks
         var what = new LookFor(target.Kind, target.Value, target.ImageData, target.Tolerance, target.ConfidencePct, Region: null, SizeTolerancePct: target.SizeTolerancePct, MatchColor: target.MatchColor);
         var view = ctx.AreaFor(null).Center;
         var (ok, point, ratio) = await CenterAxisAsync(ctx, what, target, target.Point, view, tolerance, method, vertical: false, guess: null);
-        // Sideways sensitivity is a good first guess for up and down.
-        if (ok && tilt)
+        // Sideways sensitivity is a good first guess for up and down. Arrow keys only turn sideways: in most games
+        // (Roblox too) Up and Down walk instead of tilting the view.
+        if (ok && tilt && method != "arrowKeys")
             (_, point, _) = await CenterAxisAsync(ctx, what, target, point, view, tolerance, method, vertical: true, guess: ratio);
         return (point, ratio ?? 1);
     }
@@ -161,6 +163,8 @@ internal static class DetectBlocks
                     ? (int)Math.Clamp(off / g * 0.6, -CenterFirstMovePx, CenterFirstMovePx)
                     : (int)Math.Clamp(off * 0.4, -CenterFirstMovePx, CenterFirstMovePx);
             if (send == 0) send = Math.Sign(off);
+            // A short arrow tap is held for a minimum time, so it turns at least that much.
+            var turned = method == "arrowKeys" ? Math.Sign(send) * Math.Max(Math.Abs(send), InputBlocks.ArrowMinPx) : send;
             var (sx, sy) = vertical ? (0, send) : (send, 0);
             await ctx.InputAsync(() => InputBlocks.TurnAsync(ctx, method, sx, sy, InputBlocks.DefaultTurnMs(send)));
             await ctx.PauseExactAsync(ScanSettleMs);
@@ -174,7 +178,7 @@ internal static class DetectBlocks
             // A reading that went the wrong way (the target itself moved) is ignored.
             var moved = vertical ? point.Y - next.Y : point.X - next.X;
             if (Math.Abs(moved) > 2 && Math.Sign(moved) == Math.Sign(send))
-                ratio = Math.Clamp(moved / (double)send, 0.05, 20);
+                ratio = Math.Clamp(moved / (double)turned, 0.05, 20);
             point = next;
             ctx.LastFound = target with { Point = next };
         }
