@@ -998,6 +998,8 @@ public static class Conditions
     {
         var (kind, value) = Read(c);
         var label = Kinds.FirstOrDefault(k => k.Value == kind)?.Label ?? kind;
+        // A picture check without its picture stops the macro with an error, so say so on the row.
+        if (kind.TrimStart('!') == "imageVisible" && Inner(c)?["imageData"] is not JsonValue) return $"{label} · no picture yet";
         return value.Length > 0 ? $"{label} {value}" : label;
     }
 

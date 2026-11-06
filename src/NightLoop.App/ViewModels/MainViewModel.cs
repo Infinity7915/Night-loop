@@ -1336,6 +1336,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private void OnRunState(MacroRun run, RunState state)
     {
         OnLibraryRunState(run);
+        if (state == RunState.Faulted) ReportFault(run);
         if (run != _run) return;
         switch (state)
         {
@@ -1362,7 +1363,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 IsPlaying = false;
                 IsAtBreakpoint = false;
                 Highlight(-1);
-                Status = $"Stopped at {run.FaultBlockId}: {run.FaultMessage}";
                 if (Blocks.FirstOrDefault(b => b.Block.Id == run.FaultBlockId) is { } bad)
                 {
                     bad.IsFault = true;
@@ -1370,6 +1370,21 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 }
                 break;
         }
+    }
+
+    /// <summary>
+    /// A macro stopped on an error. Said in the status bar and as a Windows notification, for every run (also ones
+    /// started by their key from Saved macros), because Night-loop is usually hidden behind the game by then and a
+    /// macro that silently ends looks like a bug in the loop or Go to.
+    /// </summary>
+    private void ReportFault(MacroRun run)
+    {
+        var index = -1;
+        for (var i = 0; i < run.Macro.Steps.Length; i++)
+            if (run.Macro.Steps[i].Block.Id == run.FaultBlockId) { index = i; break; }
+        var where = index >= 0 ? $"block {index + 1:00}" : "a block";
+        Status = $"\"{run.Name}\" stopped at {where}: {run.FaultMessage}";
+        TrayIcon.Notify($"{run.Name} stopped at {where}", run.FaultMessage ?? "");
     }
 
     private IDisposable? TryRegister(Hotkey hotkey, Action action)
