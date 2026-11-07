@@ -270,7 +270,7 @@
         <Border Style="{StaticResource SectionCard}">
           <StackPanel>
             <TextBlock Text="Macros" Style="{StaticResource CardTitle}" />
-            <TextBlock Text="How new macros start, how the editor scrolls, extra waits while macros play and the editor's shortcut keys. Saved locally on this PC." Style="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap" />
+            <TextBlock Text="How new macros start, how the editor scrolls and follows a playing macro, extra waits while macros play and the editor's shortcut keys. Saved locally on this PC." Style="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap" />
             <DockPanel Margin="0,20,0,0">
               <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding StarterSequence}" VerticalAlignment="Center"
                         ToolTip="Starter sequence for new macros" Margin="16,0,0,0" />
@@ -286,6 +286,15 @@
               <StackPanel>
                 <TextBlock Text="Block editor follows scrolling" FontWeight="SemiBold" FontSize="14" />
                 <TextBlock Text="When a macro has more blocks than fit on screen, the bars with Record, Play and Add block stay pinned to the top and the block editor slides down beside the timeline as you scroll, so they're always in sight."
+                           Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+            </DockPanel>
+            <DockPanel Margin="0,20,0,0">
+              <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding FollowPlayingBlock}" VerticalAlignment="Center"
+                        ToolTip="Follow the playing block" Margin="16,0,0,0" />
+              <StackPanel>
+                <TextBlock Text="Follow the playing block" FontWeight="SemiBold" FontSize="14" />
+                <TextBlock Text="While a macro plays, the timeline scrolls so the block being played stays in the middle of the screen and you can watch it move."
                            Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
               </StackPanel>
             </DockPanel>

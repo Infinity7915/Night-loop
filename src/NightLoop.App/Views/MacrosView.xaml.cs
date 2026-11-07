@@ -24,8 +24,16 @@ public partial class MacrosView : UserControl
         };
         DataContextChanged += (_, e) =>
         {
-            if (e.OldValue is MainViewModel old) old.RevealRequested -= Reveal;
-            if (e.NewValue is MainViewModel now) now.RevealRequested += Reveal;
+            if (e.OldValue is MainViewModel old)
+            {
+                old.RevealRequested -= Reveal;
+                old.PlayingBlockChanged -= CenterPlaying;
+            }
+            if (e.NewValue is MainViewModel now)
+            {
+                now.RevealRequested += Reveal;
+                now.PlayingBlockChanged += CenterPlaying;
+            }
         };
     }
 
@@ -100,6 +108,27 @@ public partial class MacrosView : UserControl
     {
         if (Timeline.ItemContainerGenerator.ContainerFromIndex(index) is FrameworkElement row) row.BringIntoView();
     }, System.Windows.Threading.DispatcherPriority.Loaded);
+
+    /// <summary>
+    /// Follow the playing block (Settings › Macros): scrolls the page so the row being played sits in the middle of
+    /// the part of the page you can see (below the pinned top bars, when they're pinned).
+    /// </summary>
+    private void CenterPlaying(int index)
+    {
+        if (!IsLoaded || !IsVisible || Vm is not { } vm) return;
+        if (Timeline.ItemContainerGenerator.ContainerFromIndex(index) is not FrameworkElement row || row.ActualHeight <= 0) return;
+        var view = Scroller.ViewportHeight;
+        if (view <= 0 || Scroller.ScrollableHeight <= 0) return;
+
+        // Rows hidden under the pinned bars don't count as seen, so center in the space below them.
+        var head = MacroHead.ActualHeight;
+        var cover = vm.EditorFollowsScroll && head > 0 && head < view * 0.6 ? head : 0;
+        var rowTop = row.TranslatePoint(new Point(0, 0), Scroller).Y;
+        var rowMiddle = rowTop + row.ActualHeight / 2;
+        var target = cover + (view - cover) / 2;
+        var offset = Math.Clamp(Scroller.VerticalOffset + rowMiddle - target, 0, Scroller.ScrollableHeight);
+        if (Math.Abs(offset - Scroller.VerticalOffset) >= 1) Scroller.ScrollToVerticalOffset(offset);
+    }
 
     private void OnRowClick(object sender, MouseButtonEventArgs e)
     {

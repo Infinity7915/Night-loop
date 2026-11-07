@@ -103,6 +103,16 @@ public sealed class LocalSettings(string path)
     }
 
     /// <summary>
+    /// Settings › Macros: while a macro plays, the page scrolls so the block being played sits in the middle of the
+    /// screen. On unless turned off.
+    /// </summary>
+    public bool FollowPlayingBlock
+    {
+        get => Read()?["followPlayingBlock"] is not JsonValue v || !v.TryGetValue(out bool on) || on;
+        set => WriteNode("followPlayingBlock", value);
+    }
+
+    /// <summary>
     /// Settings › Macros: the on-screen pickers (click position, color, area, picture) leave the screen moving and
     /// draw a crosshair, the position and the outline on top, instead of freezing a screenshot. Off unless turned on.
     /// </summary>
