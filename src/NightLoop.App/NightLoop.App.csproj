@@ -40,6 +40,7 @@
     <ProjectReference Include="..\NightLoop.Client\NightLoop.Client.csproj" />
     <ProjectReference Include="..\NightLoop.Contracts\NightLoop.Contracts.csproj" />
     <ProjectReference Include="..\NightLoop.Engine\NightLoop.Engine.csproj" />
+    <ProjectReference Include="..\NightLoop.Engine.Windows\NightLoop.Engine.Windows.csproj" />
     <ProjectReference Include="..\NightLoop.LocalData\NightLoop.LocalData.csproj" />
     <ProjectReference Include="..\NightLoop.Updates\NightLoop.Updates.csproj" />
   </ItemGroup>

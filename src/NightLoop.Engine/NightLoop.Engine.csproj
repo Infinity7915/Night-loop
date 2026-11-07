@@ -3,17 +3,13 @@
     <TargetFramework>net8.0</TargetFramework>
     <RootNamespace>NightLoop.Engine</RootNamespace>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Description>Runs and records macros. No UI code, so it can be unit-tested with fake input.</Description>
+    <Description>Runs macros. No UI and no Windows code: input, screen capture, text reading and windows come in through interfaces (IInputSender, IScreenCapture, ITextReader, IWindowService), so the PC app (NightLoop.Engine.Windows) and the Android app share it, and it can be unit-tested with fakes.</Description>
   </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Windows.CsWin32" Version="0.3.106">
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\NightLoop.Contracts\NightLoop.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="NightLoop.Engine.Tests" />
+    <InternalsVisibleTo Include="NightLoop.Engine.Windows" />
   </ItemGroup>
 </Project>

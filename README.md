@@ -89,7 +89,8 @@ See [docs/building.md](docs/building.md) for more.
 | Project | What it holds |
 | --- | --- |
 | `src/NightLoop.Contracts` | Shared with the server: macro JSON format, block catalog, limits, validator, error codes, API shapes |
-| `src/NightLoop.Engine` | Runs macros. No UI code. Compiler, runner, input, window control, hotkeys |
+| `src/NightLoop.Engine` | Runs macros. No UI or Windows code, shared with the Android app. Compiler, runner, conditions, picture matching |
+| `src/NightLoop.Engine.Windows` | The PC side of the engine: SendInput, screen capture, window control, hotkeys |
 | `src/NightLoop.Client` | Talks to the server: API client, sign-in session, saved token, device id, draft autosave |
 | `src/NightLoop.LocalData` | Per-PC files: target games list, settings.json |
 | `src/NightLoop.Updates` | Velopack updates from GitHub Releases, and the Home announcements from `announcements.md` |
