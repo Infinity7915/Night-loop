@@ -103,6 +103,7 @@ public sealed partial class MainViewModel
                 Row("00000000-0000-0000-0000-000000000002", "Reconnect watcher", null, 14, false, "F8"),
                 Row("00000000-0000-0000-0000-000000000003", "Fishing loop", fishing, 9, false, "F6"),
                 Row("00000000-0000-0000-0000-000000000004", "Daily rewards", null, 6, false, "F7", alongside: false),
+                Row("00000000-0000-0000-0000-000000000006", "Phone tap farm", null, 5, false, null) with { Platform = MacroPlatforms.Android },
                 Row("00000000-0000-0000-0000-000000000005", "Chest route - east island, long version with every stop", farming, 22, true, "F6"),
             ],
             [new GroupDto(farming, "Roblox · coin farming", "#A78BFA", 0), new GroupDto(fishing, "Fishing", "#34D399", 1)],

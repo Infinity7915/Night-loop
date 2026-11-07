@@ -38,6 +38,12 @@ public sealed partial class MainViewModel
             running.Stop();
             return;
         }
+        if (_rows.FirstOrDefault(r => r.Id == id) is { IsAndroid: true } android)
+        {
+            Status = $"\"{android.Name}\" is an Android macro. Play it in Night-loop for Android.";
+            android.SetRunning(false);
+            return;
+        }
         _ = StartSavedAsync(id);
     }
 
@@ -126,7 +132,7 @@ public sealed partial class MainViewModel
     {
         DisposeMacroHotkeys();
         if (IsCapturingKey) return; // picking a key: OnCaptureChanged registers them again after
-        var keys = _rows.Select(r => (r.Id, Key: r.Id == _macroId ? EditorHotkey : r.Hotkey)).ToList();
+        var keys = _rows.Where(r => !r.IsAndroid).Select(r => (r.Id, Key: r.Id == _macroId ? EditorHotkey : r.Hotkey)).ToList();
         if (_macroId is null && !string.IsNullOrEmpty(EditorHotkey)) keys.Add((Guid.Empty, EditorHotkey));
         var byKey = keys
             .Select(k => (k.Id, Ok: Hotkey.TryParse(k.Key, out var parsed), Key: parsed))

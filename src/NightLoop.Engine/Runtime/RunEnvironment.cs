@@ -10,6 +10,8 @@ public sealed class RunEnvironment
     public required IInputSender Input { get; init; }
     public IDelay Delay { get; init; } = PreciseDelay.Instance;
     public IWindowService? Windows { get; init; }
+    /// <summary>Taps, swipes and Android buttons. Only the Android app has one; touch blocks fault without it.</summary>
+    public ITouchSender? Touch { get; init; }
     public IConditionEvaluator Conditions { get; init; } = new BasicConditionEvaluator();
     public Random Random { get; init; } = Random.Shared;
 

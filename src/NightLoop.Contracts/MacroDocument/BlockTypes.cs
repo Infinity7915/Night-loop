@@ -77,6 +77,21 @@ public static class BlockTypes
     /// <summary>Save a picture of the window or screen. Params: region, file.</summary>
     public const string Screenshot = "utility.screenshot";
 
+    // ---- Android only (see MacroPlatforms) ----
+
+    /// <summary>Tap the screen. Params: x, y (screen pixels), count (1–3 taps, default 1), holdMs (press length, default 50).</summary>
+    public const string Tap = "touch.tap";
+    /// <summary>Press and hold. Params: x, y, holdMs (default 600).</summary>
+    public const string LongPress = "touch.longPress";
+    /// <summary>Swipe in a straight line. Params: from {x, y}, to {x, y}, durationMs (default 300).</summary>
+    public const string Swipe = "touch.swipe";
+    /// <summary>Press an Android system button. Params: button (back, home, recents, notifications).</summary>
+    public const string DeviceButton = "device.button";
+    /// <summary>Open an app. Params: package (e.g. com.roblox.client), wait (wait until it's in front, default true), timeoutMs.</summary>
+    public const string AppOpen = "app.open";
+    /// <summary>Wait until an app is in front. Params: package, timeoutMs (0 or missing = Infinite).</summary>
+    public const string WaitForApp = "app.waitFor";
+
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
         Key, Click, Move, Drag, Scroll, Type, Combo, HoldKey,
@@ -86,6 +101,7 @@ public static class BlockTypes
         If, Else, End, Loop, RepeatUntil, Label, Goto, Stop,
         WindowResize, WindowPosition, WindowFocus, WaitForWindow, WindowOpen, WindowClose,
         Comment, Description, Notify, PlaySound, RunMacro, Screenshot,
+        Tap, LongPress, Swipe, DeviceButton, AppOpen, WaitForApp,
     };
 
     /// <summary>Blocks that act on what they found and have an "After found" choice (go on, leave the loop, go to a label, stop).</summary>
@@ -111,6 +127,7 @@ public static class BlockTypes
     /// <summary>Blocks that send keyboard or mouse input (used by the target lock and the runaway guard).</summary>
     public static bool IsInput(string type) =>
         type.StartsWith("input.", StringComparison.Ordinal) || type.StartsWith("camera.", StringComparison.Ordinal)
+        || type.StartsWith("touch.", StringComparison.Ordinal) || type is DeviceButton
         || type is FindClick or ScanTurn;
 
     /// <summary>Blocks that read the screen for text or images. Pixel colors don't count: they need no text reading.</summary>

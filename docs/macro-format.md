@@ -31,6 +31,20 @@ life; the server refuses a draft or save that changes it. PC macros are stored w
 is unchanged. Macro list and macro responses carry `platform` (`"pc"` or `"android"`) so an app can tell its own
 macros apart without opening them. The Android app sends `X-Client-Platform: android` on every call.
 
+Each platform has its own blocks (`MacroPlatforms.Allows`). Android macros take the touch blocks below plus
+waits, pause/resume, If/Else/Loop/Repeat until/labels/stop, comment, description, notify, play sound and run
+macro. PC macros take every block except the touch blocks. The If/Repeat until condition `appInFront`
+(`package`) is Android only; Android macros can also use `not`, `all` and `any`.
+
+| Type | Params |
+|---|---|
+| `touch.tap` | `x`, `y` (screen px), `count` 1–3 (default 1), `holdMs` (default 50) |
+| `touch.longPress` | `x`, `y`, `holdMs` (default 600) |
+| `touch.swipe` | `from {x,y}`, `to {x,y}`, `durationMs` (default 300) |
+| `device.button` | `button`: `back`, `home`, `recents` or `notifications` |
+| `app.open` | `package` (e.g. `com.roblox.client`), `wait` (default true), `timeoutMs` (default 30 s, 0 = Infinite) |
+| `app.waitFor` | `package`, `timeoutMs` (missing or 0 = Infinite) |
+
 ## Key names
 
 Letters `A`–`Z`, digits `0`–`9`, `F1`–`F24`, `NumPad0`–`NumPad9`, `Enter`, `Escape`, `Space`, `Tab`,
