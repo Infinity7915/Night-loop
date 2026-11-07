@@ -96,6 +96,46 @@ public class TemplateMatcherTests
         Assert.Empty(MacroValidator.Validate(With(MacroLimits.SizeToleranceMaxPct)));
         Assert.NotEmpty(MacroValidator.Validate(With(MacroLimits.SizeToleranceMaxPct + 1)));
     }
+
+    /// <summary>The busy background with the sprite drawn at <paramref name="contrast"/> times its own contrast.</summary>
+    private static ScreenImage DrawFaded(int width, int height, int sx, int sy, int size, double contrast)
+    {
+        var img = Draw(width, height, null)!;
+        var px = img.Bgra;
+        for (var y = 0; y < size; y++)
+        for (var x = 0; x < size; x++)
+        {
+            var g = (byte)Math.Clamp(110 + (Sprite((x + 0.5) / size, (y + 0.5) / size) - 110) * contrast, 0, 255);
+            var i = ((sy + y) * width + sx + x) * 4;
+            px[i] = px[i + 1] = px[i + 2] = g;
+        }
+        return img;
+    }
+
+    [Fact]
+    public void A_faint_smudge_with_the_right_outline_is_not_a_match()
+    {
+        var m = TemplateMatcher.Find(DrawFaded(400, 300, 150, 90, 48, 0.1), Captured(48))!.Value;
+        Assert.True(m.Score < 0.5, $"faint copy scored {m.Score:0.000}");
+    }
+
+    [Theory]
+    [InlineData(0.6)] // darker scene
+    [InlineData(1.6)] // brighter, punchier
+    public void Normal_lighting_changes_still_match(double contrast)
+    {
+        var m = TemplateMatcher.Find(DrawFaded(400, 300, 150, 90, 48, contrast), Captured(48))!.Value;
+        Assert.True(m.Score >= 0.9, $"score {m.Score:0.000}");
+        Assert.InRange(m.X, 150 + 24 - 2, 150 + 24 + 2);
+    }
+
+    [Fact]
+    public void Automatic_size_never_shrinks_a_picture_to_a_few_pixels()
+    {
+        // 30% of 20 px would be 6 px, which looks like lots of things. Shrunk sizes keep at least 12 px.
+        var m = TemplateMatcher.Find(Draw(300, 200, (100, 80, 6)), Captured(20), sizeTolerancePct: null);
+        Assert.True(m is null || m.Value.Scale * 20 >= 11.5, $"tried {m?.Scale * 20:0.0} px");
+    }
 }
 
 public class ColorMatchTests

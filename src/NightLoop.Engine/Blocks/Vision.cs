@@ -75,15 +75,48 @@ internal static class Vision
     public static TemplateMatcher.Match? BestImageMatch(RunContext ctx, LookFor what) =>
         TemplateMatcher.Find(ctx.Capture(ctx.AreaFor(what.Region)), Template(what.ImageData), what.SizeTolerancePct, what.MatchColor);
 
-    /// <summary>Looks again and again until found or the timeout passes (0 = no timeout). Returns null on timeout.</summary>
-    public static async Task<(int X, int Y)?> WaitForAsync(RunContext ctx, LookFor what, int timeoutMs)
+    /// <summary>Two looks this close together count as the same, steady spot.</summary>
+    public const int SteadyPx = 16;
+    /// <summary>Most extra looks <see cref="ConfirmAsync"/> takes while the target is still sliding (the camera easing to a stop).</summary>
+    private const int ConfirmLooks = 3;
+
+    /// <summary>
+    /// Makes sure something seen once is really there before a block clicks or turns to it. One look can be fooled:
+    /// a frame caught while the camera is still moving, a moment of a look-alike, or text read wrong once. This looks
+    /// again after <paramref name="settleMs"/> and only says yes when it is still there, in about the same place.
+    /// While it keeps sliding, it waits and looks again (up to a few times), then uses the last place seen.
+    /// Returns null when a later look doesn't find it.
+    /// </summary>
+    public static async Task<(int X, int Y)?> ConfirmAsync(RunContext ctx, LookFor what, (int X, int Y) first, int settleMs)
+    {
+        var last = first;
+        for (var i = 0; i < ConfirmLooks; i++)
+        {
+            await ctx.PauseExactAsync(settleMs);
+            if (await FindAsync(ctx, what) is not { } next) return null;
+            if (Math.Abs(next.X - last.X) <= SteadyPx && Math.Abs(next.Y - last.Y) <= SteadyPx) return next;
+            last = next;
+        }
+        return last;
+    }
+
+    /// <summary>
+    /// Looks again and again until found or the timeout passes (0 = no timeout). Returns null on timeout. With
+    /// <paramref name="confirm"/>, a find only counts once a second look agrees (see <see cref="ConfirmAsync"/>).
+    /// </summary>
+    public static async Task<(int X, int Y)?> WaitForAsync(RunContext ctx, LookFor what, int timeoutMs, bool confirm = false)
     {
         // Text reading is slow-ish (tens of ms), pictures and pixels are quick.
         var pollMs = what.Kind switch { "pixel" => 50, "image" => 120, _ => 200 };
         var waited = 0;
         while (true)
         {
-            if (await FindAsync(ctx, what) is { } p) return p;
+            if (await FindAsync(ctx, what) is { } p)
+            {
+                if (!confirm) return p;
+                if (await ConfirmAsync(ctx, what, p, pollMs) is { } sure) return sure;
+                waited += pollMs;
+            }
             if (timeoutMs > 0 && waited >= timeoutMs) return null;
             var step = timeoutMs > 0 ? Math.Min(pollMs, timeoutMs - waited) : pollMs;
             await ctx.PauseExactAsync(Math.Max(1, step));

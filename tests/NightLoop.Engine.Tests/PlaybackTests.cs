@@ -506,6 +506,82 @@ public class PlaybackTests
     private static int Clicks(FakeInput input) => input.Log.Count(l => l == "mdown Left");
 
     [Fact]
+    public async Task Scan_and_turn_does_not_click_something_seen_for_only_one_look()
+    {
+        // A look-alike shows up in one frame only (a misread, or the camera passing over it): no click.
+        var screen = new FakeScreen(400, 300);
+        screen.OnCapture = s =>
+        {
+            s.Clear();
+            if (s.Captures == 1) s.Paint(250, 147, 6, 6, new Rgb(255, 255, 0));
+        };
+        var doc = new MacroBuilder().Add(BlockTypes.ScanTurn, new()
+        {
+            ["target"] = "pixel", ["value"] = "#FFFF00", ["method"] = "rightDrag", ["maxTurns"] = 2, ["onFail"] = "continue",
+        }).Build();
+        var r = await RunAsync(doc, screen: screen);
+        Assert.Equal(0, Clicks(r.Input));
+        Assert.Equal(2, r.Input.Log.Count(l => l == "mdown Right")); // kept turning
+    }
+
+    [Fact]
+    public async Task Scan_and_turn_waits_for_the_view_to_stop_sliding_before_clicking()
+    {
+        // The camera eases to a stop after the turn: the target slides across a few looks, then holds still.
+        var screen = new FakeScreen(400, 300);
+        int[] at = [100, 160, 220];
+        screen.OnCapture = s =>
+        {
+            s.Clear();
+            s.Paint(s.Captures <= at.Length ? at[s.Captures - 1] : 225, 147, 6, 6, new Rgb(255, 255, 0));
+        };
+        var doc = new MacroBuilder().Add(BlockTypes.ScanTurn, new()
+        {
+            ["target"] = "pixel", ["value"] = "#FFFF00", ["method"] = "rightDrag",
+        }).Build();
+        var r = await RunAsync(doc, screen: screen);
+        Assert.Equal(1, Clicks(r.Input));
+        Assert.InRange(Moves(r.Input)[^1].X, 225, 231);
+    }
+
+    [Fact]
+    public async Task Scan_and_turn_with_the_camera_on_the_mouse_does_not_click_when_it_loses_the_target()
+    {
+        // Seen twice, then gone as soon as it starts turning toward it: it must not click the empty middle.
+        var screen = new FakeScreen(400, 300);
+        var input = new FakeInput();
+        screen.OnCapture = s =>
+        {
+            s.Clear();
+            if (!input.Log.Any(l => l.StartsWith("rel ", StringComparison.Ordinal))) s.Paint(300, 147, 6, 6, new Rgb(255, 255, 0));
+        };
+        var doc = new MacroBuilder().Add(BlockTypes.ScanTurn, new()
+        {
+            ["target"] = "pixel", ["value"] = "#FFFF00", ["method"] = "mouseMove", ["maxTurns"] = 1,
+        }).Build();
+        var run = new MacroRun(MacroCompiler.Compile(doc), new RunEnvironment { Input = input, Delay = new FakeDelay(), Screen = screen });
+        run.Start();
+        await run.Completion.WaitAsync(Timeout);
+        Assert.Equal(0, Clicks(input));
+    }
+
+    [Fact]
+    public async Task Find_and_click_ignores_a_one_look_flicker_and_clicks_what_stays()
+    {
+        var screen = new FakeScreen(400, 300);
+        screen.OnCapture = s =>
+        {
+            s.Clear();
+            if (s.Captures == 1) s.Paint(50, 50, 6, 6, new Rgb(0, 200, 0));
+            if (s.Captures >= 4) s.Paint(300, 200, 6, 6, new Rgb(0, 200, 0));
+        };
+        var doc = new MacroBuilder().Add(BlockTypes.FindClick, new() { ["target"] = "pixel", ["value"] = "#00C800", ["tolerance"] = 8 }).Build();
+        var r = await RunAsync(doc, screen: screen);
+        Assert.Equal(1, Clicks(r.Input));
+        Assert.InRange(Moves(r.Input)[^1].X, 300, 306);
+    }
+
+    [Fact]
     public async Task After_found_stop_ends_a_forever_loop_after_one_click()
     {
         var doc = new MacroBuilder()
