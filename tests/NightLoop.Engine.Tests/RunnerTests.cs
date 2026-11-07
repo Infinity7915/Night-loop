@@ -62,6 +62,28 @@ public class RunnerTests
     }
 
     [Fact]
+    public async Task Go_to_at_the_end_jumps_back_to_its_label_and_carries_on_from_there()
+    {
+        // 0 Press S, 1 Label top, 2 Press A, 3 Wait, 4 Go to top
+        var doc = new MacroBuilder().Press("S").Label("top").Press("A").Wait(10).Goto("top").Build();
+        var input = new FakeInput();
+        var run = new MacroRun(MacroCompiler.Compile(doc), new RunEnvironment { Input = input, Delay = new FakeDelay() });
+        var steps = new System.Collections.Concurrent.ConcurrentQueue<int>();
+        run.StepChanged += (_, index) => steps.Enqueue(index);
+        run.Start();
+        await WaitFor(() => input.Log.Count(l => l == "down A") >= 5);
+        run.Stop();
+        await run.Completion.WaitAsync(Timeout);
+
+        // The blocks before the label run once; after each Go to, the label block is the next one shown as playing.
+        Assert.Equal(1, input.Log.Count(l => l == "down S"));
+        var seen = steps.ToArray();
+        var gotos = Enumerable.Range(0, seen.Length - 1).Where(i => seen[i] == 4).ToList();
+        Assert.True(gotos.Count >= 4);
+        Assert.All(gotos, i => Assert.Equal(1, seen[i + 1]));
+    }
+
+    [Fact]
     public async Task Inner_loop_count_starts_over_each_outer_pass_and_ends()
     {
         var (run, input, _) = await RunAsync(new MacroBuilder().Loop(2).Loop(3).Press("A").End().Press("B").End().Build());
