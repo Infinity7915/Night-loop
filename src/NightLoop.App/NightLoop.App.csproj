@@ -4,10 +4,28 @@
     <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <UseWPF>true</UseWPF>
-    <!-- Only for the notification-area (tray) icon and its Windows notifications (Services/TrayIcon.cs). -->
-    <UseWindowsForms>true</UseWindowsForms>
-    <!-- The DPI settings in app.manifest are for WPF (per-monitor v2); the WinForms analyzer only knows its own API. -->
-    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+    <!-- Lighter download and install: -->
+    <!-- English only, so the 13 translated copies of the .NET and WPF error messages aren't shipped (~17 MB). -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- Our own code is compiled ahead of time when published, so launching does less work. -->
+    <PublishReadyToRun Condition="'$(RuntimeIdentifier)' != ''">true</PublishReadyToRun>
+    <!-- Trimming is used only to shrink the Windows SDK projection (~23 MB, used for text reading); see the
+         TrimOnlyWindowsSdk target. Everything else is shipped exactly as it would be without trimming. -->
+    <PublishTrimmed Condition="'$(RuntimeIdentifier)' != ''">true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <_SuppressWpfTrimError>true</_SuppressWpfTrimError>
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <!-- Trimming normally also switches off runtime features; WPF and Night-loop need them, so they stay as without
+         trimming (JSON by reflection, COM for WPF, and the rest). -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <EnableGeneratedComInterfaceComImportInterop>true</EnableGeneratedComInterfaceComImportInterop>
+    <CustomResourceTypesSupport>true</CustomResourceTypesSupport>
+    <StartupHookSupport>true</StartupHookSupport>
+    <EnableCppCLIHostActivation>true</EnableCppCLIHostActivation>
+    <_EnableConsumingManagedCodeFromNativeHosting>true</_EnableConsumingManagedCodeFromNativeHosting>
+    <VerifyDependencyInjectionOpenGenericServiceTrimmability>false</VerifyDependencyInjectionOpenGenericServiceTrimmability>
+    <AutoreleasePoolSupport>false</AutoreleasePoolSupport>
     <RootNamespace>NightLoop.App</RootNamespace>
     <AssemblyName>NightLoop</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -26,13 +44,32 @@
     <ProjectReference Include="..\NightLoop.Updates\NightLoop.Updates.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- WinForms is used in one file; keep its names (Application, MessageBox, Color…) out of the WPF code. -->
-    <Using Remove="System.Windows.Forms" />
-    <Using Remove="System.Drawing" />
-  </ItemGroup>
-  <ItemGroup>
     <Resource Include="Assets\icon.png" />
     <EmbeddedResource Include="Assets\icon.ico" LogicalName="NightLoop.icon.ico" />
     <None Include="Assets\icon.svg" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Compile ahead of time only Night-loop's own code; the Windows SDK projection would more than double in size. -->
+    <PublishReadyToRunExclude Include="Microsoft.Windows.SDK.NET.dll" />
+  </ItemGroup>
+
+  <!-- Only the Windows SDK projection is trimmed; every other assembly is copied untouched. -->
+  <Target Name="TrimOnlyWindowsSdk" AfterTargets="PrepareForILLink">
+    <ItemGroup>
+      <ManagedAssemblyToLink Condition="'%(Filename)' != 'Microsoft.Windows.SDK.NET'">
+        <IsTrimmable>false</IsTrimmable>
+        <TrimMode>copy</TrimMode>
+      </ManagedAssemblyToLink>
+    </ItemGroup>
+  </Target>
+
+  <!-- WinForms comes with the self-contained runtime but Night-loop doesn't use it (the tray icon talks to Windows
+       directly), so it isn't shipped (~25 MB). -->
+  <Target Name="DropWinForms" AfterTargets="ResolveRuntimePackAssets">
+    <ItemGroup>
+      <_NightLoopUnused Include="@(RuntimePackAsset)" Condition="'%(Filename)' == 'System.Windows.Forms' or '%(Filename)' == 'System.Windows.Forms.Design' or '%(Filename)' == 'System.Windows.Forms.Design.Editors' or '%(Filename)' == 'System.Windows.Forms.Primitives' or '%(Filename)' == 'Microsoft.VisualBasic.Forms' or '%(Filename)' == 'WindowsFormsIntegration' or '%(Filename)' == 'System.Drawing.Design'" />
+      <RuntimePackAsset Remove="@(_NightLoopUnused)" />
+      <ReferenceCopyLocalPaths Remove="@(_NightLoopUnused)" />
+    </ItemGroup>
+  </Target>
 </Project>

@@ -10,6 +10,12 @@
   Anything inside these comment marks is hidden. Delete everything else to show "Nothing new right now."
 -->
 
+# What's new in 0.8.0
+
+- Lighter: about 30% smaller to install, uses less memory and starts quicker.
+- Settings › Macros has two new sliders: Wait after clicks and Wait after every block (both start at 0).
+- Click, Drag, Find & click and Scan & turn have a Wait after click slider that follows Settings until you change it.
+
 # What's new in 0.7.0
 
 - One word for "no limit": Infinite. Loop times, Max tries, wait Timeouts and the macro's Repeat option all use it now. Type Infinite in the box (0 and Forever still work).
@@ -19,10 +25,6 @@
 
 - Fixed: a macro that stops on an error now always says why, as a Windows notification too.
 - If / Repeat until rows say "no picture yet" when Image visible has no captured picture.
-
-# What's new in 0.6.8
-
-- Fixed: opening one macro after another no longer swaps their names in Saved macros.
 
 # Happy early Thanksgiving from Night-loop!
 

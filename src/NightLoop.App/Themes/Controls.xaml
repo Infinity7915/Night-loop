@@ -298,6 +298,64 @@
     </Setter>
   </Style>
 
+  <!-- Slider (wait times): thin track, accent fill up to a round knob. -->
+  <Style x:Key="SliderKnob" TargetType="Thumb">
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Thumb">
+          <Ellipse x:Name="Knob" Width="18" Height="18" Fill="#FFFFFF" Stroke="{DynamicResource Accent}" StrokeThickness="2" />
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Knob" Property="StrokeThickness" Value="3" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style x:Key="SliderSide" TargetType="RepeatButton">
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="IsTabStop" Value="False" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RepeatButton">
+          <Border Background="Transparent">
+            <Border Height="4" CornerRadius="2" Background="{TemplateBinding Background}" VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style TargetType="Slider">
+    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="IsMoveToPointEnabled" Value="True" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Slider">
+          <Track x:Name="PART_Track" VerticalAlignment="Center">
+            <Track.DecreaseRepeatButton>
+              <RepeatButton Style="{StaticResource SliderSide}" Background="{DynamicResource Accent}" Command="Slider.DecreaseLarge" />
+            </Track.DecreaseRepeatButton>
+            <Track.IncreaseRepeatButton>
+              <RepeatButton Style="{StaticResource SliderSide}" Background="{DynamicResource BorderStrong}" Command="Slider.IncreaseLarge" />
+            </Track.IncreaseRepeatButton>
+            <Track.Thumb>
+              <Thumb x:Name="Knob" Style="{StaticResource SliderKnob}" />
+            </Track.Thumb>
+          </Track>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Opacity" Value="0.45" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <!-- Container for Segment buttons: Dark / Light / System, Every sign-in / New devices only. -->
   <Style x:Key="SegmentBar" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource Bg}" />

@@ -69,6 +69,22 @@ public sealed class LocalSettings(string path)
         set => WriteNode("starterSequence", value);
     }
 
+    /// <summary>Settings › Macros › Wait after clicks (ms): the default for clicking blocks without their own. 0 unless set.</summary>
+    public int WaitAfterClicksMs
+    {
+        get => ReadMs("waitAfterClicksMs");
+        set => WriteNode("waitAfterClicksMs", Math.Max(0, value));
+    }
+
+    /// <summary>Settings › Macros › Wait after every block (ms). 0 unless set.</summary>
+    public int WaitAfterBlocksMs
+    {
+        get => ReadMs("waitAfterBlocksMs");
+        set => WriteNode("waitAfterBlocksMs", Math.Max(0, value));
+    }
+
+    private int ReadMs(string key) => Read()?[key] is JsonValue v && v.TryGetValue(out int ms) && ms > 0 ? ms : 0;
+
     /// <summary>Keep Night-loop above every other window (Settings › Appearance). Off unless turned on.</summary>
     public bool AlwaysOnTop
     {

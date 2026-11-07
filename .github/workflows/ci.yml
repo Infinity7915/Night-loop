@@ -43,6 +43,20 @@ jobs:
           Get-Content smoke\*.error.txt -ErrorAction SilentlyContinue
           if ($p.ExitCode -ne 0) { throw "UI smoke test failed (exit $($p.ExitCode))" }
 
+      # The release ships a published build, which differs from the one above (WinForms left out, the Windows SDK
+      # part trimmed, our code pre-compiled). Run the same check on it, so a missing piece fails here, not after release.
+      - name: Published build check
+        shell: pwsh
+        timeout-minutes: 8
+        run: |
+          dotnet publish src/NightLoop.App/NightLoop.App.csproj -c Release -r win-x64 --self-contained -o publish
+          "Published size: {0:N1} MB" -f ((Get-ChildItem publish -Recurse | Measure-Object Length -Sum).Sum / 1MB)
+          $p = Start-Process "$pwd\publish\NightLoop.exe" -ArgumentList '--smoke', "$pwd\smoke-published" -Wait -PassThru
+          Get-Content smoke-published\windows-parts.txt -ErrorAction SilentlyContinue
+          Get-Content smoke-published\*.error.txt -ErrorAction SilentlyContinue
+          if (Test-Path smoke) { Copy-Item smoke-published\windows-parts.txt smoke\windows-parts-published.txt -ErrorAction SilentlyContinue }
+          if ($p.ExitCode -ne 0) { throw "Published build check failed (exit $($p.ExitCode))" }
+
       - name: Upload screen pictures
         if: always()
         uses: actions/upload-artifact@v4

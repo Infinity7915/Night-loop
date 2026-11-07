@@ -39,6 +39,8 @@ public sealed class RunEnvironment
     /// <summary>utility.runMacro: runs another macro by name and completes when it ends.</summary>
     public Func<string, CancellationToken, Task>? RunMacro { get; init; }
     public Action<string>? Log { get; init; }
+    /// <summary>Settings › Macros' wait after clicks and after every block. Null means no extra waits.</summary>
+    public BlockWaits? Waits { get; init; }
 }
 
 /// <summary>Per-run settings chosen by whoever starts the run.</summary>

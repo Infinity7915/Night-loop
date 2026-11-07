@@ -225,6 +225,9 @@ public static class MacroValidator
         void OnFail() => Need(OneOf("onFail", FailActions, "continue"), "On fail must be continue, retry, go to label or stop.");
         void AfterFound() => Need(OneOf("afterFound", FoundActions, "next"), "After found must be next block, leave loop, go to label or stop.");
 
+        if (BlockTypes.HasWaitAfterClick(b.Type))
+            Need(OptIntIn(BlockTypes.WaitAfterKey, 0, MacroLimits.WaitAfterMaxMs), "Wait after click must be 0–2,000 ms.");
+
         switch (b.Type)
         {
             case BlockTypes.Key:

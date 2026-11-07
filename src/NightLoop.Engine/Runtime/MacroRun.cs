@@ -222,7 +222,11 @@ public sealed class MacroRun
             switch (step.Kind)
             {
                 case StepKind.Action:
-                    switch (await RunBlockAsync(step.Block, ctx))
+                    var ended = await RunBlockAsync(step.Block, ctx);
+                    // Settings › Macros: wait after clicks / after every block.
+                    if (ended != BlockEnd.Interrupted && _env.Waits is { } waits && waits.After(step.Block, ended == BlockEnd.Done) is > 0 and var extra)
+                        await ctx.PauseExactAsync(extra);
+                    switch (ended)
                     {
                         case BlockEnd.Interrupted:
                             next = pc; // paused right away: run this block again on resume

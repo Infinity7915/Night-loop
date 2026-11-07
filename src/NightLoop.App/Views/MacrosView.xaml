@@ -778,8 +778,20 @@
                             </Grid>
                             <Button Style="{StaticResource LinkButton}" Content="Clear" HorizontalAlignment="Left" Margin="0,6,0,0"
                                     Command="{Binding ClearProgramCommand}" Visibility="{Binding CanClear, Converter={StaticResource BoolToVisible}}" />
+                            <!-- Slider (Wait after click): follows the Settings slider until moved -->
+                            <StackPanel Visibility="{Binding IsSlider, Converter={StaticResource BoolToVisible}}">
+                              <DockPanel>
+                                <TextBlock DockPanel.Dock="Right" Text="{Binding SliderText}" FontFamily="{StaticResource Mono}" FontSize="13"
+                                           MinWidth="64" TextAlignment="Right" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                <Slider Minimum="0" Maximum="{Binding SliderMax}" Value="{Binding SliderValue}" TickFrequency="10"
+                                        IsSnapToTickEnabled="True" SmallChange="10" LargeChange="100" AutomationProperties.Name="{Binding Label}" />
+                              </DockPanel>
+                              <TextBlock Text="{Binding SliderNote}" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0" />
+                              <Button Style="{StaticResource LinkButton}" Content="Follow Settings again" HorizontalAlignment="Left" Margin="0,4,0,0"
+                                      Command="{Binding UseSettingsValueCommand}" Visibility="{Binding HasOwnValue, Converter={StaticResource BoolToVisible}}" />
+                            </StackPanel>
                             <TextBlock Text="{Binding Hint}" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
-                                       Visibility="{Binding HasHint, Converter={StaticResource BoolToVisible}}" />
+                                       Visibility="{Binding ShowsHint, Converter={StaticResource BoolToVisible}}" />
                             <TextBlock Text="{Binding Error}" Style="{StaticResource FieldError}"
                                        Visibility="{Binding Error, Converter={StaticResource TextToVisible}}" />
                           </StackPanel>

@@ -28,6 +28,8 @@ public sealed class RunManager(IInputSender input, IWindowService? windows = nul
     public IScreenCapture? Screen { get; set; }
     /// <summary>Text recognition for the text blocks.</summary>
     public ITextReader? Text { get; set; }
+    /// <summary>Settings › Macros' extra waits, shared by every run (changes apply to running macros too).</summary>
+    public BlockWaits? Waits { get; set; }
     /// <summary>Key state for Wait for key and "Key held".</summary>
     public Func<int, bool>? IsKeyDown { get; set; }
     /// <summary>utility.screenshot.</summary>
@@ -62,6 +64,7 @@ public sealed class RunManager(IInputSender input, IWindowService? windows = nul
             Text = Text,
             IsKeyDown = IsKeyDown,
             SaveScreenshot = SaveScreenshot,
+            Waits = Waits,
         };
         var run = new MacroRun(macro, env, settings);
         run.StateChanged += (r, s) => RunStateChanged?.Invoke(r, s);

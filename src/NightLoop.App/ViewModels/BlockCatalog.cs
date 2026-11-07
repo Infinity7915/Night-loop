@@ -19,6 +19,8 @@ public enum FieldKind
     LabelName,
     /// <summary>A program: clicking the box opens File Explorer to pick it (or pick a running app).</summary>
     Program,
+    /// <summary>A number of ms on a slider. Blank follows Settings › Macros (Wait after click).</summary>
+    Slider,
 }
 
 /// <summary>One choice: the value stored in JSON and what the user sees.</summary>
@@ -44,7 +46,8 @@ public sealed record FieldDef(
     Func<Block, bool>? ShowIf = null,
     bool AllMacros = false,
     bool Mono = true,
-    bool FullPath = false);
+    bool FullPath = false,
+    int SliderMax = 0);
 
 /// <summary>A palette entry: one block type with its defaults, inspector fields and one-line summary.</summary>
 public sealed record BlockDef(
@@ -134,7 +137,8 @@ public static class BlockCatalog
              F.Int("x", "X", -Coord, Coord, optional: true, placeholder: "Where the mouse is"),
              F.Int("y", "Y", -Coord, Coord, optional: true, placeholder: "Where the mouse is"),
              F.Int("moveMs", "Glide there (ms)", 0, MacroLimits.MoveMaxMs, optional: true, placeholder: "Automatic",
-                 hint: "0 jumps straight there.")],
+                 hint: "0 jumps straight there."),
+             F.WaitAfterClick()],
             ClickSummary),
         new("move", BlockTypes.Move, "Mouse move", "MOV", "Input", "Move to a point, or by an offset.",
             () => new() { ["mode"] = "absolute", ["x"] = 0, ["y"] = 0, ["durationMs"] = 120, ["relativeTo"] = "gameWindow" },
@@ -149,7 +153,7 @@ public static class BlockCatalog
             },
             [F.Pick("button", "Button", Buttons, "left"),
              F.Int("from.x", "From X", -Coord, Coord), F.Int("from.y", "From Y", -Coord, Coord),
-             F.Int("to.x", "To X", -Coord, Coord), F.Int("to.y", "To Y", -Coord, Coord)],
+             F.Int("to.x", "To X", -Coord, Coord), F.Int("to.y", "To Y", -Coord, Coord), F.WaitAfterClick()],
             b => b.GetPoint("from") is { } f && b.GetPoint("to") is { } t ? $"{f.X},{f.Y} → {t.X},{t.Y}" : ""),
         new("scroll", BlockTypes.Scroll, "Scroll", "SCR", "Input", "Scroll the mouse wheel up or down a number of ticks.",
             () => new() { ["direction"] = "down", ["amount"] = 3 },
@@ -233,7 +237,7 @@ public static class BlockCatalog
         new("findclick", BlockTypes.FindClick, "Find & click", "FND", "Detect", "Find text, an image or a color and click it.",
             () => new() { ["target"] = "text", ["value"] = "Claim", ["button"] = "left", ["timeoutMs"] = 5000, ["onFail"] = "continue" },
             [F.Pick("target", "Find", FindTargets, "text"), F.FindValue(), .. F.LookTuning(), F.Pick("button", "Button", Buttons, "left"),
-             F.IntPick("clicks", "Clicks", ClickCounts, 1), F.Region(), F.AfterFound(), F.FoundLabel(), F.OnFail(), F.FailLabel()],
+             F.IntPick("clicks", "Clicks", ClickCounts, 1), F.WaitAfterClick(), F.Region(), F.AfterFound(), F.FoundLabel(), F.OnFail(), F.FailLabel()],
             b => $"{Label(FindTargets, b.GetString("target", "text"))} \"{b.GetString("value", "")}\" → {b.GetString("button", "left")} click"),
         new("scan", BlockTypes.ScanTurn, "Scan & turn", "SCN", "Detect", "Turn the camera step by step until a target is seen.",
             () => new() { ["target"] = "text", ["value"] = "Collect", ["method"] = "rightDrag", ["direction"] = "right", ["stepPx"] = 120, ["maxTurns"] = 12, ["whenFound"] = "click", ["button"] = "left", ["clicks"] = 1, ["onFail"] = "continue" },
@@ -242,6 +246,7 @@ public static class BlockCatalog
              F.Pick("whenFound", "When found", WhenFound, "click"),
              F.Pick("button", "Button", Buttons, "left") with { ShowIf = b => b.GetString("whenFound", "click") == "click" },
              F.IntPick("clicks", "Clicks", ClickCounts, 1) with { ShowIf = b => b.GetString("whenFound", "click") == "click" },
+             F.WaitAfterClick() with { ShowIf = b => b.GetString("whenFound", "click") == "click" },
              F.AfterFound(), F.FoundLabel(), F.OnFail(), F.FailLabel()],
             b => $"{Label(FindTargets, b.GetString("target", "text"))} \"{b.GetString("value", "")}\" · {b.GetString("direction", "right")} {b.GetInt("stepPx", 120)}px ×{b.GetInt("maxTurns", 12)}"),
 
@@ -378,12 +383,14 @@ public static class BlockCatalog
     {
         var button = Label(Buttons, b.GetString("button", "left"));
         var where = b.GetInt("x") is { } x && b.GetInt("y") is { } y ? $"at {x}, {y}" : "at the mouse";
-        return b.GetString("action", "press") switch
+        var text = b.GetString("action", "press") switch
         {
             "down" => $"Hold {button.ToLowerInvariant()} button {where}",
             "up" => $"Let go of {button.ToLowerInvariant()} button {where}",
             _ => $"{button} ×{b.GetInt("clicks", 1)} {where}{(b.GetInt("holdMs") is { } h and > 20 ? $" · {h} ms" : "")}",
         };
+        // Only a wait set on the block itself; the Settings one isn't part of the macro.
+        return b.GetInt(BlockTypes.WaitAfterKey) is { } wait ? $"{text} · then wait {wait} ms" : text;
     }
 
     private static string PauseSummary(Block b)
@@ -427,6 +434,28 @@ internal static class F
                 return null;
             },
             Placeholder: placeholder, Hint: hint, MaxLength: 12);
+
+    /// <summary>
+    /// Clicking blocks: how long to wait after the click. Blank (the default) follows Settings › Macros › Wait after
+    /// clicks, so changing that slider changes every block that wasn't set by hand.
+    /// </summary>
+    public static FieldDef WaitAfterClick() =>
+        new(BlockTypes.WaitAfterKey, "Wait after click (ms)", FieldKind.Slider,
+            b => P.Text(P.Get(b, BlockTypes.WaitAfterKey)),
+            (b, text) =>
+            {
+                var t = text.Trim();
+                if (t.Length == 0)
+                {
+                    P.Remove(b, BlockTypes.WaitAfterKey);
+                    return null;
+                }
+                if (!int.TryParse(t, NumberStyles.None, CultureInfo.InvariantCulture, out var n) || n > MacroLimits.WaitAfterMaxMs)
+                    return $"Use 0 to {MacroLimits.WaitAfterMaxMs:N0}.";
+                P.Set(b, BlockTypes.WaitAfterKey, n);
+                return null;
+            },
+            Hint: "Until you move it, this follows Settings › Macros › Wait after clicks.", SliderMax: MacroLimits.WaitAfterMaxMs);
 
     public static FieldDef Text(string path, string label, int max, bool optional = false, bool multiLine = false, bool mono = true, string? placeholder = null) =>
         new(path, label, multiLine ? FieldKind.MultiLine : FieldKind.Text,

@@ -22,6 +22,8 @@ public static class MacroLimits
     public const int ScrollMax = 50;
     public const int ClicksMin = 1;
     public const int ClicksMax = 3;
+    /// <summary>Wait after click (on a block) and Settings' wait sliders go up to this.</summary>
+    public const int WaitAfterMaxMs = 2_000;
     public const int TimingJitterMaxPct = 50;
     public const int HumanizeMouseMaxPx = 10;
     public const int ConditionGroupMaxChildren = 5;
