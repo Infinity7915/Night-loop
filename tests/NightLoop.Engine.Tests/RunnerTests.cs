@@ -37,6 +37,61 @@ public class RunnerTests
         Assert.Equal(3, input.Log.Count(l => l == "down A"));
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(25)]
+    public async Task Loop_with_a_number_stops_after_that_many_times(int count)
+    {
+        var (run, input, _) = await RunAsync(new MacroBuilder().Loop(count).Press("A").End().Press("B").Build());
+        Assert.Equal(RunState.Stopped, run.State);
+        Assert.Equal(count, input.Log.Count(l => l == "down A"));
+        Assert.Equal(1, input.Log.Count(l => l == "down B"));
+    }
+
+    [Fact]
+    public async Task Loop_with_a_go_to_inside_its_body_still_stops_at_its_count()
+    {
+        // Go to a label inside the loop skips the rest of that pass but keeps the count.
+        var doc = new MacroBuilder().Loop(3).Label("top").Press("A").Goto("skip").Press("X").Label("skip").End().Press("B").Build();
+        var (run, input, _) = await RunAsync(doc);
+        Assert.Equal(RunState.Stopped, run.State);
+        Assert.Equal(3, input.Log.Count(l => l == "down A"));
+        Assert.DoesNotContain("down X", input.Log);
+        Assert.Equal(1, input.Log.Count(l => l == "down B"));
+    }
+
+    [Fact]
+    public async Task Inner_loop_count_starts_over_each_outer_pass_and_ends()
+    {
+        var (run, input, _) = await RunAsync(new MacroBuilder().Loop(2).Loop(3).Press("A").End().Press("B").End().Build());
+        Assert.Equal(RunState.Stopped, run.State);
+        Assert.Equal(6, input.Log.Count(l => l == "down A"));
+        Assert.Equal(2, input.Log.Count(l => l == "down B"));
+    }
+
+    [Fact]
+    public async Task Playing_from_inside_a_loop_ends()
+    {
+        var doc = new MacroBuilder().Loop(3).Press("A").Press("B").End().Press("C").Build();
+        var (run, input, _) = await RunAsync(doc, new RunSettings { StartIndex = 2 });
+        Assert.Equal(RunState.Stopped, run.State);
+        Assert.Equal(1, input.Log.Count(l => l == "down C"));
+    }
+
+    [Fact]
+    public async Task Infinite_loop_keeps_going_until_stopped()
+    {
+        var doc = new MacroBuilder().Add(BlockTypes.Loop, new() { ["forever"] = true }).Press("A").Wait(10).End().Build();
+        var input = new FakeInput();
+        var run = new MacroRun(MacroCompiler.Compile(doc), new RunEnvironment { Input = input, Delay = new FakeDelay() });
+        run.Start();
+        await WaitFor(() => input.Log.Count(l => l == "down A") >= 50);
+        Assert.False(run.Completion.IsCompleted);
+        run.Stop();
+        await run.Completion.WaitAsync(Timeout);
+    }
+
     [Fact]
     public async Task Nested_loops_multiply()
     {

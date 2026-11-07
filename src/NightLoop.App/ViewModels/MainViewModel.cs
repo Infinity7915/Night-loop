@@ -63,6 +63,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _games = games;
         _settings = settings ?? new LocalSettings();
         _editorFollowsScroll = _settings.EditorFollowsScroll;
+        _followPlayingBlock = _settings.FollowPlayingBlock;
         Waits = new BlockWaits { AfterClicksMs = _settings.WaitAfterClicksMs, AfterBlocksMs = _settings.WaitAfterBlocksMs };
         _games.TargetChanged += OnTargetChanged;
         _runs = new RunManager(new Win32InputSender(), _windows)
@@ -143,6 +144,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _recordMouseMoves = true;
     /// <summary>Settings › Macros › Block editor follows scrolling. The view reads it on every scroll.</summary>
     [ObservableProperty] private bool _editorFollowsScroll = true;
+    /// <summary>Settings › Macros › Follow the playing block. The view scrolls to each block as it plays.</summary>
+    [ObservableProperty] private bool _followPlayingBlock = true;
     [ObservableProperty] private int _repeatCount = 1;
     [ObservableProperty] private bool _repeatForever;
     [ObservableProperty] private bool _humanize;
@@ -1373,7 +1376,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private void Highlight(int index)
     {
         foreach (var row in Blocks) row.IsCurrent = row.Index == index;
+        if (index >= 0 && index < Blocks.Count && FollowPlayingBlock) PlayingBlockChanged?.Invoke(index);
     }
+
+    /// <summary>A block of the loaded macro started playing; the view centers it (Settings › Follow the playing block).</summary>
+    public event Action<int>? PlayingBlockChanged;
 
     private void OnRunState(MacroRun run, RunState state)
     {

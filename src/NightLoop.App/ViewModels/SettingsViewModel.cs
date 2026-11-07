@@ -62,6 +62,19 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>While a macro plays, the page scrolls so the playing block stays in the middle. Kept on this PC.</summary>
+    public bool FollowPlayingBlock
+    {
+        get => _shell.Local.FollowPlayingBlock;
+        set
+        {
+            if (_shell.Local.FollowPlayingBlock == value) return;
+            _shell.Local.FollowPlayingBlock = value;
+            if (_shell.Macros is { } macros) macros.FollowPlayingBlock = value;
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>On-screen pickers keep the screen moving instead of freezing a screenshot. Off by default. Kept on this PC.</summary>
     public bool LivePicking
     {

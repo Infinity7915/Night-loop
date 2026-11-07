@@ -10,6 +10,10 @@
   Anything inside these comment marks is hidden. Delete everything else to show "Nothing new right now."
 -->
 
+# What's new in 0.9.1
+
+- While a macro plays, the editor scrolls so the block being played stays in the middle of the screen. Turn it off in Settings › Macros › Follow the playing block.
+
 # What's new in 0.9.0
 
 - Settings has a new Limits box: macros (out of 15), new macros today (out of 30), blocks in all your macros (out of 2,000) and blocks placed today (out of 200), with when the daily counts reset.
@@ -19,12 +23,6 @@
 # What's new in 0.8.1
 
 - Find & click and Scan & turn with a picture can click a chosen spot inside it, not just the middle. Use "Set click spot in picture" or click the picture preview. It follows the picture when it's found smaller or bigger.
-
-# What's new in 0.8.0
-
-- Lighter: about 30% smaller to install, uses less memory and starts quicker.
-- Settings › Macros has two new sliders: Wait after clicks and Wait after every block (both start at 0).
-- Click, Drag, Find & click and Scan & turn have a Wait after click slider that follows Settings until you change it.
 
 # Happy early Thanksgiving from Night-loop!
 
