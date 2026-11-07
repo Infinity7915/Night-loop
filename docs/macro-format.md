@@ -23,6 +23,14 @@ notes what the code implements and the small additions made for recording.
 }
 ```
 
+## Platform
+
+`platform` says which app a macro is for: missing means a PC macro (every macro made before Android), and
+`"android"` means a macro made in the Android app. Any other value is refused. A macro keeps its platform for
+life; the server refuses a draft or save that changes it. PC macros are stored without the field, so their JSON
+is unchanged. Macro list and macro responses carry `platform` (`"pc"` or `"android"`) so an app can tell its own
+macros apart without opening them. The Android app sends `X-Client-Platform: android` on every call.
+
 ## Key names
 
 Letters `A`–`Z`, digits `0`–`9`, `F1`–`F24`, `NumPad0`–`NumPad9`, `Enter`, `Escape`, `Space`, `Tab`,
