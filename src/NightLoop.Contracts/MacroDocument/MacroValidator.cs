@@ -36,6 +36,8 @@ public static class MacroValidator
             issues.Add(new(null, "The macro is larger than 200 KB."));
         if (doc.TargetGame is { Length: > MacroLimits.PathMaxLength })
             issues.Add(new(null, "The game's program name is too long."));
+        if (!MacroPlatforms.IsKnown(doc.Platform))
+            issues.Add(new(null, "The macro's platform must be PC or Android."));
 
         ValidateOptions(doc.Options, issues);
 

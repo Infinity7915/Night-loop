@@ -12,6 +12,8 @@ public static class ApiHeaders
 {
     public const string InstallId = "X-Install-Id";
     public const string ClientVersion = "X-Client-Version";
+    /// <summary>"android" from the Android app. Missing (the PC app) means "pc".</summary>
+    public const string ClientPlatform = "X-Client-Platform";
     public const string IfMatch = "If-Match";
 }
 
@@ -118,7 +120,8 @@ public sealed record MacroSummaryDto(
     string TriggerMode,
     DateTimeOffset? SavedAt,
     DateTimeOffset? DraftUpdatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string Platform = MacroPlatforms.Pc);
 
 /// <summary>One macro with both copies. DraftDoc is null when there are no unsaved changes.</summary>
 public sealed record MacroDto(
@@ -137,7 +140,8 @@ public sealed record MacroDto(
     MacroDoc? DraftDoc,
     DateTimeOffset? DraftUpdatedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt,
+    string Platform = MacroPlatforms.Pc)
 {
     /// <summary>The copy the editor should open: the draft when there is one, else the saved copy.</summary>
     [JsonIgnore]

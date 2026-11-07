@@ -24,13 +24,16 @@ public sealed class ApiClient
     private readonly HttpClient _http;
     private readonly Guid _installId;
     private readonly string _clientVersion;
+    private readonly string? _platform;
 
     /// <param name="http">Its BaseAddress must end with /v1/ (e.g. https://api.example.com/v1/).</param>
-    public ApiClient(HttpClient http, Guid installId, string clientVersion)
+    /// <param name="platform">"android" from the Android app (sent as X-Client-Platform); null for the PC app.</param>
+    public ApiClient(HttpClient http, Guid installId, string clientVersion, string? platform = null)
     {
         _http = http;
         _installId = installId;
         _clientVersion = clientVersion;
+        _platform = platform;
     }
 
     /// <summary>The session token. Null when signed out.</summary>
@@ -164,6 +167,7 @@ public sealed class ApiClient
         if (Token is not null) req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token);
         req.Headers.Add(ApiHeaders.InstallId, _installId.ToString());
         req.Headers.Add(ApiHeaders.ClientVersion, _clientVersion);
+        if (_platform is not null) req.Headers.Add(ApiHeaders.ClientPlatform, _platform);
         if (ifMatch is { } v) req.Headers.TryAddWithoutValidation(ApiHeaders.IfMatch, $"\"{v}\"");
 
         HttpResponseMessage res;

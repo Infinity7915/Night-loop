@@ -11,6 +11,12 @@ public sealed class MacroDoc
     public int Schema { get; set; } = MacroLimits.CurrentSchema;
     public string Name { get; set; } = "";
     public string? TargetGame { get; set; }
+    /// <summary>
+    /// "android" for macros made in the Android app. Null (and left out of the JSON) for PC macros, so PC macros
+    /// read and write exactly as before. See <see cref="MacroPlatforms"/>.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Platform { get; set; }
     public MacroOptions Options { get; set; } = new();
     public List<Block> Blocks { get; set; } = [];
 }

@@ -33,6 +33,8 @@ public static class MacroSanitizer
     public static int Clean(MacroDoc doc)
     {
         var dropped = 0;
+        // "pc" and missing mean the same; store PC macros without the field so they stay as they always were.
+        if (doc.Platform == MacroPlatforms.Pc) doc.Platform = null;
         foreach (var block in doc.Blocks)
         {
             block.Params ??= [];
