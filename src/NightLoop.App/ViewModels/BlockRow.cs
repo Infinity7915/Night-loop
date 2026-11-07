@@ -11,6 +11,7 @@ public sealed partial class BlockRow : ObservableObject
     public BlockRow(int index, Block block, int depth, Action<BlockRow> changed)
     {
         Index = index;
+        CoversTo = index;
         Block = block;
         Depth = depth;
         _changed = changed;
@@ -34,7 +35,31 @@ public sealed partial class BlockRow : ObservableObject
     [NotifyPropertyChangedFor(nameof(InlineDetail))]
     private string _detail = "";
     /// <summary>The detail shown after the title. Descriptions show theirs on its own lines instead.</summary>
-    public string InlineDetail => IsDescription ? "" : HeldFor.Length > 0 ? $"{Detail} · {HeldFor}" : Detail;
+    public string InlineDetail
+    {
+        get
+        {
+            if (IsDescription) return "";
+            var text = HeldFor.Length > 0 ? $"{Detail} · {HeldFor}" : Detail;
+            return FoldedText.Length > 0 ? (text.Length > 0 ? $"{text} · {FoldedText}" : FoldedText) : text;
+        }
+    }
+
+    /// <summary>A Loop / If / Repeat until with its End, so the blocks inside can be folded away.</summary>
+    [ObservableProperty] private bool _canCollapse;
+    /// <summary>Folded: the blocks inside (and the End) are hidden under this row.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CollapseToolTip))]
+    private bool _isCollapsed;
+    /// <summary>Inside a folded Loop / If / Repeat until, so the row isn't shown.</summary>
+    [ObservableProperty] private bool _isHidden;
+    /// <summary>On a folded row: "5 blocks inside".</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(InlineDetail))]
+    private string _foldedText = "";
+    /// <summary>The last block this row stands for: its End when folded, else itself.</summary>
+    public int CoversTo { get; set; }
+    public string CollapseToolTip => IsCollapsed ? "Expand: show the blocks inside" : "Collapse: hide the blocks inside";
 
     /// <summary>On a Hold down: how long until its Let go ("held 130 ms"). Set by the timeline.</summary>
     [ObservableProperty]
