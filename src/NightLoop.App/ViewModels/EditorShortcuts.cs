@@ -104,7 +104,6 @@ public sealed partial class MainViewModel
         var key = KeyText(h.ToString());
         if (h == Hotkey.Panic) return $"{key} is the stop-everything key.";
         if (h == PlayHotkey) return $"{key} is the editor's Play key.";
-        if (h == RecordHotkey) return $"{key} starts and stops recording.";
         if (h == SelectAllKey) return $"{key} selects every block.";
         if (h.VirtualKey == EscapeKey) return "Esc clears the selection, so it can't be a shortcut.";
         return null;

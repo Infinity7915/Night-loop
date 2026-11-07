@@ -2,10 +2,8 @@ using System.Text.Json.Nodes;
 using NightLoop.Contracts.MacroDocument;
 using NightLoop.Engine.Blocks;
 using NightLoop.Engine.Compiler;
-using NightLoop.Engine.Recording;
 using NightLoop.Engine.Runtime;
 using NightLoop.Engine.Screen;
-using E = NightLoop.Engine.Recording.RawInputEvent;
 
 namespace NightLoop.Engine.Tests;
 
@@ -784,58 +782,6 @@ public class PlaybackTests
         await RunAsync(doc, new RunSettings { TargetExe = "game.exe" }, windows, new FakeScreen(200, 200), save: (img, f) => { saved = img; file = f; });
         Assert.Equal("farm.png", file);
         Assert.Equal((10, 20, 64, 48), (saved!.Left, saved.Top, saved.Width, saved.Height));
-    }
-
-    [Fact]
-    public void Recording_a_camera_turn_with_a_hidden_cursor_saves_relative_motion()
-    {
-        // Right button down, the game hides and pins the cursor, the mouse moves 300 px right, button up.
-        var events = new List<E> { E.Move(0, 500, 400), E.MouseDown(100, Input.MouseButton.Right, 500, 400) };
-        for (var t = 1; t <= 20; t++) events.Add(E.Move(100 + t * 16, 500, 400, dx: 15, dy: t % 2, hidden: true));
-        events.Add(E.MouseUp(500, Input.MouseButton.Right, 500, 400));
-
-        var blocks = RecordingBuilder.Build(events).Blocks;
-        var doc = new MacroDoc { Name = "Turn", Blocks = blocks };
-        Assert.Empty(MacroValidator.Validate(doc));
-
-        var move = Assert.Single(blocks, b => b.Type == BlockTypes.Move);
-        Assert.Equal("relative", move.GetString("mode"));
-        Assert.Equal(300, move.GetInt("x"));
-        Assert.Equal(10, move.GetInt("y"));
-        Assert.Contains(blocks, b => b.Type == BlockTypes.Click && b.GetString("action") == "down" && b.GetString("button") == "right");
-        Assert.Contains(blocks, b => b.Type == BlockTypes.Click && b.GetString("action") == "up");
-    }
-
-    [Fact]
-    public async Task Recorded_drag_keeps_its_path_and_clicks_glide_without_changing_the_timing()
-    {
-        var events = new List<E> { E.Move(0, 0, 0) };
-        // Wander to 400,300 over 300 ms, wait, click; then a curved drag.
-        for (var t = 1; t <= 15; t++) events.Add(E.Move(1000 + t * 20, t * 400 / 15, t * 300 / 15));
-        events.Add(E.MouseDown(2000, Input.MouseButton.Left, 400, 300));
-        events.Add(E.MouseUp(2040, Input.MouseButton.Left, 400, 300));
-        events.Add(E.MouseDown(3000, Input.MouseButton.Left, 400, 300));
-        for (var t = 1; t <= 20; t++)
-        {
-            var a = t / 20.0 * Math.PI;
-            events.Add(E.Move(3000 + t * 20, 400 + (int)(200 * (1 - Math.Cos(a))), 300 - (int)(150 * Math.Sin(a))));
-        }
-        events.Add(E.MouseUp(3420, Input.MouseButton.Left, 800, 300));
-
-        var blocks = RecordingBuilder.Build(events).Blocks;
-        var doc = new MacroDoc { Name = "Drag", Blocks = blocks };
-        Assert.Empty(MacroValidator.Validate(doc));
-        var drag = Assert.Single(blocks, b => b.Type == BlockTypes.Drag);
-        Assert.True(drag.Params["path"] is JsonArray { Count: > 3 }, "the curve should be kept");
-        Assert.Equal(BlockTypes.Click, blocks.First(b => b.Type != BlockTypes.Wait).Type);
-
-        var r = await RunAsync(doc);
-        var moves = Moves(r.Input);
-        Assert.Contains(moves, m => m.Y < 200); // went over the top of the arc
-        Assert.Equal((800, 300), moves[^1]);
-        // Same length as the recording from its first action (1.42 s) plus the first click's 312 ms glide in,
-        // give or take the drag's settle pauses.
-        Assert.InRange(r.Delay.TotalMs, 1700, 1850);
     }
 
     /// <summary>Short waits return at once; waits of 10 s or more last until cancelled.</summary>

@@ -16,7 +16,7 @@ public sealed partial class UpdatesViewModel : ObservableObject
     private readonly Func<bool> _isBusy;
     private readonly Func<Task> _prepareForRestart;
 
-    /// <param name="isBusy">True while a macro runs or records: then the app never restarts by itself.</param>
+    /// <param name="isBusy">True while a macro runs: then the app never restarts by itself.</param>
     /// <param name="prepareForRestart">Saves drafts and stops macros before the app closes.</param>
     public UpdatesViewModel(UpdateService service, Func<bool> isBusy, Func<Task> prepareForRestart)
     {
@@ -42,7 +42,7 @@ public sealed partial class UpdatesViewModel : ObservableObject
 
     /// <summary>
     /// Checks GitHub and downloads a newer release. With <paramref name="restartWhenReady"/> the app then restarts
-    /// into it right away, unless a macro is running or recording (then the Restart button waits for the user).
+    /// into it right away, unless a macro is running (then the Restart button waits for the user).
     /// </summary>
     public async Task CheckAsync(bool restartWhenReady, CancellationToken ct = default)
     {

@@ -75,7 +75,7 @@ public static class SmokeTest
         MainViewModel SampleMacros(string select = "position")
         {
             if (samples.TryGetValue(select, out var existing)) return existing;
-            // Only one editor holds F6 and F9 at a time (the app never has two); free them for the new one.
+            // Only one editor holds F6 at a time (the app never has two); free them for the new one.
             foreach (var old in samples.Values) old.Dispose();
             var dir = Path.Combine(Path.GetTempPath(), "nightloop-smoke");
             Directory.CreateDirectory(dir);
@@ -135,7 +135,7 @@ public static class SmokeTest
             ("macros-collapsed", () => new MacrosView { DataContext = SampleMacros("position#collapsed") }, 1060, 1400),
             ("macros-narrow", () => new MacrosView { DataContext = SampleMacros() }, 740, 3000),
             ("macros-wide", () => new MacrosView { DataContext = SampleMacros() }, 1700, 2000),
-            // The loaded macro's options (record key) and a picture block with its preview.
+            // The loaded macro's options (start key) and a picture block with its preview.
             ("macros-picture", () => new MacrosView { DataContext = SampleMacros("image") }, 1060, 2100),
             ("macros-open-window", () => new MacrosView { DataContext = SampleMacros("open") }, 1060, 1300),
             ("macros-close-window", () => new MacrosView { DataContext = SampleMacros("close") }, 1060, 2100),
@@ -178,55 +178,8 @@ public static class SmokeTest
             Themes.ThemeManager.Preview(Themes.ThemeManager.Dark, palette.Accent, palette.Id);
             failures += Draw(app, folder, palette.Id, themed);
         }
-        CheckMinimizeFocus(folder);
         failures += CheckWindowsParts(folder);
         return failures == 0 ? 0 : 1;
-    }
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
-    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr hWnd, int cmd);
-    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-    /// <summary>
-    /// Report only (never fails the run): after minimizing for Record, is Night-loop still the foreground window?
-    /// It must not be, or the keys typed next go to Night-loop. Compares WPF's WindowState = Minimized with the
-    /// SW_MINIMIZE that Record uses, with another window behind to take focus. Written to minimize-check.txt.
-    /// </summary>
-    private static void CheckMinimizeFocus(string folder)
-    {
-        var lines = new List<string>();
-        try
-        {
-            void Pump() => Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
-            void Wait() { for (var i = 0; i < 10; i++) { Pump(); Thread.Sleep(30); } }
-            var behind = new Window { Title = "Behind", Width = 300, Height = 200, Left = 50, Top = 50, ShowActivated = true };
-            behind.Show();
-            var main = new Window { Title = "Night-loop check", Width = 400, Height = 300, Left = 100, Top = 100 };
-            main.Show();
-            var hwnd = new System.Windows.Interop.WindowInteropHelper(main).Handle;
-            foreach (var (name, minimize) in new (string, Action)[]
-                     {
-                         ("WindowState = Minimized", () => main.WindowState = WindowState.Minimized),
-                         ("ShowWindow(SW_MINIMIZE)", () => ShowWindow(hwnd, 6)),
-                     })
-            {
-                main.WindowState = WindowState.Normal;
-                main.Activate();
-                SetForegroundWindow(hwnd);
-                Wait();
-                var before = GetForegroundWindow() == hwnd;
-                minimize();
-                Wait();
-                lines.Add($"{name}: in front before={before}, still in front after minimize={GetForegroundWindow() == hwnd}");
-            }
-            main.Close();
-            behind.Close();
-        }
-        catch (Exception ex)
-        {
-            lines.Add("check failed: " + ex.Message);
-        }
-        File.WriteAllLines(Path.Combine(folder, "minimize-check.txt"), lines);
     }
 
     /// <summary>

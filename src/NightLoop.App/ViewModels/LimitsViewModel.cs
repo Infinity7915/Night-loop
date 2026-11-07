@@ -92,7 +92,7 @@ public sealed partial class LimitsViewModel(ApiClient? api) : ObservableObject
         return false;
     }
 
-    /// <summary>Why nothing more can be placed (record, add, paste).</summary>
+    /// <summary>Why nothing more can be placed (add, paste).</summary>
     public string NoneLeftText() => Usage is not null && TodayIsTighter()
         ? $"You've placed {Usage.BlocksPerDay} blocks today, the most for one day. More at {Usage.ResetsAt.ToLocalTime():t}."
         : $"Your macros hold {Usage?.BlocksMax ?? MacroLimits.BlocksPerUser:N0} blocks, the most an account can have. Delete some to add more.";
