@@ -108,10 +108,21 @@ public class MacroValidatorTests
     }
 
     [Fact]
-    public void Too_many_blocks_are_rejected()
+    public void Block_count_has_no_cap_of_its_own()
     {
-        var blocks = Enumerable.Range(1, MacroLimits.MaxBlocks + 1).Select(i => B($"b{i}", BlockTypes.Comment)).ToArray();
-        Assert.Contains(MacroValidator.Validate(Doc(blocks)), i => i.Message.Contains("500"));
+        var blocks = Enumerable.Range(1, 600).Select(i => B($"b{i}", BlockTypes.Comment)).ToArray();
+        Assert.Empty(MacroValidator.Validate(Doc(blocks)));
+    }
+
+    [Fact]
+    public void New_blocks_are_the_ids_not_seen_before()
+    {
+        var before = Doc(B("b1", BlockTypes.Comment), B("b2", BlockTypes.Comment));
+        var after = Doc(B("b2", BlockTypes.Comment), B("b3", BlockTypes.Comment), B("b4", BlockTypes.Comment));
+        Assert.Equal(2, MacroLimits.NewBlocks(before, after));
+        Assert.Equal(3, MacroLimits.NewBlocks(null, after));
+        Assert.Equal(new DateTimeOffset(2026, 11, 8, 0, 0, 0, TimeSpan.Zero),
+            MacroLimits.NextDailyReset(new DateTimeOffset(2026, 11, 7, 18, 30, 0, TimeSpan.FromHours(-5))));
     }
 
     [Fact]

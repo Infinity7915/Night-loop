@@ -34,9 +34,19 @@ public static class SmokeTest
     private static readonly BindingErrors Errors = new();
 
     /// <summary>The real window's content (sidebar + loading page), moved out so it can be drawn without showing a window.</summary>
-    private static FrameworkElement MainWindowContent()
+    private static readonly Contracts.Api.DailyUsage SampleUsage = new(4, 15, 1240, 2000, 2, 30, 193, 200,
+        new DateTimeOffset(DateTime.UtcNow.Date.AddDays(1), TimeSpan.Zero));
+
+    private static FrameworkElement MainWindowContent() => MainWindowContent(null);
+
+    /// <summary>The window with an in-app message at the top (blocks running low).</summary>
+    private static FrameworkElement MainWindowNotice() =>
+        MainWindowContent("7 blocks left to place today. More at 7:00 PM.");
+
+    private static FrameworkElement MainWindowContent(string? notice)
     {
         var window = new MainWindow();
+        if (notice is not null) ((ShellViewModel)window.DataContext).ShowNotice(notice);
         // The window itself must carry the dark theme; a white window slipped through once.
         if (window.Background != Application.Current.FindResource("Bg"))
             throw new InvalidOperationException($"MainWindow background is {window.Background}, not the theme's Bg.");
@@ -86,7 +96,14 @@ public static class SmokeTest
 
         // Settings needs the app shell behind it (account, updates, games). It stays offline here.
         ShellViewModel? shell = null;
-        ShellViewModel Shell() => shell ??= new ShellViewModel();
+        ShellViewModel Shell()
+        {
+            if (shell is not null) return shell;
+            shell = new ShellViewModel();
+            // Settings › Limits with sample counts: 7 blocks left today.
+            shell.Limits.Apply(SampleUsage);
+            return shell;
+        }
         SettingsViewModel? settings = null;
         SettingsViewModel SampleSettings() => settings ??= new SettingsViewModel(Shell());
         // The create-account screen, with its terms line.
@@ -133,13 +150,14 @@ public static class SmokeTest
             ("macros-saved-options", () => new MacrosView { DataContext = SampleMacros("position#saved") }, 1060, 2700),
             ("macros-new-group", () => new MacrosView { DataContext = SampleMacros("position#group") }, 1060, 2300),
             ("settings", () => new SettingsView { DataContext = SampleSettings() }, 1060, 1700),
-            ("settings-full", () => new SettingsView { DataContext = SampleSettings() }, 1060, 2600),
+            ("settings-full", () => new SettingsView { DataContext = SampleSettings() }, 1060, 3000),
             ("settings-username", () => new SettingsView { DataContext = SettingsWith(a => a.ChangeUsernameCommand.Execute(null)) }, 1060, 2600),
             ("settings-email", () => new SettingsView { DataContext = SettingsWith(a => a.ChangeEmailCommand.Execute(null)) }, 1060, 2600),
             ("settings-password", () => new SettingsView { DataContext = SettingsWith(a => a.ChangePasswordCommand.Execute(null)) }, 1060, 2600),
             ("settings-delete", () => new SettingsView { DataContext = SettingsWith(a => a.DeleteAccountCommand.Execute(null)) }, 1060, 2600),
             ("settings-narrow", () => new SettingsView { DataContext = SampleSettings() }, 740, 1900),
             ("window", MainWindowContent, 1280, 800),
+            ("window-notice", MainWindowNotice, 1280, 800),
         };
 
         // Every screen in both palettes, with the accent each one is most often seen with.

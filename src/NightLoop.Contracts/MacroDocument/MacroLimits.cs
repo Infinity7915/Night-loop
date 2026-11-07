@@ -7,7 +7,14 @@ public static class MacroLimits
     public const int MacrosPerUser = 15;
     public const int NameMaxLength = 60;
     public const int MaxDocumentBytes = 200 * 1024;
-    public const int MaxBlocks = 500;
+    /// <summary>Blocks across every macro on an account. No cap per macro beyond the size limit (MaxDocumentBytes).</summary>
+    public const int BlocksPerUser = 2000;
+    /// <summary>New blocks an account may place per day (UTC).</summary>
+    public const int BlocksPerDay = 200;
+    /// <summary>New macros an account may create per day (UTC), on top of the MacrosPerUser cap.</summary>
+    public const int NewMacrosPerDay = 30;
+    /// <summary>The app warns (in the window, not in Windows) once this many or fewer blocks or macros are left.</summary>
+    public const int WarnWhenLeft = 10;
     public const int MaxNestingDepth = 16;
     public const int TypeTextMaxLength = 200;
     public const int CommentMaxLength = 200;
@@ -48,4 +55,22 @@ public static class MacroLimits
     public const int BlockIdMaxLength = 64;
     /// <summary>The most text any one block setting can hold, apart from pictures, descriptions and conditions.</summary>
     public const int ParamMaxLength = 4096;
+
+    /// <summary>
+    /// Blocks in <paramref name="after"/> whose id isn't in <paramref name="before"/>: what an edit placed. Moving,
+    /// editing or deleting blocks places nothing. The app gives every new block a fresh id.
+    /// </summary>
+    public static int NewBlocks(MacroDoc? before, MacroDoc after)
+    {
+        if (before is null) return after.Blocks.Count;
+        var old = new HashSet<string>(before.Blocks.Select(b => b.Id), StringComparer.Ordinal);
+        return after.Blocks.Count(b => !old.Contains(b.Id));
+    }
+
+    /// <summary>When the daily counts start again: the next midnight UTC.</summary>
+    public static DateTimeOffset NextDailyReset(DateTimeOffset now)
+    {
+        var utc = now.ToUniversalTime();
+        return new DateTimeOffset(utc.Year, utc.Month, utc.Day, 0, 0, 0, TimeSpan.Zero).AddDays(1);
+    }
 }

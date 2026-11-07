@@ -52,6 +52,7 @@ public sealed partial class MainViewModel
         try
         {
             ApplyList(await _api.ListMacrosAsync());
+            if (Limits is not null) await Limits.RefreshAsync();
         }
         catch (Exception ex) when (ex is ApiException or ServerUnreachableException)
         {

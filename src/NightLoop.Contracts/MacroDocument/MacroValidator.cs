@@ -32,8 +32,6 @@ public static class MacroValidator
             issues.Add(new(null, $"Schema version {doc.Schema} isn't supported (newest known is {MacroLimits.CurrentSchema})."));
         if (string.IsNullOrWhiteSpace(doc.Name) || doc.Name.Length > MacroLimits.NameMaxLength)
             issues.Add(new(null, $"Name must be 1–{MacroLimits.NameMaxLength} characters."));
-        if (doc.Blocks.Count > MacroLimits.MaxBlocks)
-            issues.Add(new(null, $"A macro can have at most {MacroLimits.MaxBlocks} blocks."));
         if (MacroJson.ByteSize(doc) > MacroLimits.MaxDocumentBytes)
             issues.Add(new(null, "The macro is larger than 200 KB."));
         if (doc.TargetGame is { Length: > MacroLimits.PathMaxLength })

@@ -95,6 +95,29 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
     public string ConnectionText => IsOffline ? "Offline · reconnecting" : "Server connected";
 
     public MainViewModel? Macros { get; private set; }
+    /// <summary>The account's macro and block limits (Settings › Account › Limits). Replaced on each sign-in.</summary>
+    public LimitsViewModel Limits { get; private set; } = new(null);
+
+    /// <summary>The in-app message shown at the top of the window (block and macro limits). Never a Windows notification.</summary>
+    [ObservableProperty] private string _notice = "";
+    [ObservableProperty] private bool _isNoticeVisible;
+    private DispatcherTimer? _noticeTimer;
+
+    internal void ShowNotice(string text)
+    {
+        Notice = text;
+        IsNoticeVisible = true;
+        _noticeTimer ??= new DispatcherTimer(TimeSpan.FromSeconds(8), DispatcherPriority.Normal, (_, _) => HideNotice(), Dispatcher.CurrentDispatcher);
+        _noticeTimer.Stop();
+        _noticeTimer.Start();
+    }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void HideNotice()
+    {
+        _noticeTimer?.Stop();
+        IsNoticeVisible = false;
+    }
     public HomeViewModel? Home { get; private set; }
     public SettingsViewModel? Settings { get; private set; }
 
@@ -210,7 +233,10 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
     {
         Username = Session.User?.Username ?? "";
         DisposePages();
-        Macros = new MainViewModel(Api, Games, _settings) { OpenSettings = () => IsSettingsTab = true };
+        Limits = new LimitsViewModel(Api);
+        Limits.Notice += text => OnUi(() => ShowNotice(text));
+        OnPropertyChanged(nameof(Limits));
+        Macros = new MainViewModel(Api, Games, _settings) { OpenSettings = () => IsSettingsTab = true, Limits = Limits };
         Macros.PropertyChanged += OnMacrosChanged;
         Home = new HomeViewModel(this, new AnnouncementFeed(_github, AppPaths.Announcements));
         Settings = new SettingsViewModel(this);
@@ -250,6 +276,7 @@ public sealed partial class ShellViewModel : ObservableObject, IDisposable
         Macros = null;
         Home = null;
         Settings = null;
+        HideNotice();
         OnPropertyChanged(nameof(Macros));
     }
 

@@ -205,9 +205,9 @@ public class RecordingBuilderTests
             events.Add(E.KeyDown(i * 1000, A));
             events.Add(E.KeyUp(i * 1000 + 10, A));
         }
-        var result = RecordingBuilder.Build(events);
+        var result = RecordingBuilder.Build(events, new RecordingOptions { MaxBlocks = MacroLimits.BlocksPerDay });
         Assert.True(result.Truncated);
-        Assert.Equal(MacroLimits.MaxBlocks, result.Blocks.Count);
+        Assert.Equal(MacroLimits.BlocksPerDay, result.Blocks.Count);
     }
 
     [Fact]
