@@ -46,7 +46,7 @@ internal static class DetectBlocks
     public static async Task<bool> FindClickAsync(Block b, RunContext ctx)
     {
         var what = Target(b);
-        var found = await Vision.WaitForAsync(ctx, what, b.GetInt("timeoutMs", 0));
+        var found = await Vision.WaitForAsync(ctx, what, b.GetInt("timeoutMs", 0), confirm: true);
         if (found is not { } p) return false;
         ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor, what.ClickX, what.ClickY);
         await ClickFoundAsync(b, ctx, p);
@@ -83,11 +83,11 @@ internal static class DetectBlocks
 
         for (var i = 0; i <= tries; i++)
         {
-            if (await Vision.FindAsync(ctx, what) is { } p)
+            // Turning has stopped. Only act on it when a second look after the view settles still sees it in the same
+            // place: a single look can catch the camera still moving or a look-alike for a moment, and clicking that
+            // clicks before the target is really there.
+            if (await Vision.FindAsync(ctx, what) is { } seen && await Vision.ConfirmAsync(ctx, what, seen, ScanSettleMs) is { } p)
             {
-                // Turning has stopped. Look once more after the view settles, so the click lands where the target is now.
-                await ctx.PauseExactAsync(ScanSettleMs);
-                if (await Vision.FindAsync(ctx, what) is { } settled) p = settled;
                 ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor, what.ClickX, what.ClickY);
                 switch (b.GetString("whenFound", "click"))
                 {
@@ -95,7 +95,9 @@ internal static class DetectBlocks
                         // The camera follows the mouse here, so gliding to the target would turn the view away from
                         // it. Turn the target into the middle (sideways only), then click without moving the mouse.
                         var tolerance = b.GetInt("tolerancePx", 40);
-                        var (at, ratio) = await CenterAsync(ctx, ctx.LastFound, tolerance, method, tilt: false);
+                        var (ok, at, ratio) = await CenterAsync(ctx, ctx.LastFound, tolerance, method, tilt: false);
+                        // Lost it while turning to it: don't click blind, keep scanning.
+                        if (!ok) continue;
                         await ClickAimedAsync(b, ctx, at, ratio, tolerance, method);
                         break;
                     case "click":
@@ -131,9 +133,9 @@ internal static class DetectBlocks
     /// method isn't arrow keys) tilts
     /// up or down until it is centered top to bottom. Each step measures how far the target moved on screen for each
     /// pixel of turn, so it settles in a few turns whatever the game's mouse sensitivity is. Returns where the target
-    /// is now and the measured sideways screen pixels per pixel of turn.
+    /// is now and the measured sideways screen pixels per pixel of turn. Ok is false when it lost sight of the target.
     /// </summary>
-    private static async Task<((int X, int Y) Point, double Ratio)> CenterAsync(RunContext ctx, FoundTarget target, int tolerance, string method, bool tilt = true)
+    private static async Task<(bool Ok, (int X, int Y) Point, double Ratio)> CenterAsync(RunContext ctx, FoundTarget target, int tolerance, string method, bool tilt = true)
     {
         var what = new LookFor(target.Kind, target.Value, target.ImageData, target.Tolerance, target.ConfidencePct, Region: null, SizeTolerancePct: target.SizeTolerancePct, MatchColor: target.MatchColor,
             ClickX: target.ClickX, ClickY: target.ClickY);
@@ -142,8 +144,8 @@ internal static class DetectBlocks
         // Sideways sensitivity is a good first guess for up and down. Arrow keys only turn sideways: in most games
         // (Roblox too) Up and Down walk instead of tilting the view.
         if (ok && tilt && method != "arrowKeys")
-            (_, point, _) = await CenterAxisAsync(ctx, what, target, point, view, tolerance, method, vertical: true, guess: ratio);
-        return (point, ratio ?? 1);
+            (ok, point, _) = await CenterAxisAsync(ctx, what, target, point, view, tolerance, method, vertical: true, guess: ratio);
+        return (ok, point, ratio ?? 1);
     }
 
     /// <summary>One direction of <see cref="CenterAsync"/>: only sideways turns, or only up and down. Ok is false when the target was lost.</summary>

@@ -159,6 +159,11 @@ public static class TemplateMatcher
     private const int Candidates = 6;
     /// <summary>Smaller than this, a picture has too little detail to tell apart from anything else.</summary>
     private const int MinSide = 8;
+    /// <summary>
+    /// A picture shrunk to look for it farther away must keep at least this much (or its captured size, if that is
+    /// smaller): a few pixels of a shrunk picture look like lots of things, and scanning many sizes finds one.
+    /// </summary>
+    private const int MinScaledSide = 12;
 
     /// <param name="Scale">The size it was found at, 1 = as captured.</param>
     /// <param name="ColorOk">False when colors were checked and no well-shaped spot had the picture's colors.</param>
@@ -287,7 +292,7 @@ public static class TemplateMatcher
         var found = new List<Found>();
         var w = (int)Math.Round(template.Width * scale);
         var h = (int)Math.Round(template.Height * scale);
-        if (w < MinSide || h < MinSide || w > hay.Width || h > hay.Height) return found;
+        if (TooSmall(template, w, h) || w > hay.Width || h > hay.Height) return found;
         var full = Resize(template.Gray, template.Width, template.Height, w, h);
         var factor = Math.Clamp(Math.Min(w, h) / CoarseTarget, 1, MaxFactor);
 
@@ -312,12 +317,16 @@ public static class TemplateMatcher
         return found;
     }
 
+    private static bool TooSmall(ImageTemplate t, int w, int h) =>
+        w < MinSide || h < MinSide
+        || (w < t.Width && w < MinScaledSide) || (h < t.Height && h < MinScaledSide);
+
     /// <summary>Tries one more size around an earlier find, keeping its middle in place.</summary>
     private static Found? Polish(Haystack hay, ImageTemplate template, Found at, double scale)
     {
         var w = (int)Math.Round(template.Width * scale);
         var h = (int)Math.Round(template.Height * scale);
-        if (w < MinSide || h < MinSide || w > hay.Width || h > hay.Height) return null;
+        if (TooSmall(template, w, h) || w > hay.Width || h > hay.Height) return null;
         var x = at.X + at.W / 2 - w / 2;
         var y = at.Y + at.H / 2 - h / 2;
         var (fx, fy, score) = BestNear(hay.Level(1), new Needle(Resize(template.Gray, template.Width, template.Height, w, h), w, h), x, y, 2);
@@ -393,8 +402,18 @@ public static class TemplateMatcher
             var diff = Math.Abs(sumH / n - t.Sum / n);
             return t.Variance < 1e-6 && varH < 1e-6 ? 1 - diff / 255.0 : 0;
         }
-        return (sumHT - sumH * t.Sum / n) / Math.Sqrt(varH * t.Variance);
+        var score = (sumHT - sumH * t.Sum / n) / Math.Sqrt(varH * t.Variance);
+        // Correlation alone ignores contrast, so a faint smudge with the right outline (or a busy patch with the
+        // right light and dark spots) can score high. The real thing has about the picture's contrast, give or take
+        // lighting: far outside that, the score is lowered.
+        var contrast = Math.Sqrt(varH / t.Variance);
+        if (score > 0 && contrast < MinContrast) score *= contrast / MinContrast;
+        else if (score > 0 && contrast > MaxContrast) score *= MaxContrast / contrast;
+        return score;
     }
+
+    /// <summary>A found spot may have this much less (or more) contrast than the picture before its score is lowered.</summary>
+    private const double MinContrast = 0.4, MaxContrast = 2.5;
 
     private static byte[] Shrink(byte[] src, int w, int h, int f, out int nw, out int nh)
     {

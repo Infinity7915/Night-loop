@@ -15,6 +15,11 @@
 - Night-loop now has its own Privacy Policy, and the Terms of Service were updated to match (November 7, 2026). Both are linked from the Create account screen and on GitHub.
 - Questions about your data, privacy or legal requests? Use the contact page: api.night-loop.win/contact
 
+# What's new in 0.9.3
+
+- Scan & turn and Find & click now look twice before clicking, so they no longer click when the picture or text was only seen for a moment or the camera was still moving.
+- Fewer false matches on pictures: faint look-alikes and tiny shrunk copies no longer count.
+
 # What's new in 0.9.2
 
 - If, Loop and Repeat until blocks can be collapsed: click the arrow on the right of the row to hide the blocks inside, and again to show them. Everything starts expanded, and hidden blocks still play.
@@ -22,12 +27,6 @@
 # What's new in 0.9.1
 
 - While a macro plays, the editor scrolls so the block being played stays in the middle of the screen. Turn it off in Settings › Macros › Follow the playing block.
-
-# What's new in 0.9.0
-
-- Settings has a new Limits box: macros (out of 15), new macros today (out of 30), blocks in all your macros (out of 2,000) and blocks placed today (out of 200), with when the daily counts reset.
-- Night-loop shows a message at the top of its window once 10 or fewer blocks or macros are left.
-- Macros no longer stop at 500 blocks; the account-wide 2,000 is the limit now.
 
 # Happy early Thanksgiving from Night-loop!
 
