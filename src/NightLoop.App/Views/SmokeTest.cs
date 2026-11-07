@@ -6,6 +6,7 @@ using System.Windows.Threading;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using NightLoop.App.ViewModels;
+using NightLoop.Contracts.MacroDocument;
 
 namespace NightLoop.App.Views;
 
@@ -90,6 +91,8 @@ public static class SmokeTest
                 case "saved": macros.Sections.SelectMany(g => g.Rows).First().ShowOptions = true; break;
                 case "group": macros.NewGroupCommand.Execute(null); break;
                 case "options": macros.ShowEditorOptions = true; break;
+                // The Loop folded shut, with the If inside it.
+                case "collapsed": macros.ToggleCollapseCommand.Execute(macros.Blocks.First(r => r.Block.Type == BlockTypes.Loop)); break;
             }
             return samples[select] = macros;
         }
@@ -128,6 +131,8 @@ public static class SmokeTest
             ("macros", () => new MacrosView { DataContext = SampleMacros() }, 1060, 800),
             // The whole Macros page, down to the saved macros list.
             ("macros-full", () => new MacrosView { DataContext = SampleMacros() }, 1060, 2300),
+            // A folded Loop: the blocks inside are hidden under its row.
+            ("macros-collapsed", () => new MacrosView { DataContext = SampleMacros("position#collapsed") }, 1060, 1400),
             ("macros-narrow", () => new MacrosView { DataContext = SampleMacros() }, 740, 3000),
             ("macros-wide", () => new MacrosView { DataContext = SampleMacros() }, 1700, 2000),
             // The loaded macro's options (record key) and a picture block with its preview.

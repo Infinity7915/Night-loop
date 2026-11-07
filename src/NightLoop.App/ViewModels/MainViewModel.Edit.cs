@@ -164,7 +164,7 @@ public sealed partial class MainViewModel
         }
         var copies = MacroJson.Deserialize(s_copied).Blocks;
         if (!CanPlace(copies.Count)) return;
-        var at = SelectedBlock is null ? _doc.Blocks.Count : SelectedBlock.Index + 1;
+        var at = InsertAt;
         for (var i = 0; i < copies.Count; i++)
         {
             copies[i].Id = NextId();

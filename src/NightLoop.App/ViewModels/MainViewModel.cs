@@ -307,6 +307,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (oldValue is not null) oldValue.IsSelected = false;
         if (newValue is not null) newValue.IsSelected = true;
+        // Highlighting a block inside a folded one (a fault, an undo) unfolds it, so you can see what's highlighted.
+        if (newValue is { IsHidden: true }) Unfold(newValue.Index);
         BuildInspector();
     }
 
@@ -337,7 +339,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (IsRecording || IsPlaying) return;
         var placing = BlockTypes.IsOpener(def.Type) ? 2 : 1;
         if (!CanPlace(placing)) return;
-        var at = SelectedBlock is null ? _doc.Blocks.Count : SelectedBlock.Index + 1;
+        var at = InsertAt;
         var block = Block.Create(NextId(), def.Type, def.Defaults());
         ApplyTargetDefaults(block);
         if (block.Type == BlockTypes.WindowOpen)
@@ -409,12 +411,24 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void MoveBlockDown(BlockRow row) => Move(row, +1);
 
+    /// <summary>
+    /// Swaps a row with the one above (or below). A folded block moves with everything inside it, and moving past a
+    /// folded block jumps over the whole of it, so nothing slips in or out of a section you can't see.
+    /// </summary>
     private void Move(BlockRow row, int by)
     {
-        var to = row.Index + by;
-        if (IsRecording || IsPlaying || to < 0 || to >= _doc.Blocks.Count) return;
-        (_doc.Blocks[row.Index], _doc.Blocks[to]) = (_doc.Blocks[to], _doc.Blocks[row.Index]);
-        ShowBlocks(selectIndex: to);
+        if (IsRecording || IsPlaying) return;
+        var (from, to) = ShownUnit(row.Index);
+        var (nFrom, nTo) = by < 0 ? ShownUnit(from - 1) : ShownUnit(to + 1);
+        if (nFrom < 0 || nTo >= _doc.Blocks.Count) return;
+        var blocks = _doc.Blocks;
+        var moving = blocks.GetRange(from, to - from + 1);
+        var first = Math.Min(from, nFrom);
+        blocks.RemoveRange(from, moving.Count);
+        // Below the moved row the neighbor shifted up by its size; above, it stays where it was.
+        var insertAt = by < 0 ? nFrom : nTo - moving.Count + 1;
+        blocks.InsertRange(insertAt, moving);
+        ShowBlocks(selectIndex: by < 0 ? first : insertAt);
         MarkChanged();
     }
 
@@ -564,11 +578,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 if (!picked.Contains(i) || picked.Contains(i - 1)) continue;
                 var end = i;
                 while (end + 1 < blocks.Count && picked.Contains(end + 1)) end++;
-                var above = blocks[i - 1];
-                blocks.RemoveAt(i - 1);
-                blocks.Insert(end, above);
-                for (var k = i; k <= end; k++) { picked.Remove(k); picked.Add(k - 1); }
-                picked.Remove(end);
+                // The row above, or all of a folded block above.
+                var (aFrom, aTo) = ShownUnit(i - 1);
+                if (aTo != i - 1 || picked.GetViewBetween(aFrom, aTo).Count > 0) continue;
+                var n = aTo - aFrom + 1;
+                var above = blocks.GetRange(aFrom, n);
+                blocks.RemoveRange(aFrom, n);
+                blocks.InsertRange(end - n + 1, above);
+                for (var k = i; k <= end; k++) { picked.Remove(k); picked.Add(k - n); }
                 moved = true;
                 i = end;
             }
@@ -580,11 +597,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 if (!picked.Contains(i) || picked.Contains(i + 1)) continue;
                 var start = i;
                 while (start - 1 >= 0 && picked.Contains(start - 1)) start--;
-                var below = blocks[i + 1];
-                blocks.RemoveAt(i + 1);
-                blocks.Insert(start, below);
-                for (var k = i; k >= start; k--) { picked.Remove(k); picked.Add(k + 1); }
-                picked.Remove(start);
+                // The row below, or all of a folded block below.
+                var (bFrom, bTo) = ShownUnit(i + 1);
+                if (bFrom != i + 1 || picked.GetViewBetween(bFrom, bTo).Count > 0) continue;
+                var n = bTo - bFrom + 1;
+                var below = blocks.GetRange(bFrom, n);
+                blocks.RemoveRange(bFrom, n);
+                blocks.InsertRange(start, below);
+                for (var k = i; k >= start; k--) { picked.Remove(k); picked.Add(k + n); }
                 moved = true;
                 i = start;
             }
@@ -703,7 +723,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             Status = Limits.NoneLeftText();
             return;
         }
-        _recordAfter = SelectedBlock?.Block;
+        _recordAfter = SelectedBlock is null ? null : _doc.Blocks[InsertAt - 1];
         try
         {
             _recorder.Start(new RecorderSettings
@@ -1272,6 +1292,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             EditorHotkeyError = "";
             // A macro remembers the game it was made for; opening it switches the target to that game.
             if (doc.TargetGame is not null) _games.SelectByName(doc.TargetGame);
+            ResetCollapse();
             ShowBlocks(selectIndex: select);
             ResetUndo();
         }
@@ -1336,6 +1357,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (_checkAnchor is not null && !shown.Contains(_checkAnchor)) _checkAnchor = null;
         NotifyChecked();
         OnPropertyChanged(nameof(BlockSummary));
+        ApplyCollapse();
         SelectedBlock = keep is { } k && k >= 0 && k < Blocks.Count ? Blocks[k] : null;
     }
 
@@ -1373,10 +1395,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         return null;
     }
 
+    /// <summary>
+    /// Marks the playing block. One hidden inside a folded block lights up the folded row instead (it stays folded),
+    /// and that's the row Follow the playing block keeps in view.
+    /// </summary>
     private void Highlight(int index)
     {
-        foreach (var row in Blocks) row.IsCurrent = row.Index == index;
-        if (index >= 0 && index < Blocks.Count && FollowPlayingBlock) PlayingBlockChanged?.Invoke(index);
+        var shown = ShownRow(index);
+        foreach (var row in Blocks) row.IsCurrent = row.Index == shown;
+        if (shown >= 0 && shown < Blocks.Count && FollowPlayingBlock) PlayingBlockChanged?.Invoke(shown);
     }
 
     /// <summary>A block of the loaded macro started playing; the view centers it (Settings › Follow the playing block).</summary>

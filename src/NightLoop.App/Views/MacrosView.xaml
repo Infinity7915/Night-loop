@@ -579,6 +579,10 @@
                         <DockPanel Margin="2,0,6,0">
                           <!-- Row actions -->
                           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <!-- Fold a Loop / If / Repeat until: hides the blocks inside. Rows that can't fold keep the space, so the buttons line up. -->
+                            <Button x:Name="Fold" Style="{StaticResource IconButton}" Width="34" Height="36" Content="&#xE70D;"
+                                    ToolTip="{Binding CollapseToolTip}" Visibility="Hidden"
+                                    Command="{Binding DataContext.ToggleCollapseCommand, ElementName=Root}" CommandParameter="{Binding}" />
                             <Button Style="{StaticResource IconButton}" Width="34" Height="36" Content="&#xE8C8;" ToolTip="Duplicate"
                                     Command="{Binding DataContext.DuplicateBlockCommand, ElementName=Root}" CommandParameter="{Binding}" />
                             <Button Style="{StaticResource IconButton}" Width="34" Height="36" Content="&#xE70E;" ToolTip="Move up"
@@ -648,6 +652,15 @@
                         </DataTrigger>
                         <DataTrigger Binding="{Binding IsStructural}" Value="True">
                           <Setter TargetName="Tag" Property="Background" Value="{DynamicResource Structural}" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding CanCollapse}" Value="True">
+                          <Setter TargetName="Fold" Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsCollapsed}" Value="True">
+                          <Setter TargetName="Fold" Property="Content" Value="&#xE76C;" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsHidden}" Value="True">
+                          <Setter TargetName="Row" Property="Visibility" Value="Collapsed" />
                         </DataTrigger>
                         <DataTrigger Binding="{Binding IsChecked}" Value="True">
                           <Setter TargetName="RowBg" Property="Background" Value="{DynamicResource AccentSoft}" />
