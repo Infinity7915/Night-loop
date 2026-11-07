@@ -15,6 +15,12 @@
 - Night-loop now has its own Privacy Policy, and the Terms of Service were updated to match (November 7, 2026). Both are linked from the Create account screen and on GitHub.
 - Questions about your data, privacy or legal requests? Use the contact page: api.night-loop.win/contact
 
+# What's new in 0.10.0
+
+- Recording is gone: macros are now built from blocks only. The Record button, the record key (F9) and the "Record mouse movement" switch are removed, and Night-loop no longer watches your keyboard or mouse.
+- Macros you recorded before still play exactly as they did, and you can keep editing their blocks.
+- F9 is free again: you can use it as a macro's start key.
+
 # What's new in 0.9.3
 
 - Scan & turn and Find & click now look twice before clicking, so they no longer click when the picture or text was only seen for a moment or the camera was still moving.
@@ -23,10 +29,6 @@
 # What's new in 0.9.2
 
 - If, Loop and Repeat until blocks can be collapsed: click the arrow on the right of the row to hide the blocks inside, and again to show them. Everything starts expanded, and hidden blocks still play.
-
-# What's new in 0.9.1
-
-- While a macro plays, the editor scrolls so the block being played stays in the middle of the screen. Turn it off in Settings › Macros › Follow the playing block.
 
 # Happy early Thanksgiving from Night-loop!
 

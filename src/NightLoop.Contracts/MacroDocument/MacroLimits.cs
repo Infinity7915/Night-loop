@@ -41,7 +41,7 @@ public static class MacroLimits
     public const int ScanTurnsMax = 360;
     /// <summary>File names for the screenshot block (saved under Pictures\Night-loop).</summary>
     public const int FileNameMaxLength = 80;
-    /// <summary>Recorded mouse paths keep at most this many points per block.</summary>
+    /// <summary>Mouse paths (only in macros recorded before recording was removed) keep at most this many points per block.</summary>
     public const int PathMaxPoints = 64;
     /// <summary>A small picture saved inside an image block (base64 text), about 40 KB.</summary>
     public const int ImageDataMaxLength = 56_000;

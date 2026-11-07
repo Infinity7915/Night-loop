@@ -94,6 +94,6 @@ public sealed partial class MainViewModel
         return (index, index);
     }
 
-    /// <summary>Where Add block, Paste and Record put new blocks: under the highlighted row, after its End when it's folded.</summary>
+    /// <summary>Where Add block and Paste put new blocks: under the highlighted row, after its End when it's folded.</summary>
     private int InsertAt => SelectedBlock is null ? _doc.Blocks.Count : ShownUnit(SelectedBlock.Index).To + 1;
 }

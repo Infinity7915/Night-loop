@@ -24,7 +24,7 @@ Versions are `MAJOR.MINOR.PATCH` and must go up. Pre-releases are ignored by the
 | When | What happens |
 | --- | --- |
 | Launch (and Retry on the loading screen) | Checks GitHub. If there's a newer release it downloads it, installs it and reopens before you sign in. Gives up after 8 s if GitHub doesn't answer. |
-| Home → Refresh | Fetches announcements and checks for updates. A new version installs and restarts straight away, unless a macro is running or recording. |
+| Home → Refresh | Fetches announcements and checks for updates. A new version installs and restarts straight away, unless a macro is running. |
 | Settings → Check now | Same as Refresh, for updates only. |
 | Every 4 hours while open | Downloads quietly and shows **Update ready · Restart** in the sidebar, Home and Settings. Never restarts on its own. |
 | Server says `426 update_required` | The loading screen shows **Update now**. |

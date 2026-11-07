@@ -103,7 +103,7 @@ public partial class MacrosView : UserControl
         if (row is UIElement element) element.Focus();
     }
 
-    /// <summary>Scrolls a timeline row into sight once it's laid out (after recording, the new blocks).</summary>
+    /// <summary>Scrolls a timeline row into sight once it's laid out (after adding or pasting, the new blocks).</summary>
     private void Reveal(int index) => Dispatcher.BeginInvoke(() =>
     {
         if (Timeline.ItemContainerGenerator.ContainerFromIndex(index) is FrameworkElement row) row.BringIntoView();
@@ -159,7 +159,7 @@ public partial class MacrosView : UserControl
         var onDelete = Keyboard.FocusedElement is Button { DataContext: SavedMacroRow or GroupSection } && e.Key is Key.Enter or Key.Space;
         if (!onDelete) vm.CancelDeleteConfirms();
 
-        // Capturing a start/stop key for the loaded macro or a saved one, or the record key.
+        // Capturing a start/stop key for the loaded macro or a saved one.
         if (vm.CapturingShortcut is not null) return; // Settings is picking an editor shortcut
         if (vm.IsCapturingKey)
         {
@@ -173,13 +173,12 @@ public partial class MacrosView : UserControl
             if (key is Key.Back or Key.Delete) clear = true;
             else if (key != Key.Escape && KeyCatalog.NameOf(vk) is not null) hotkey = new Hotkey(CurrentModifiers(), vk);
 
-            if (vm.IsCapturingRecordHotkey) vm.OnRecordHotkeyCaptured(hotkey, clear);
-            else if (vm.IsCapturingEditorHotkey) vm.OnEditorHotkeyCaptured(hotkey, clear);
+            if (vm.IsCapturingEditorHotkey) vm.OnEditorHotkeyCaptured(hotkey, clear);
             else vm.CapturingRow?.OnCaptured(hotkey, clear);
             return;
         }
 
-        // Esc first clears the ticks, then lets go of the highlighted block, so Play runs from the top and Record
+        // Esc first clears the ticks, then lets go of the highlighted block, so Play runs from the top and Add block
         // adds at the end.
         if (e.Key == Key.Escape && (vm.HasChecked || vm.HasSelection) && !IsTyping(e.OriginalSource))
         {
@@ -229,7 +228,7 @@ public partial class MacrosView : UserControl
 
     /// <summary>
     /// Block editor follows scrolling (Settings › Macros). When the timeline is taller than the page:
-    /// - The macro's top bars (Record, Play, Add block, ticked blocks row) stay pinned to the top of the page, inside
+    /// - The macro's top bars (Play, Add block, ticked blocks row) stay pinned to the top of the page, inside
     ///   the macro card, unless they are too tall (an open options panel or block list) to leave room.
     /// - The editor moves down its column by the same share the timeline has been scrolled: 0% scrolled keeps it at
     ///   the top, 100% puts it at the bottom. Because it moves by that share of the spare room (counting only the part

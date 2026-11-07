@@ -108,23 +108,13 @@ public sealed partial class MainViewModel
 
     partial void OnCapturingRowChanged(SavedMacroRow? value) => OnCaptureChanged();
 
-    /// <summary>
-    /// Why a key can't be a macro's start key (or, with <paramref name="recordKey"/>, the record key), or null when
-    /// it's free.
-    /// </summary>
-    internal string? HotkeyProblem(Hotkey h, Guid? forMacro, bool recordKey = false)
+    /// <summary>Why a key can't be a macro's start key, or null when it's free. Macros may share a start key (it starts them together).</summary>
+    internal string? HotkeyProblem(Hotkey h, Guid? forMacro)
     {
         var key = KeyText(h.ToString());
-        if (!recordKey && h == RecordHotkey) return $"{key} starts and stops recording. Pick another key, or change the record key in the loaded macro's options.";
         if (h == Hotkey.Panic) return $"{key} is the stop-everything key.";
         if (h == PlayHotkey) return $"{key} is the editor's Play key. Pick another key.";
         if (ShortcutFor(h) is { } shortcut) return $"{key} is the editor's {shortcut.Label} shortcut. Pick another key, or change the shortcut in Settings › Macros.";
-        // Macros may share a start key (it starts them together), but the record key can't be one of them.
-        if (!recordKey) return null;
-        var clash = _rows.FirstOrDefault(r => Hotkey.TryParse(r.Hotkey, out var other) && other == h);
-        if (clash is not null) return $"{key} already starts \"{clash.Name}\".";
-        if (Hotkey.TryParse(EditorHotkey, out var editorKey) && editorKey == h)
-            return $"{key} already starts \"{MacroName}\".";
         return null;
     }
 
@@ -140,7 +130,7 @@ public sealed partial class MainViewModel
         if (_macroId is null && !string.IsNullOrEmpty(EditorHotkey)) keys.Add((Guid.Empty, EditorHotkey));
         var byKey = keys
             .Select(k => (k.Id, Ok: Hotkey.TryParse(k.Key, out var parsed), Key: parsed))
-            .Where(k => k.Ok && k.Key != RecordHotkey && k.Key != PlayHotkey && k.Key != Hotkey.Panic && ShortcutFor(k.Key) is null)
+            .Where(k => k.Ok && k.Key != PlayHotkey && k.Key != Hotkey.Panic && ShortcutFor(k.Key) is null)
             .GroupBy(k => k.Key, k => k.Id);
         // A start key that is also an editor shortcut (Settings › Macros) doesn't start the macro until one changes.
         foreach (var row in _rows)

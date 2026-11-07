@@ -17,7 +17,6 @@ The Contracts and Engine projects (and their tests) also build and test on Linux
 engine logic is tested with fake input. The WPF app builds anywhere with `EnableWindowsTargeting` but only
 runs on Windows.
 
-## Trying record and replay safely
+## Trying playback safely
 
-Open Notepad, set the target to N/A, press F9, type something, press F9 again, click into Notepad and
-press F6. If anything goes wrong, Ctrl+Alt+End stops every macro and releases all keys.
+Open Notepad, set the target to N/A, add a Type text block, click into Notepad and press F6. If anything goes wrong, Ctrl+Alt+End stops every macro and releases all keys.

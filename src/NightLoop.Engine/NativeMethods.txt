@@ -13,10 +13,6 @@ SetForegroundWindow
 AllowSetForegroundWindow
 IsIconic
 ShowWindow
-SetWindowsHookEx
-UnhookWindowsHookEx
-CallNextHookEx
-GetModuleHandle
 RegisterHotKey
 UnregisterHotKey
 GetMessage
@@ -27,8 +23,6 @@ DispatchMessage
 QueryFullProcessImageName
 OpenProcess
 GetCursorPos
-KBDLLHOOKSTRUCT
-MSLLHOOKSTRUCT
 WM_*
 VIRTUAL_KEY
 PeekMessage
@@ -48,16 +42,5 @@ GetMonitorInfo
 MONITORINFO
 MonitorFromWindow
 GetWindowRect
-RegisterRawInputDevices
-GetRawInputData
-RAWINPUT
-RAWINPUTDEVICE
-CreateWindowEx
-DestroyWindow
-HWND_MESSAGE
-GetCursorInfo
-CURSORINFO
-CURSORINFO_FLAGS
-RID_DEVICE_INFO_TYPE
 SetCursorPos
 IsWindowVisible

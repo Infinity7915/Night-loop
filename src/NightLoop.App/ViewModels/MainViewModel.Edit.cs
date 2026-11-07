@@ -78,7 +78,7 @@ public sealed partial class MainViewModel
     /// <summary>Ctrl+Z: puts back the blocks as they were before the last change (deleted blocks come back).</summary>
     public void Undo()
     {
-        if (IsRecording || IsPlaying) return;
+        if (IsPlaying) return;
         if (_undo.Count == 0)
         {
             Status = "Nothing to undo.";
@@ -92,7 +92,7 @@ public sealed partial class MainViewModel
     /// <summary>Ctrl+Y or Ctrl+Shift+Z: does the undone change again.</summary>
     public void Redo()
     {
-        if (IsRecording || IsPlaying) return;
+        if (IsPlaying) return;
         if (_redo.Count == 0)
         {
             Status = "Nothing to redo.";
@@ -146,7 +146,7 @@ public sealed partial class MainViewModel
     /// <summary>Ctrl+X: copies, then deletes what was copied.</summary>
     public void CutBlocks()
     {
-        if (IsRecording || IsPlaying) return;
+        if (IsPlaying) return;
         if (!CopyBlocks()) return;
         var count = s_copiedCount;
         DeleteSelected();
@@ -156,7 +156,7 @@ public sealed partial class MainViewModel
     /// <summary>Ctrl+V: puts the copied blocks under the highlighted block (or at the end when none is highlighted).</summary>
     public void PasteBlocks()
     {
-        if (IsRecording || IsPlaying) return;
+        if (IsPlaying) return;
         if (s_copied is null)
         {
             Status = $"Nothing copied yet. Tick some blocks and press {KeyOf(EditAction.Copy)}.";

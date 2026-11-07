@@ -31,7 +31,7 @@ public static class KeyCatalog
         Add("Period", 0xBE); Add("Slash", 0xBF); Add("Backtick", 0xC0);
         Add("LeftBracket", 0xDB); Add("Backslash", 0xDC); Add("RightBracket", 0xDD); Add("Quote", 0xDE);
 
-        // Generic modifiers. Recording always produces the left/right names; these are for hand-written blocks and hotkeys.
+        // Generic modifiers. Older recorded macros use the left/right names; these are for blocks and hotkeys.
         AddAlias("Shift", 0x10); AddAlias("Ctrl", 0x11); AddAlias("Control", 0x11); AddAlias("Alt", 0x12);
         AddAlias("Win", 0x5B); AddAlias("Esc", 0x1B); AddAlias("Return", 0x0D); AddAlias("Del", 0x2E); AddAlias("Ins", 0x2D);
     }

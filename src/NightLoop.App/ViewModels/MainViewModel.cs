@@ -12,7 +12,6 @@ using NightLoop.Contracts.MacroDocument;
 using NightLoop.Engine.Compiler;
 using NightLoop.Engine.Hotkeys;
 using NightLoop.Engine.Input;
-using NightLoop.Engine.Recording;
 using NightLoop.Engine.Runtime;
 using NightLoop.Engine.Screen;
 using NightLoop.Engine.Window;
@@ -22,15 +21,13 @@ namespace NightLoop.App.ViewModels;
 
 /// <summary>
 /// The Macros screen (schema section 8). This file is the editor: the loaded macro, the block palette, the
-/// timeline and the inspector, Record and Play. MainViewModel.Library.cs is the saved-macros list
+/// timeline and the inspector, and Play. MainViewModel.Library.cs is the saved-macros list
 /// with groups, and MainViewModel.Runs.cs runs several macros at once with their own hotkeys.
 /// Macros live on the account: the first edit of a new macro creates it on the server (taking one of the 15 slots),
 /// every later edit autosaves a draft, and Save makes it the saved copy.
 /// </summary>
 public sealed partial class MainViewModel : ObservableObject, IDisposable
 {
-    /// <summary>Start / stop recording until it's changed in the loaded macro's options.</summary>
-    public static readonly Hotkey DefaultRecordHotkey = new(HotkeyModifiers.None, 0x78); // F9
     public static readonly Hotkey PlayHotkey = new(HotkeyModifiers.None, 0x75);   // F6
 
     private static readonly FieldDef NoteField = F.Text("note", "Note (optional)", MacroLimits.CommentMaxLength,
@@ -40,10 +37,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly Win32WindowService _windows = new();
     private readonly Win32ScreenCapture _screen = new();
     private readonly LocalSettings _settings;
-    private readonly InputRecorder _recorder = new();
     private readonly HotkeyManager _hotkeys = new();
     private bool _disposed;
-    private IDisposable? _recordKey;
     private IDisposable? _playKey;
     private IDisposable? _panicKey;
     private readonly ApiClient _api;
@@ -96,9 +91,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             .Select(c => new PaletteCategory(c.Name, c.Color, BlockCatalog.Palette.Count(d => d.Category == c.Name)))
             .ToList();
 
-        RecordHotkey = Hotkey.TryParse(_settings.RecordHotkey, out var recordKey) && RecordHotkeyRule(recordKey) is null
-            ? recordKey
-            : DefaultRecordHotkey;
         _panicKey = TryRegister(Hotkey.Panic, () => OnUi(StopAll));
         RegisterEditorKeys();
 
@@ -118,10 +110,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public IReadOnlyList<PaletteCategory> Categories { get; }
     public ObservableCollection<BlockDef> PaletteItems { get; } = [];
 
-    /// <summary>Starts and stops recording. Changed in the loaded macro's options; kept on this PC.</summary>
-    public Hotkey RecordHotkey { get; private set; }
-    public string RecordHotkeyText => KeyText(RecordHotkey.ToString());
-    public string RecordToolTip => $"Start or stop recording ({RecordHotkeyText}). New blocks go under the highlighted block.";
     public string PanicHotkeyText => Hotkey.Panic.ToString();
 
     /// <summary>The loaded macro's own start key, or F6 (the editor's Play key) when it has none. Shown as "Ctrl + F5".</summary>
@@ -132,16 +120,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty] private string _macroName = "New macro";
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsBusy))]
-    private bool _isRecording;
-    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PlayText))]
     private bool _isPlaying;
     /// <summary>The loaded macro is paused at a breakpoint; Play reads Continue.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PlayText))]
     private bool _isAtBreakpoint;
-    [ObservableProperty] private bool _recordMouseMoves = true;
     /// <summary>Settings › Macros › Block editor follows scrolling. The view reads it on every scroll.</summary>
     [ObservableProperty] private bool _editorFollowsScroll = true;
     /// <summary>Settings › Macros › Follow the playing block. The view scrolls to each block as it plays.</summary>
@@ -184,8 +168,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _editorRunAlongside = true;
     [ObservableProperty] private bool _isCapturingEditorHotkey;
     [ObservableProperty] private string _editorHotkeyError = "";
-    [ObservableProperty] private bool _isCapturingRecordHotkey;
-    [ObservableProperty] private string _recordHotkeyError = "";
 
     /// <summary>The loaded macro has a start / stop key (the None button is only useful then).</summary>
     public bool EditorHasHotkey => !string.IsNullOrEmpty(EditorHotkey);
@@ -194,20 +176,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ? "Press a key combo… (Esc cancels)"
         : string.IsNullOrEmpty(EditorHotkey) ? "None  ·  Change" : $"{KeyText(EditorHotkey)}  ·  Change";
 
-    public string RecordHotkeyLabel => IsCapturingRecordHotkey ? "Press a key combo… (Esc cancels)" : $"{RecordHotkeyText}  ·  Change";
-
     /// <summary>Waiting for a key press to use as a start/stop key (the app's own keys are let go meanwhile).</summary>
-    public bool IsCapturingKey => IsCapturingEditorHotkey || IsCapturingRecordHotkey || CapturingRow is not null || CapturingShortcut is not null;
+    public bool IsCapturingKey => IsCapturingEditorHotkey || CapturingRow is not null || CapturingShortcut is not null;
 
     partial void OnIsCapturingEditorHotkeyChanged(bool value)
     {
         OnPropertyChanged(nameof(EditorHotkeyLabel));
-        OnCaptureChanged();
-    }
-
-    partial void OnIsCapturingRecordHotkeyChanged(bool value)
-    {
-        OnPropertyChanged(nameof(RecordHotkeyLabel));
         OnCaptureChanged();
     }
 
@@ -234,8 +208,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public int ActiveRunCount => _runs.ActiveRuns.Count;
     public string StopAllText => $"Stop all · {ActiveRunCount} running";
 
-    /// <summary>Recording or running: the app must not restart for an update by itself.</summary>
-    public bool IsBusy => IsRecording || ActiveRunCount > 0;
+    /// <summary>Running: the app must not restart for an update by itself.</summary>
+    public bool IsBusy => ActiveRunCount > 0;
 
     public string BlockSummary => $"{Blocks.Count} blocks · {Blocks.Count(b => !b.Enabled)} off";
 
@@ -281,7 +255,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     partial void OnTimingJitterPctChanged(int value) => MarkChanged();
     partial void OnMouseJitterPxChanged(int value) => MarkChanged();
     partial void OnSpeedPctChanged(int value) => MarkChanged();
-    partial void OnRecordMouseMovesChanged(bool value) => MarkChanged();
     partial void OnEditorHotkeyChanged(string value)
     {
         // A macro already on the account saves its key straight away (SaveEditorHotkeyAsync), into both the saved
@@ -336,7 +309,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void AddBlock(BlockDef def)
     {
-        if (IsRecording || IsPlaying) return;
+        if (IsPlaying) return;
         var placing = BlockTypes.IsOpener(def.Type) ? 2 : 1;
         if (!CanPlace(placing)) return;
         var at = InsertAt;
@@ -377,7 +350,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void DuplicateBlock(BlockRow row)
     {
-        if (IsRecording || IsPlaying) return;
+        if (IsPlaying) return;
         var (from, to) = SectionOf(row.Index);
         var count = to - from + 1;
         if (!CanPlace(count)) return;
@@ -417,7 +390,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     private void Move(BlockRow row, int by)
     {
-        if (IsRecording || IsPlaying) return;
+        if (IsPlaying) return;
         var (from, to) = ShownUnit(row.Index);
         var (nFrom, nTo) = by < 0 ? ShownUnit(from - 1) : ShownUnit(to + 1);
         if (nFrom < 0 || nTo >= _doc.Blocks.Count) return;
@@ -439,7 +412,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void DeleteBlock(BlockRow row)
     {
-        if (IsRecording || IsPlaying) return;
+        if (IsPlaying) return;
         var index = row.Index;
         var remove = new SortedSet<int> { index };
         var type = _doc.Blocks[index].Type;
@@ -463,7 +436,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ToggleBreakpoint(BlockRow row) => row.Breakpoint = !row.Breakpoint;
 
-    /// <summary>Esc on the timeline: nothing highlighted, so Play starts at the top and Record adds at the end.</summary>
+    /// <summary>Esc on the timeline: nothing highlighted, so Play starts at the top and Add block adds at the end.</summary>
     public void ClearSelection() => SelectedBlock = null;
 
     /// <summary>The Delete key: the ticked blocks when some are ticked, else the highlighted one.</summary>
@@ -567,7 +540,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     private void MoveChecked(int by)
     {
-        if (IsRecording || IsPlaying || !HasChecked) return;
+        if (IsPlaying || !HasChecked) return;
         var picked = CheckedSections();
         var blocks = _doc.Blocks;
         var moved = false;
@@ -626,7 +599,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void DeleteChecked()
     {
-        if (IsRecording || IsPlaying || !HasChecked) return;
+        if (IsPlaying || !HasChecked) return;
         var structure = MacroStructure.Analyze(_doc.Blocks);
         var remove = new SortedSet<int>();
         for (var i = 0; i < _doc.Blocks.Count; i++)
@@ -702,103 +675,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (!used.Contains($"b{i}")) return $"b{i}";
     }
 
-    // ---------------- Record / Play ----------------
-
-    /// <summary>
-    /// Record, then press it (or the record key) again to stop. What was recorded goes under the block that was
-    /// highlighted when recording started, or at the end when none was. Recording again adds more the same way.
-    /// </summary>
-    [RelayCommand]
-    private void ToggleRecord()
-    {
-        if (IsPlaying) return;
-        if (IsRecording)
-        {
-            StopRecording();
-            return;
-        }
-
-        if (Limits is { BlocksLeft: 0 })
-        {
-            Status = Limits.NoneLeftText();
-            return;
-        }
-        _recordAfter = SelectedBlock is null ? null : _doc.Blocks[InsertAt - 1];
-        try
-        {
-            _recorder.Start(new RecorderSettings
-            {
-                TargetExe = TargetExe,
-                StopHotkey = RecordHotkey,
-                RecordMouseMoves = RecordMouseMoves,
-            });
-        }
-        catch (InvalidOperationException ex)
-        {
-            Status = ex.Message;
-            return;
-        }
-        IsRecording = true;
-        StepAside();
-        HideWhileRecording();
-        var where = SelectedBlock is { } sel ? $" New blocks go after block {sel.Number}{InsideText(sel.Index + 1)}." : "";
-        Status = $"Recording… press {RecordHotkeyText} to stop.{where} Keys and clicks on Night-loop itself aren't recorded.";
-    }
-
-    private void StopRecording()
-    {
-        IsRecording = false;
-        SyncDoc();
-        // Stop (which finishes sorting the last inputs) before Night-loop comes back to the front, so nothing typed
-        // into the other app is mistaken for input aimed at Night-loop.
-        var result = _recorder.Stop(new RecordingOptions
-        {
-            RecordMouseMoves = RecordMouseMoves,
-            StopHotkey = RecordHotkey,
-            // Blocks left today and on the account, and room left in this macro's size, so it stays under the limits.
-            MaxBlocks = Limits?.BlocksLeft ?? int.MaxValue,
-            MaxBytes = Math.Max(0, MacroLimits.MaxDocumentBytes * 9 / 10 - MacroJson.ByteSize(_doc)),
-        });
-
-        ShowAfterRecording();
-
-        var at = _recordAfter is { } after && _doc.Blocks.IndexOf(after) is var i and >= 0 ? i + 1 : _doc.Blocks.Count;
-        _recordAfter = null;
-        var count = result.Blocks.Count;
-        if (count == 0)
-        {
-            var skipped = _recorder.SkippedOwnInputs;
-            Status = result.Truncated
-                ? Limits is { BlocksLeft: 0 } ? Limits.NoneLeftText() : "This macro is full, so nothing more could be recorded. Delete some blocks first."
-                : skipped > 0
-                    ? $"Nothing was recorded: all {skipped} keys and clicks went to Night-loop itself, which Record skips. Click into the app you want first."
-                    : "Nothing was recorded. No keys or clicks reached Night-loop while it was recording. If the app you used runs as administrator, run Night-loop as administrator too.";
-            return;
-        }
-
-        for (var k = 0; k < count; k++)
-        {
-            result.Blocks[k].Id = NextId();
-            _doc.Blocks.Insert(at + k, result.Blocks[k]);
-        }
-        var last = at + count - 1;
-        var atEnd = last == _doc.Blocks.Count - 1;
-        // At the end: nothing stays highlighted, so Play runs it all and the next recording goes on the end too.
-        // In the middle: the last new block is highlighted, so the next recording carries on right after it.
-        ShowBlocks(selectIndex: atEnd ? null : last);
-        RevealRequested?.Invoke(last);
-        MarkChanged();
-        var outOfBlocks = Limits is { } lim && count >= lim.BlocksLeft;
-        Limits?.Placed(count);
-        var what = count == 1 ? "1 block" : $"{count} blocks";
-        Status = result.Truncated
-            ? outOfBlocks
-                ? $"Recorded {what}, then stopped: no blocks left {(Limits!.Usage is { } u && u.BlocksPerDay - u.BlocksToday <= u.BlocksMax - u.Blocks ? "today" : "on your account")}."
-                : $"Recorded {what}, then stopped at the size limit for one macro."
-            : atEnd
-                ? $"Recorded {what} at the end. Press Play ({PlayHotkeyText}) to replay from the top."
-                : $"Recorded {what} after block {at:00}{InsideText(at)}.";
-    }
+    // ---------------- Play ----------------
 
     /// <summary>" inside the If" (or Loop, ...) when a block put at this index lands inside one, else "".</summary>
     private string InsideText(int index)
@@ -823,7 +700,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void TogglePlay()
     {
-        if (IsRecording) return;
         if (_run is { IsActive: true } running)
         {
             if (IsAtBreakpoint) running.Continue();
@@ -833,40 +709,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         StartEditorRun(new RunSettings { TargetExe = TargetExe, Debug = true, StartIndex = SelectedBlock?.Index ?? 0 });
     }
 
-    private bool _hiddenForRecording;
-    private WindowState _stateBeforeRecording;
-
-    /// <summary>Night-loop gets out of the way while recording: minimized, so nothing lands on it.</summary>
-    private void HideWhileRecording()
-    {
-        // Already out of the way: minimized, or hidden in the system tray (stays there, and comes back only from the tray).
-        if (Application.Current?.MainWindow is not { IsVisible: true } window || window.WindowState == WindowState.Minimized) return;
-        _hiddenForRecording = true;
-        _stateBeforeRecording = window.WindowState;
-        // SW_MINIMIZE, not WindowState = Minimized: WPF minimizes with SW_SHOWMINIMIZED, which leaves Night-loop the
-        // active window, so the keys typed next went to (minimized) Night-loop and Record skipped them as its own.
-        // SW_MINIMIZE hands focus to the next window, the app the person is about to use.
-        var hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
-        if (hwnd == IntPtr.Zero || !ShowWindow(hwnd, SwMinimize)) window.WindowState = WindowState.Minimized;
-    }
-
-    private const int SwMinimize = 6;
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-    /// <summary>Recording stopped: Night-loop comes back with the new blocks in view.</summary>
-    private void ShowAfterRecording()
-    {
-        if (!_hiddenForRecording || Application.Current?.MainWindow is not { } window) return;
-        _hiddenForRecording = false;
-        if (!window.IsVisible) return; // sent to the tray while recording: leave it there
-        window.WindowState = _stateBeforeRecording;
-        window.Activate();
-    }
-
     /// <summary>
-    /// Pressing Record or Play in Night-loop leaves Night-loop in front, where the first keys would land. Put the
+    /// Pressing Play in Night-loop leaves Night-loop in front, where the first keys would land. Put the
     /// target game in front instead, or with no target, the window that was in front before Night-loop.
     /// </summary>
     private void StepAside()
@@ -922,7 +766,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void StopAll()
     {
-        if (IsRecording) ToggleRecord();
         _ = _runs.StopAllAsync();
     }
 
@@ -935,7 +778,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task NewMacroAsync()
     {
-        if (IsRecording || IsPlaying) return;
+        if (IsPlaying) return;
         if (_rows.Count >= _limit)
         {
             ShowLimit = true;
@@ -976,7 +819,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task DeleteAsync()
     {
-        if (IsRecording || IsPlaying) return;
+        if (IsPlaying) return;
         if (_macroId is not { } id)
         {
             ApplyDoc(NewDoc(), starter: false);
@@ -1062,63 +905,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    // ---------------- Record key ----------------
-
-    [RelayCommand]
-    private void CaptureRecordHotkey()
-    {
-        if (IsRecording) return;
-        ShowEditorOptions = true;
-        RecordHotkeyError = "";
-        IsCapturingRecordHotkey = true;
-    }
-
-    /// <summary>Called by the view with the key pressed while picking the record key. Escape cancels, Backspace/Delete puts F9 back.</summary>
-    public void OnRecordHotkeyCaptured(Hotkey? hotkey, bool reset)
-    {
-        var key = reset ? DefaultRecordHotkey : hotkey;
-        if (key is not { } h)
-        {
-            IsCapturingRecordHotkey = false;
-            return;
-        }
-        if ((RecordHotkeyRule(h) ?? HotkeyProblem(h, forMacro: null, recordKey: true)) is { } problem)
-        {
-            RecordHotkeyError = problem;
-            IsCapturingRecordHotkey = false;
-            return;
-        }
-        RecordHotkeyError = "";
-        RecordHotkey = h;
-        _settings.RecordHotkey = h == DefaultRecordHotkey ? null : h.ToString();
-        OnPropertyChanged(nameof(RecordHotkey));
-        OnPropertyChanged(nameof(RecordHotkeyText));
-        OnPropertyChanged(nameof(RecordHotkeyLabel));
-        OnPropertyChanged(nameof(RecordToolTip));
-        IsCapturingRecordHotkey = false; // registers the new key
-        Status = $"Record now starts and stops with {RecordHotkeyText}.";
-    }
-
-    /// <summary>
-    /// A record key has to be one you don't type with: a letter or Space on its own would start recording every
-    /// time you typed it.
-    /// </summary>
-    internal static string? RecordHotkeyRule(Hotkey h)
-    {
-        if (h == Hotkey.Panic) return $"{KeyText(h.ToString())} is the stop-everything key.";
-        if (h == PlayHotkey) return $"{KeyText(h.ToString())} is the editor's Play key. Pick another key.";
-        var typing = h.VirtualKey is (>= 0x30 and <= 0x5A) or 0x20 or 0x0D or 0x09 or 0x08 or (>= 0xBA and <= 0xE2) or (>= 0x60 and <= 0x6F);
-        var shiftOnly = h.Modifiers is HotkeyModifiers.None or HotkeyModifiers.Shift;
-        return typing && shiftOnly ? "Pick a function key like F9, or add Ctrl or Alt, so typing never starts a recording." : null;
-    }
-
     // ---------------- Plumbing ----------------
 
     private async Task OpenAsync(Guid id)
     {
-        if (IsRecording || IsPlaying)
+        if (IsPlaying)
         {
-            Status = "Stop recording or playing before opening another macro.";
+            Status = "Stop playing before opening another macro.";
             return;
         }
         try
@@ -1476,25 +1269,22 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>The record key and the editor's Play key (F6).</summary>
+    /// <summary>The editor's Play key (F6).</summary>
     private void RegisterEditorKeys()
     {
-        _recordKey?.Dispose();
         _playKey?.Dispose();
-        _recordKey = TryRegister(RecordHotkey, () => OnUi(ToggleRecord));
         _playKey = TryRegister(PlayHotkey, () => OnUi(TogglePlay));
     }
 
     private void DisposeEditorKeys()
     {
-        _recordKey?.Dispose();
         _playKey?.Dispose();
-        _recordKey = _playKey = null;
+        _playKey = null;
     }
 
     /// <summary>
     /// While a key is being picked, Night-loop lets go of its own keys (all but stop-everything), so pressing one of
-    /// them picks it instead of starting a recording or a macro.
+    /// them picks it instead of starting a macro.
     /// </summary>
     private void OnCaptureChanged()
     {
@@ -1504,7 +1294,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             DisposeEditorKeys();
             DisposeMacroHotkeys();
         }
-        else if (_recordKey is null && _playKey is null)
+        else if (_playKey is null)
         {
             RegisterEditorKeys();
             RefreshHotkeys();
@@ -1538,7 +1328,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _toastTimer.Stop();
         _games.TargetChanged -= OnTargetChanged;
         _ = DisposeAutosaverAsync();
-        _recorder.Dispose();
         _ = _runs.StopAllAsync();
         DisposeMacroHotkeys();
         DisposeEditorKeys();

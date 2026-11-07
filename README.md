@@ -1,20 +1,18 @@
 # Night-loop
 
-A Windows macro app for games. Record what you do with the keyboard and mouse, then replay it, or build
-macros from blocks (keys, clicks, waits, loops, if/else and more).
+A Windows macro app for games. Build macros from blocks (keys, clicks, waits, loops, if/else, screen
+reading and more), then play them.
 
 Night-loop never touches game memory. It only sends ordinary input through Windows, like a keyboard and mouse would.
 
-> **Status: early development.** Record and replay, the block editor, screen reading (text, image and pixel
+> **Status: early development.** The block editor, playback, screen reading (text, image and pixel
 > detection) and Settings work. Macros sync to your account through the private server, and the app updates
 > itself from GitHub Releases.
 
 ## What works today
 
-- **Record** keyboard and mouse with low-level hooks. Quick presses become one block, overlapping keys
-  (like Ctrl+C, or holding W while clicking) become separate down/up blocks with their real hold times, so
-  they replay exactly. A new recording goes under the selected block.
-  Pauses over 50 ms become Wait blocks. Clicks inside the target game are saved relative to its window.
+- **Blocks only**: there is no keyboard or mouse recording (removed in 0.10.0). Macros recorded with older
+  versions still play.
 - **Replay** with `SendInput` using scan codes (many games ignore virtual-key events), eased mouse moves,
   drags, double clicks, scrolling and typing.
 - **Safety**: every key and button a macro presses is released when it stops, pauses or fails.
@@ -23,7 +21,7 @@ Night-loop never touches game memory. It only sends ordinary input through Windo
   (random timing and mouse jitter), breakpoints, play from any block, several macros at once.
 - **Editor**: build macros from 39 blocks in seven categories (Input, Camera, Timing, Detect, Logic, Window,
   Utility). Reorder, duplicate, switch off or add notes to blocks, edit each block's settings in the side
-  panel, and debug with breakpoints. **Play** starts from the selected block and **Record** adds new blocks
+  panel, and debug with breakpoints. **Play** starts from the selected block and **Add block** puts new blocks
   under it. Block settings can be picked straight off the screen: a point, a color, a region or a picture to
   look for (with a preview and a one-click test). Window blocks pick programs with File Explorer, and
   **Open window** starts one. New macros start with a starter sequence
@@ -66,8 +64,7 @@ example [Night-loop-Server](https://github.com/Infinity7915/Night-loop-Server) r
 
 1. Create an account or sign in. In development the server prints the 6-digit code in its console.
 2. Pick a target game (or N/A for any window).
-3. Press **Record** or **F9**, do your thing, press **F9** again. It's saved to your account as a draft.
-   The key next to Record changes F9 to another key.
+3. Add blocks from **Add block** and set them up in the side panel. Edits save to your account as a draft.
 4. Press **Play** or **F6** to replay (from the selected block, if one is). **F6** stops it,
    **Ctrl+Alt+End** stops everything.
 5. Press **Save** to keep this version.
@@ -92,7 +89,7 @@ See [docs/building.md](docs/building.md) for more.
 | Project | What it holds |
 | --- | --- |
 | `src/NightLoop.Contracts` | Shared with the server: macro JSON format, block catalog, limits, validator, error codes, API shapes |
-| `src/NightLoop.Engine` | Runs and records macros. No UI code. Compiler, runner, input, window control, hotkeys, recording |
+| `src/NightLoop.Engine` | Runs macros. No UI code. Compiler, runner, input, window control, hotkeys |
 | `src/NightLoop.Client` | Talks to the server: API client, sign-in session, saved token, device id, draft autosave |
 | `src/NightLoop.LocalData` | Per-PC files: target games list, settings.json |
 | `src/NightLoop.Updates` | Velopack updates from GitHub Releases, and the Home announcements from `announcements.md` |
@@ -108,7 +105,7 @@ More in [docs/architecture.md](docs/architecture.md) and [docs/macro-format.md](
 | --- | --- | --- |
 | M0 Setup | Solution, CI | Done |
 | M5 Engine core | Compiler, runner, SendInput, logic blocks, hotkeys, panic key | Done (vision-free parts) |
-| M7 Recording | Hooks to blocks, target-game lock | Done (window blocks need testing in games) |
+| M7 Recording | Hooks to blocks, target-game lock | Removed in 0.10.0 (blocks only) |
 | M1 Accounts | Server: register, verify, sign in, sessions | Done (server repo) |
 | M2 Client shell | Sign-in screens, DPAPI session, Home | Done |
 | M3 Macros API | Server macro storage, drafts, 15-macro limit | Done (server repo); app syncs macros |
