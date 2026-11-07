@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using NightLoop.Contracts.MacroDocument;
+using NightLoop.Engine.Blocks;
 using NightLoop.Engine.Compiler;
 using NightLoop.Engine.Recording;
 using NightLoop.Engine.Runtime;
@@ -584,6 +585,45 @@ public class PlaybackTests
             .Build();
         var r = await RunAsync(doc, screen: screen);
         Assert.Equal((162, 102), Moves(r.Input)[^1]);
+    }
+
+    [Theory]
+    [InlineData(0, 0, 150, 90)]
+    [InlineData(100, 100, 173, 113)]
+    [InlineData(25, 75, 156, 107)]
+    public async Task Picture_is_clicked_at_the_chosen_spot(int xPct, int yPct, int wantX, int wantY)
+    {
+        var pattern = new byte[24 * 24 * 4];
+        var rng = new Random(7);
+        for (var i = 0; i < 24 * 24; i++) pattern[i * 4] = pattern[i * 4 + 1] = pattern[i * 4 + 2] = (byte)rng.Next(256);
+        var template = ImageTemplate.FromImage(new ScreenImage(0, 0, 24, 24, pattern));
+        var screen = new FakeScreen(320, 240);
+        screen.Show(150, 90, template);
+        var doc = new MacroBuilder()
+            .Add(BlockTypes.FindClick, new() { ["target"] = "image", ["value"] = "chest.png", ["imageData"] = template.Encode(), ["sizeTolerancePct"] = 0,
+                [BlockTypes.ClickXKey] = xPct, [BlockTypes.ClickYKey] = yPct })
+            .Build();
+        Assert.Empty(MacroValidator.Validate(doc));
+        var r = await RunAsync(doc, screen: screen);
+        Assert.Equal((wantX, wantY), Moves(r.Input)[^1]);
+    }
+
+    [Fact]
+    public void Click_spot_outside_the_picture_is_refused()
+    {
+        var doc = new MacroBuilder().Add(BlockTypes.FindClick, new() { ["target"] = "image", ["clickXPct"] = 101 }).Build();
+        Assert.Contains(MacroValidator.Validate(doc), i => i.Message.Contains("click spot"));
+    }
+
+    [Fact]
+    public void Click_spot_follows_a_picture_found_bigger()
+    {
+        var pattern = new byte[24 * 24 * 4];
+        var template = ImageTemplate.FromImage(new ScreenImage(0, 0, 24, 24, pattern));
+        var what = new LookFor("image", "", ClickX: 1, ClickY: 0);
+        // Found at twice its size, middle at 200,100: 48 px wide, so the right edge is 223 and the top 76.
+        Assert.Equal((223, 76), Vision.PointIn(new TemplateMatcher.Match(200, 100, 1, 2), template, what));
+        Assert.Equal((200, 100), Vision.PointIn(new TemplateMatcher.Match(200, 100, 1, 2), template, what with { ClickX = 0.5, ClickY = 0.5 }));
     }
 
     [Fact]

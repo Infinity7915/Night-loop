@@ -121,3 +121,19 @@ public sealed class StringsEqualConverter : IMultiValueConverter
         values.Length > 1 && values.All(v => string.Equals(v?.ToString(), values[0]?.ToString(), StringComparison.OrdinalIgnoreCase));
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) => throw new NotSupportedException();
 }
+
+/// <summary>
+/// A share of a size, minus half of a marker's size (the parameter), to place a marker's middle on a spot: the
+/// click spot dot on a block's picture preview.
+/// </summary>
+public sealed class ShareToOffsetConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        var size = values.Length > 0 && values[0] is double s && double.IsFinite(s) ? s : 0;
+        var share = values.Length > 1 && values[1] is double f && double.IsFinite(f) ? f : 0.5;
+        var half = double.TryParse(parameter as string, NumberStyles.Float, CultureInfo.InvariantCulture, out var h) ? h : 0;
+        return size * share - half;
+    }
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) => throw new NotSupportedException();
+}

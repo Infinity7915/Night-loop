@@ -97,6 +97,11 @@ public static class BlockTypes
     /// <summary>The "Wait after click" setting on clicking blocks, in ms.</summary>
     public const string WaitAfterKey = "waitAfterMs";
 
+    /// <summary>Find &amp; click / Scan &amp; turn with a picture: where inside the found picture to click, 0–100 % across.</summary>
+    public const string ClickXKey = "clickXPct";
+    /// <summary>…and 0–100 % down. Both blank = the middle.</summary>
+    public const string ClickYKey = "clickYPct";
+
     /// <summary>Blocks with an "On fail" choice (continue, retry, go to label, stop).</summary>
     public static bool HasOnFail(string type) => type is WaitForText or WaitForImage or WaitForImageGone or DetectPixelColor or DetectPixelColorGone or FindClick or ScanTurn;
 

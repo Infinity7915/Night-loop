@@ -118,6 +118,11 @@ public static class SmokeTest
             ("macros-open-window", () => new MacrosView { DataContext = SampleMacros("open") }, 1060, 1300),
             ("macros-close-window", () => new MacrosView { DataContext = SampleMacros("close") }, 1060, 2100),
             ("macros-scan-turn", () => new MacrosView { DataContext = SampleMacros("scan") }, 1060, 2100),
+            // Scan & turn with a picture: the click spot dot on the preview and its two % fields.
+            ("macros-click-spot", () => new MacrosView { DataContext = SampleMacros("scanpic") }, 1060, 3300),
+            // The window "Set click spot in picture" opens.
+            ("click-spot-picker", () => Controls.ClickSpotPicker.ContentForSmoke(
+                (System.Windows.Media.Imaging.BitmapSource)SampleMacros("scanpic").InspectorImage!, 0.3, 0.25), 600, 480),
             // A Click block with its Wait after click slider.
             ("macros-click", () => new MacrosView { DataContext = SampleMacros("click") }, 1060, 2100),
             ("auth-code", () => new AuthView { DataContext = AuthIn(AuthMode.Code) }, 1280, 800),

@@ -11,7 +11,7 @@ namespace NightLoop.App.ViewModels;
 /// </summary>
 public sealed partial class MainViewModel
 {
-    /// <summary><paramref name="select"/>: which block the inspector shows ("position", "image", "open", "close" or "scan").</summary>
+    /// <summary><paramref name="select"/>: which block the inspector shows ("position", "image", "open", "close", "scan" or "scanpic").</summary>
     internal void ShowSample(string select = "position")
     {
         var coin = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -61,6 +61,15 @@ public sealed partial class MainViewModel
         };
         foreach (var (type, p) in blocks)
             doc.Blocks.Add(Block.Create(NextId(), type, p ?? BlockCatalog.For(type)?.Defaults()));
+        // "scanpic": Scan & turn looks for the coin picture, with a click spot set off the middle.
+        if (select == "scanpic" && doc.Blocks.FirstOrDefault(b => b.Type == BlockTypes.ScanTurn) is { } scan)
+        {
+            scan.Params["target"] = "image";
+            scan.Params["value"] = "coin";
+            scan.Params["imageData"] = SampleCoin();
+            scan.Params[BlockTypes.ClickXKey] = 30;
+            scan.Params[BlockTypes.ClickYKey] = 25;
+        }
 
         _macroId = coin;
         ApplyDoc(doc);
@@ -69,7 +78,7 @@ public sealed partial class MainViewModel
             "image" => BlockTypes.WaitForImage,
             "open" => BlockTypes.WindowOpen,
             "close" => BlockTypes.WindowClose,
-            "scan" => BlockTypes.ScanTurn,
+            "scan" or "scanpic" => BlockTypes.ScanTurn,
             "click" => BlockTypes.Click,
             _ => BlockTypes.WindowPosition,
         };

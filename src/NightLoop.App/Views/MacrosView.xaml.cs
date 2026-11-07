@@ -48,6 +48,15 @@ public partial class MacrosView : UserControl
         }
     }
 
+    /// <summary>A click on the picture preview sets where Find &amp; click / Scan &amp; turn click inside the picture.</summary>
+    private void OnPicturePreviewClick(object sender, MouseButtonEventArgs e)
+    {
+        if (Vm is not { InspectorCanSetClickSpot: true } vm || sender is not FrameworkElement el || el.ActualWidth <= 0 || el.ActualHeight <= 0) return;
+        var p = e.GetPosition(el);
+        vm.SetClickSpot(p.X / el.ActualWidth, p.Y / el.ActualHeight);
+        e.Handled = true;
+    }
+
     /// <summary>Switching to another window (or the game) puts an armed "Delete?" back.</summary>
     private void OnWindowDeactivated(object? sender, EventArgs e) => Vm?.CancelDeleteConfirms();
 

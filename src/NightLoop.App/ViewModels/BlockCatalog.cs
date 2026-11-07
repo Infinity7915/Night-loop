@@ -625,16 +625,24 @@ internal static class F
     public static FieldDef MatchColor() =>
         YesNo("matchColor", "Match colors", fallback: true, yes: "On", no: "Off") with { Hint = MatchColorHint };
 
+    private const string ClickSpotHint =
+        "Where inside the picture to click once it is found: 0 is the left (or top) edge, 100 the right (or bottom), " +
+        "blank the middle. Easiest: click the spot on the picture below, or use \"Set click spot in picture\".";
+
     /// <summary>Find &amp; click / Scan &amp; turn: how close a picture or color has to be, shown for the kind being looked for.</summary>
     public static FieldDef[] LookTuning()
     {
         static bool Is(Block b, string kind) => b.GetString("target", "text") == kind;
+        static bool Clicks(Block b) => b.Type != BlockTypes.ScanTurn || b.GetString("whenFound", "click") != "continue";
         return
         [
             Int("confidencePct", "Confidence %", 1, 100, optional: true, placeholder: "90",
                 hint: "How alike the spot has to be. Lower finds it more easily but may click the wrong thing.") with { ShowIf = b => Is(b, "image") },
             SizeTolerance() with { ShowIf = b => Is(b, "image") },
             MatchColor() with { ShowIf = b => Is(b, "image") },
+            Int(BlockTypes.ClickXKey, "Click spot across %", 0, 100, optional: true, placeholder: "50",
+                hint: ClickSpotHint) with { ShowIf = b => Is(b, "image") && Clicks(b) },
+            Int(BlockTypes.ClickYKey, "Click spot down %", 0, 100, optional: true, placeholder: "50") with { ShowIf = b => Is(b, "image") && Clicks(b) },
             Int("tolerance", "Color tolerance", 0, 255, optional: true, placeholder: "10",
                 hint: "How far each color channel may be from the one picked.") with { ShowIf = b => Is(b, "pixel") },
         ];

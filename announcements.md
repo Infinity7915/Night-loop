@@ -10,6 +10,10 @@
   Anything inside these comment marks is hidden. Delete everything else to show "Nothing new right now."
 -->
 
+# What's new in 0.8.1
+
+- Find & click and Scan & turn with a picture can click a chosen spot inside it, not just the middle. Use "Set click spot in picture" or click the picture preview. It follows the picture when it's found smaller or bigger.
+
 # What's new in 0.8.0
 
 - Lighter: about 30% smaller to install, uses less memory and starts quicker.
@@ -20,11 +24,6 @@
 
 - One word for "no limit": Infinite. Loop times, Max tries, wait Timeouts and the macro's Repeat option all use it now. Type Infinite in the box (0 and Forever still work).
 - The Scroll block (Input) now counts in ticks: pick Up or Down and how many ticks of the scroll wheel to turn.
-
-# What's new in 0.6.9
-
-- Fixed: a macro that stops on an error now always says why, as a Windows notification too.
-- If / Repeat until rows say "no picture yet" when Image visible has no captured picture.
 
 # Happy early Thanksgiving from Night-loop!
 

@@ -808,8 +808,39 @@
                     <StackPanel Margin="0,16,0,0" Visibility="{Binding InspectorImageText, Converter={StaticResource TextToVisible}}">
                       <Border Background="{DynamicResource Bg}" BorderBrush="{DynamicResource Border}" BorderThickness="1" CornerRadius="8" Padding="8"
                               HorizontalAlignment="Left" Visibility="{Binding InspectorImage, Converter={StaticResource NullToVisible}}">
-                        <Image Source="{Binding InspectorImage}" MaxHeight="120" MaxWidth="230" Stretch="Uniform" StretchDirection="Both"
-                               RenderOptions.BitmapScalingMode="NearestNeighbor" SnapsToDevicePixels="True" />
+                        <!-- With a click spot (Find & click / Scan & turn), the dot shows it and a click on the picture moves it. -->
+                        <Grid x:Name="PicturePreview" HorizontalAlignment="Left" VerticalAlignment="Top" Background="Transparent"
+                              MouseLeftButtonDown="OnPicturePreviewClick">
+                          <Grid.Style>
+                            <Style TargetType="Grid">
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding InspectorCanSetClickSpot}" Value="True">
+                                  <Setter Property="Cursor" Value="Cross" />
+                                  <Setter Property="ToolTip" Value="Click where in the picture to click once it is found" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </Grid.Style>
+                          <Image Source="{Binding InspectorImage}" MaxHeight="120" MaxWidth="230" MinHeight="48" MinWidth="48" Stretch="Uniform" StretchDirection="Both"
+                                 RenderOptions.BitmapScalingMode="NearestNeighbor" SnapsToDevicePixels="True" />
+                          <Canvas IsHitTestVisible="False" ClipToBounds="False"
+                                  Visibility="{Binding InspectorCanSetClickSpot, Converter={StaticResource BoolToVisible}}">
+                            <Ellipse Width="12" Height="12" Stroke="{DynamicResource Accent}" StrokeThickness="2" Fill="#66FFFFFF">
+                              <Canvas.Left>
+                                <MultiBinding Converter="{StaticResource ShareToOffset}" ConverterParameter="6">
+                                  <Binding Path="ActualWidth" ElementName="PicturePreview" />
+                                  <Binding Path="InspectorClickX" />
+                                </MultiBinding>
+                              </Canvas.Left>
+                              <Canvas.Top>
+                                <MultiBinding Converter="{StaticResource ShareToOffset}" ConverterParameter="6">
+                                  <Binding Path="ActualHeight" ElementName="PicturePreview" />
+                                  <Binding Path="InspectorClickY" />
+                                </MultiBinding>
+                              </Canvas.Top>
+                            </Ellipse>
+                          </Canvas>
+                        </Grid>
                       </Border>
                       <TextBlock Text="{Binding InspectorImageText}" Style="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,6,0,0" />
                     </StackPanel>

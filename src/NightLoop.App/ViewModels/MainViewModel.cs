@@ -633,6 +633,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _undoGroup = $"{row.Block.Id}:{field.Def.Key}";
         try { OnRowChanged(row); }
         finally { _undoGroup = null; }
+        // Typed click spot: move the dot on the picture preview to match.
+        if (field.Def.Key is BlockTypes.ClickXKey or BlockTypes.ClickYKey) ShowImagePreview(row.Block);
         // A choice can show or hide other fields and tools (On fail → Go to label, Find → Image…).
         if (field.RebuildsInspector)
             Application.Current?.Dispatcher.BeginInvoke(() => { if (SelectedBlock == row) BuildInspector(); }, DispatcherPriority.Background);
