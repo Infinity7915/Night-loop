@@ -16,5 +16,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\NightLoop.Engine\NightLoop.Engine.csproj" />
+    <ProjectReference Include="..\..\src\NightLoop.Engine.Windows\NightLoop.Engine.Windows.csproj" />
   </ItemGroup>
 </Project>

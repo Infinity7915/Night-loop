@@ -6,9 +6,9 @@ project schema document; this page describes what is in this repository today.
 ## Projects
 
 ```
-NightLoop.App ──► NightLoop.Engine ──► NightLoop.Contracts ◄── Night-loop-Server (git submodule)
-     │                                       ▲
-     ├──► NightLoop.Client ──────────────────┘
+NightLoop.App ──► NightLoop.Engine.Windows ──► NightLoop.Engine ──► NightLoop.Contracts ◄── Night-loop-Server (git submodule)
+     │                                                                     ▲
+     ├──► NightLoop.Client ────────────────────────────────────────────────┘
      │          │
      ├──► NightLoop.LocalData ◄┘
      │
@@ -23,9 +23,14 @@ NightLoop.App ──► NightLoop.Engine ──► NightLoop.Contracts ◄──
   error codes → `ApiException`), `AccountSession` (saved token, sign-in/up, 60-second heartbeat, session
   replaced), `DraftAutosaver` (1.5 s debounce, If-Match versions, conflicts, offline retry),
   `DeviceIdentity` (install.id and hashed hardware fingerprint) and `DpapiSessionStore` (session.bin).
-- **Engine** targets plain `net8.0` so its logic runs in tests on any OS. Classes that call Win32 are marked
-  `[SupportedOSPlatform("windows10.0.17763")]` and use [CsWin32](https://github.com/microsoft/CsWin32)
-  generated P/Invoke (`NativeMethods.txt`), so there are no hand-written signatures.
+- **Engine** targets plain `net8.0` and has no Windows code: the compiler, runner, conditions, waits, picture
+  matching and path playback. Input, screen capture, text reading and windows come in through `IInputSender`,
+  `IScreenCapture`, `ITextReader` and `IWindowService`, so the PC app and the planned Android app share it and
+  it runs in tests on any OS.
+- **Engine.Windows** is the PC side of the engine: `Win32InputSender`, `Win32ScreenCapture`, `Win32WindowService`,
+  `HotkeyManager`, `KeyState`. Classes that call Win32 are marked `[SupportedOSPlatform("windows10.0.17763")]` and
+  use [CsWin32](https://github.com/microsoft/CsWin32) generated P/Invoke (`NativeMethods.txt`), so there are no
+  hand-written signatures. It keeps the `NightLoop.Engine.*` namespaces.
 - **Updates** has no UI code either: `UpdateService` (check → download → restart, one check at a time, failures
   keep the current version) over `VelopackUpdater`, and `AnnouncementFeed`, which reads `announcements.md` from
   the repo and caches it. Both talk only to GitHub. See [releasing.md](releasing.md).
