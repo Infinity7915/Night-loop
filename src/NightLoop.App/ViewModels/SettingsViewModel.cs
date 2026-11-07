@@ -167,6 +167,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     {
         Games.RefreshStatus();
         _gameTimer.Start();
+        _ = _shell.Limits.RefreshAsync();
     }
 
     public void OnHidden() => _gameTimer.Stop();

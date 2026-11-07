@@ -39,4 +39,6 @@ public static class ErrorCodes
     public const string NoSavedCopy = "no_saved_copy";
     /// <summary>428: a macro write arrived without an If-Match version.</summary>
     public const string VersionRequired = "version_required";
+    /// <summary>403: the change places more blocks than are left today (BlocksPerDay) or on the account (BlocksPerUser).</summary>
+    public const string BlockLimit = "block_limit";
 }

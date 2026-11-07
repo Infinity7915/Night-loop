@@ -525,6 +525,67 @@
           </StackPanel>
         </Border>
 
+        <!-- Limits: macros and blocks used, from GET /me/limits -->
+        <Border Style="{StaticResource SectionCard}" DataContext="{Binding Shell.Limits}">
+          <StackPanel>
+            <TextBlock Text="Limits" Style="{StaticResource CardTitle}" />
+            <TextBlock Style="{StaticResource Muted}" Margin="0,4,0,0" TextWrapping="Wrap"
+                       Text="How many macros and blocks your account uses. A message shows in Night-loop when 10 or fewer are left." />
+            <TextBlock Text="Couldn't reach the server for your limits. They show here once it answers." Style="{StaticResource Muted}"
+                       FontSize="12" Margin="0,16,0,0" TextWrapping="Wrap"
+                       Visibility="{Binding HasUsage, Converter={StaticResource BoolToVisible}, ConverterParameter=invert}" />
+            <StackPanel Visibility="{Binding HasUsage, Converter={StaticResource BoolToVisible}}">
+              <controls:AutoGrid MinItemWidth="240" Gap="24" Margin="0,20,0,0">
+              <StackPanel>
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Right" Text="{Binding MacrosText}" FontWeight="SemiBold" FontSize="14" />
+                  <TextBlock Text="Macros" FontSize="14" />
+                </DockPanel>
+                <Border Height="6" CornerRadius="3" Background="{DynamicResource BorderStrong}" Margin="0,8,0,0" ClipToBounds="True">
+                  <ProgressBar Value="{Binding MacrosPercent, Mode=OneWay}" Height="6" BorderThickness="0" Background="Transparent"
+                               Foreground="{DynamicResource Accent}" />
+                </Border>
+                <TextBlock Text="Macros on your account, drafts included." Style="{StaticResource Muted}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel>
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Right" Text="{Binding NewMacrosText}" FontWeight="SemiBold" FontSize="14" />
+                  <TextBlock Text="New macros today" FontSize="14" />
+                </DockPanel>
+                <Border Height="6" CornerRadius="3" Background="{DynamicResource BorderStrong}" Margin="0,8,0,0" ClipToBounds="True">
+                  <ProgressBar Value="{Binding NewMacrosPercent, Mode=OneWay}" Height="6" BorderThickness="0" Background="Transparent"
+                               Foreground="{DynamicResource Accent}" />
+                </Border>
+                <TextBlock Text="Macros created since the last reset." Style="{StaticResource Muted}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel>
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Right" Text="{Binding BlocksText}" FontWeight="SemiBold" FontSize="14" />
+                  <TextBlock Text="Blocks" FontSize="14" />
+                </DockPanel>
+                <Border Height="6" CornerRadius="3" Background="{DynamicResource BorderStrong}" Margin="0,8,0,0" ClipToBounds="True">
+                  <ProgressBar Value="{Binding BlocksPercent, Mode=OneWay}" Height="6" BorderThickness="0" Background="Transparent"
+                               Foreground="{DynamicResource Accent}" />
+                </Border>
+                <TextBlock Text="Blocks in all your macros together." Style="{StaticResource Muted}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel>
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Right" Text="{Binding BlocksTodayText}" FontWeight="SemiBold" FontSize="14" />
+                  <TextBlock Text="Blocks placed today" FontSize="14" />
+                </DockPanel>
+                <Border Height="6" CornerRadius="3" Background="{DynamicResource BorderStrong}" Margin="0,8,0,0" ClipToBounds="True">
+                  <ProgressBar Value="{Binding BlocksTodayPercent, Mode=OneWay}" Height="6" BorderThickness="0" Background="Transparent"
+                               Foreground="{DynamicResource Accent}" />
+                </Border>
+                <TextBlock Text="New blocks you've added, pasted or recorded today." Style="{StaticResource Muted}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+              </controls:AutoGrid>
+              <TextBlock Text="{Binding ResetText}" Style="{StaticResource Muted}" FontSize="12" Margin="0,18,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
         <!-- Updates (schema section 9): GitHub Releases, installed with Velopack -->
         <Border Style="{StaticResource SectionCard}">
           <StackPanel>

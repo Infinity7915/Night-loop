@@ -23,7 +23,8 @@ public sealed class RecordingOptions
     public bool RecordMouseMoves { get; init; }
     /// <summary>The stop hotkey. Its modifier presses at the very end are dropped so they don't get replayed.</summary>
     public Hotkey? StopHotkey { get; init; }
-    public int MaxBlocks { get; init; } = MacroLimits.MaxBlocks;
+    /// <summary>The most blocks to make. The app passes the blocks left today.</summary>
+    public int MaxBlocks { get; init; } = int.MaxValue;
     /// <summary>
     /// The most JSON the recorded blocks may add. Recording into a macro that already has blocks passes what's left,
     /// so the macro stays under the size limit.

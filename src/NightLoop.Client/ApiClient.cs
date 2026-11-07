@@ -113,6 +113,10 @@ public sealed class ApiClient
     public Task<AccountDataResponse> GetAccountDataAsync(CancellationToken ct = default) =>
         SendAsync<AccountDataResponse>(HttpMethod.Get, "me/data", null, ct);
 
+    /// <summary>Settings › Account › Limits: macros and blocks used out of the caps, today's counts and the reset time.</summary>
+    public Task<DailyUsage> GetLimitsAsync(CancellationToken ct = default) =>
+        SendAsync<DailyUsage>(HttpMethod.Get, "me/limits", null, ct);
+
     public Task DeleteAccountAsync(string currentPassword, CancellationToken ct = default) =>
         SendAsync<object>(HttpMethod.Delete, "me", new DeleteAccountRequest(currentPassword), ct);
 

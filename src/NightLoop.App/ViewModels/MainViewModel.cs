@@ -247,6 +247,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>Set by the shell: opens Settings, where the target game is picked.</summary>
     public Action? OpenSettings { get; set; }
+    /// <summary>Blocks and macros left (today and on the account). Null in previews and tests: then only the server checks.</summary>
+    public LimitsViewModel? Limits { get; set; }
+
+    /// <summary>Checks the daily and account block limits before placing blocks; says why not in the toast.</summary>
+    private bool CanPlace(int count)
+    {
+        if (Limits is null || Limits.CanPlace(count, out var why)) return true;
+        Status = why;
+        return false;
+    }
 
     private void OnTargetChanged(GameTarget value)
     {
@@ -322,11 +332,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private void AddBlock(BlockDef def)
     {
         if (IsRecording || IsPlaying) return;
-        if (_doc.Blocks.Count >= MacroLimits.MaxBlocks)
-        {
-            Status = $"A macro can have at most {MacroLimits.MaxBlocks} blocks.";
-            return;
-        }
+        var placing = BlockTypes.IsOpener(def.Type) ? 2 : 1;
+        if (!CanPlace(placing)) return;
         var at = SelectedBlock is null ? _doc.Blocks.Count : SelectedBlock.Index + 1;
         var block = Block.Create(NextId(), def.Type, def.Defaults());
         ApplyTargetDefaults(block);
@@ -339,10 +346,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (block.Type == BlockTypes.RunMacro && LibraryNames().FirstOrDefault(n => n != MacroName) is { } other)
             block.Params["macroName"] = other;
         _doc.Blocks.Insert(at, block);
-        if (BlockTypes.IsOpener(def.Type) && _doc.Blocks.Count < MacroLimits.MaxBlocks)
+        if (BlockTypes.IsOpener(def.Type))
             _doc.Blocks.Insert(at + 1, Block.Create(NextId(), BlockTypes.End));
         ShowBlocks(selectIndex: at);
         MarkChanged();
+        Limits?.Placed(placing);
         if (BlockTypes.NeedsVision(block) && _runs.Text is null && block.Type is BlockTypes.WaitForText or BlockTypes.FindClick or BlockTypes.ScanTurn)
             Status = "Reading text needs Windows text recognition. Add a language with text recognition in Windows Settings › Time & language › Language.";
     }
@@ -367,11 +375,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (IsRecording || IsPlaying) return;
         var (from, to) = SectionOf(row.Index);
         var count = to - from + 1;
-        if (_doc.Blocks.Count + count > MacroLimits.MaxBlocks)
-        {
-            Status = $"A macro can have at most {MacroLimits.MaxBlocks} blocks.";
-            return;
-        }
+        if (!CanPlace(count)) return;
         var copies = MacroJson.Deserialize(MacroJson.Serialize(new MacroDoc { Name = "x", Blocks = _doc.Blocks.GetRange(from, count) })).Blocks;
         for (var i = 0; i < copies.Count; i++)
         {
@@ -380,6 +384,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         ShowBlocks(selectIndex: to + 1);
         MarkChanged();
+        Limits?.Placed(count);
         if (count > 1) Status = $"Copied the whole {BlockCatalog.For(_doc.Blocks[from].Type)?.Label ?? "section"} ({count} blocks).";
     }
 
@@ -690,9 +695,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (_doc.Blocks.Count >= MacroLimits.MaxBlocks)
+        if (Limits is { BlocksLeft: 0 })
         {
-            Status = $"This macro already has {MacroLimits.MaxBlocks} blocks, the most one can have. Delete some to record more.";
+            Status = Limits.NoneLeftText();
             return;
         }
         _recordAfter = SelectedBlock?.Block;
@@ -727,8 +732,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             RecordMouseMoves = RecordMouseMoves,
             StopHotkey = RecordHotkey,
-            // Room left in this macro, so it stays under the limits however much is already in it.
-            MaxBlocks = Math.Max(0, MacroLimits.MaxBlocks - _doc.Blocks.Count),
+            // Blocks left today and on the account, and room left in this macro's size, so it stays under the limits.
+            MaxBlocks = Limits?.BlocksLeft ?? int.MaxValue,
             MaxBytes = Math.Max(0, MacroLimits.MaxDocumentBytes * 9 / 10 - MacroJson.ByteSize(_doc)),
         });
 
@@ -741,7 +746,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             var skipped = _recorder.SkippedOwnInputs;
             Status = result.Truncated
-                ? "This macro is full, so nothing more could be recorded. Delete some blocks first."
+                ? Limits is { BlocksLeft: 0 } ? Limits.NoneLeftText() : "This macro is full, so nothing more could be recorded. Delete some blocks first."
                 : skipped > 0
                     ? $"Nothing was recorded: all {skipped} keys and clicks went to Night-loop itself, which Record skips. Click into the app you want first."
                     : "Nothing was recorded. No keys or clicks reached Night-loop while it was recording. If the app you used runs as administrator, run Night-loop as administrator too.";
@@ -760,9 +765,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ShowBlocks(selectIndex: atEnd ? null : last);
         RevealRequested?.Invoke(last);
         MarkChanged();
+        var outOfBlocks = Limits is { } lim && count >= lim.BlocksLeft;
+        Limits?.Placed(count);
         var what = count == 1 ? "1 block" : $"{count} blocks";
         Status = result.Truncated
-            ? $"Recorded {what}, then stopped at the size limit for one macro."
+            ? outOfBlocks
+                ? $"Recorded {what}, then stopped: no blocks left {(Limits!.Usage is { } u && u.BlocksPerDay - u.BlocksToday <= u.BlocksMax - u.Blocks ? "today" : "on your account")}."
+                : $"Recorded {what}, then stopped at the size limit for one macro."
             : atEnd
                 ? $"Recorded {what} at the end. Press Play ({PlayHotkeyText}) to replay from the top."
                 : $"Recorded {what} after block {at:00}{InsideText(at)}.";
@@ -907,6 +916,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (_rows.Count >= _limit)
         {
             ShowLimit = true;
+            return;
+        }
+        if (Limits is { MacrosLeft: 0, Usage: { } usage })
+        {
+            Status = $"You've made {usage.NewMacrosPerDay} new macros today, the most for one day. More at {usage.ResetsAt.ToLocalTime():t}.";
             return;
         }
         await CloseCurrentAsync();
@@ -1127,6 +1141,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             SyncText = "Not saved: account full";
             Status = ex.Message;
         }
+        catch (ApiException ex) when (ex.Code == ErrorCodes.BlockLimit)
+        {
+            SyncText = "Not saved: no blocks left";
+            Status = ex.Message;
+            _ = Limits?.RefreshAsync();
+        }
         catch (Exception ex) when (ex is ApiException or ServerUnreachableException)
         {
             SyncText = "Not saved";
@@ -1149,6 +1169,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             if (ReferenceEquals(saver, _autosaver)) OnSyncState(state);
         });
+        // The counts are the account's, so even a closed macro's last save brings fresh ones.
+        saver.UsageReported += usage => OnUi(() => Limits?.Apply(usage));
         OnSyncState(saver.State);
     }
 
@@ -1196,6 +1218,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _ => "",
         };
         if (state == SyncState.Conflict) ResolveConflict();
+        if (state == SyncState.Error && _autosaver?.Message is { Length: > 0 } why)
+        {
+            Status = why;
+            _ = Limits?.RefreshAsync();
+        }
         if (state is SyncState.Saved or SyncState.Draft) MarkEditorRow(state == SyncState.Draft);
     }
 

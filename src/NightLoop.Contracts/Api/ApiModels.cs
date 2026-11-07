@@ -153,7 +153,31 @@ public sealed record CreateMacroRequest(string Name, MacroDoc Doc, Guid? GroupId
 
 public sealed record SaveDraftRequest(MacroDoc Doc);
 
-public sealed record DraftSavedResponse(int Version, DateTimeOffset DraftUpdatedAt);
+/// <summary>Usage is the account's daily counts after this save (null from servers before v0.9.0).</summary>
+public sealed record DraftSavedResponse(int Version, DateTimeOffset DraftUpdatedAt, DailyUsage? Usage = null);
+
+/// <summary>
+/// GET /me/limits, Settings › Account › Limits: macros and blocks held out of the account caps, new macros and blocks
+/// placed today out of the daily caps, and when the daily counts reset (midnight UTC).
+/// </summary>
+public sealed record DailyUsage(
+    int Macros,
+    int MacrosMax,
+    int Blocks,
+    int BlocksMax,
+    int NewMacrosToday,
+    int NewMacrosPerDay,
+    int BlocksToday,
+    int BlocksPerDay,
+    DateTimeOffset ResetsAt)
+{
+    [JsonIgnore]
+    /// <summary>Blocks that can still be placed: whichever of the account cap and today's cap runs out first.</summary>
+    public int BlocksLeft => Math.Max(0, Math.Min(BlocksMax - Blocks, BlocksPerDay - BlocksToday));
+    /// <summary>New macros that can still be made: whichever of the account cap and today's cap runs out first.</summary>
+    [JsonIgnore]
+    public int MacrosLeft => Math.Max(0, Math.Min(MacrosMax - Macros, NewMacrosPerDay - NewMacrosToday));
+}
 
 /// <summary>
 /// PATCH /macros/{id}. Only fields that are not null change. Set Ungroup to move the macro out of its group.

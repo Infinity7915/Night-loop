@@ -163,11 +163,7 @@ public sealed partial class MainViewModel
             return;
         }
         var copies = MacroJson.Deserialize(s_copied).Blocks;
-        if (_doc.Blocks.Count + copies.Count > MacroLimits.MaxBlocks)
-        {
-            Status = $"A macro can have at most {MacroLimits.MaxBlocks} blocks, so these {copies.Count} don't fit.";
-            return;
-        }
+        if (!CanPlace(copies.Count)) return;
         var at = SelectedBlock is null ? _doc.Blocks.Count : SelectedBlock.Index + 1;
         for (var i = 0; i < copies.Count; i++)
         {
@@ -177,6 +173,7 @@ public sealed partial class MainViewModel
         ShowBlocks(selectIndex: at + copies.Count - 1);
         MarkChanged();
         RevealRequested?.Invoke(at + copies.Count - 1);
+        Limits?.Placed(copies.Count);
         Status = copies.Count == 1 ? "Pasted 1 block." : $"Pasted {copies.Count} blocks.";
     }
 }

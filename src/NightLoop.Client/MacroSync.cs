@@ -62,6 +62,8 @@ public sealed class DraftAutosaver : IAsyncDisposable
 
     /// <summary>Raised on a thread-pool thread; marshal to the UI yourself.</summary>
     public event Action<SyncState>? StateChanged;
+    /// <summary>The account's daily counts after a draft went up (thread-pool thread, like StateChanged).</summary>
+    public event Action<DailyUsage>? UsageReported;
 
     /// <summary>Records an edit. The document is copied now, so later changes to it don't leak into this save.</summary>
     public void Changed(MacroDoc doc)
@@ -179,6 +181,7 @@ public sealed class DraftAutosaver : IAsyncDisposable
                 try
                 {
                     var res = await _api.SaveDraftAsync(MacroId, Version, MacroJson.Deserialize(json), ct);
+                    if (res.Usage is { } usage) UsageReported?.Invoke(usage);
                     lock (_gate)
                     {
                         Version = res.Version;

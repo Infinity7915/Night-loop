@@ -82,5 +82,21 @@
     </Border>
 
     <controls:PageHost Grid.Column="1" Content="{Binding CurrentPage}" />
+
+    <!-- In-app message (blocks or macros running low): top of the window, over every page, never a Windows notification -->
+    <Border Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="40,18,40,0" MaxWidth="560" Padding="16,10,8,10"
+            CornerRadius="10" BorderThickness="1" Background="{DynamicResource PanelRaised}" BorderBrush="{DynamicResource Warning}"
+            Visibility="{Binding IsNoticeVisible, Converter={StaticResource BoolToVisible}}">
+      <Border.Effect>
+        <DropShadowEffect BlurRadius="18" ShadowDepth="4" Opacity="0.35" Color="#000000" />
+      </Border.Effect>
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="10" Width="28" Height="28"
+                Margin="10,0,0,0" ToolTip="Close" Command="{Binding HideNoticeCommand}" VerticalAlignment="Center" />
+        <TextBlock DockPanel.Dock="Left" Text="&#xE7BA;" FontFamily="{StaticResource Icons}" Foreground="{DynamicResource Warning}"
+                   FontSize="16" VerticalAlignment="Center" Margin="0,0,10,0" />
+        <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" VerticalAlignment="Center" FontSize="13" />
+      </DockPanel>
+    </Border>
   </Grid>
 </Window>
