@@ -13,11 +13,13 @@ public sealed partial class BlockField : ObservableObject
     private readonly BlockRow _row;
     private readonly Action<BlockRow, BlockField> _changed;
     private readonly bool _loading;
+    private readonly Func<int> _sliderDefault;
 
     public BlockField(BlockRow row, FieldDef def, Action<BlockRow, BlockField> changed, IReadOnlyList<string>? macroNames = null,
-        IReadOnlyList<string>? labelNames = null)
+        IReadOnlyList<string>? labelNames = null, Func<int>? sliderDefault = null)
     {
         _row = row;
+        _sliderDefault = sliderDefault ?? (() => 0);
         Def = def;
         _changed = changed;
         _loading = true;
@@ -42,6 +44,8 @@ public sealed partial class BlockField : ObservableObject
     public bool IsMono => Def.Mono;
 
     public bool IsText => Def.Kind == FieldKind.Text;
+    /// <summary>The label and hint above the box; slider fields show their own note instead of the hint.</summary>
+    public bool ShowsHint => HasHint && !IsSlider;
     public bool IsMultiLine => Def.Kind == FieldKind.MultiLine;
     public bool IsChoice => Def.Kind is FieldKind.Choice or FieldKind.MacroName or FieldKind.LabelName;
     /// <summary>A program: the box opens File Explorer, the arrow lists running apps.</summary>
@@ -98,6 +102,43 @@ public sealed partial class BlockField : ObservableObject
 
     [RelayCommand]
     private void ClearProgram() => Value = "";
+
+    // ---- Slider fields (Wait after click) ----
+
+    public bool IsSlider => Def.Kind == FieldKind.Slider;
+    public int SliderMax => Math.Max(1, Def.SliderMax);
+    /// <summary>Set on this block by hand; otherwise it follows the Settings slider.</summary>
+    public bool HasOwnValue => IsSlider && Value.Length > 0;
+
+    /// <summary>The slider's position: the block's own value, or the Settings one it follows. Moving it sets the block's own.</summary>
+    public double SliderValue
+    {
+        get => HasOwnValue && int.TryParse(Value, out var n) ? n : _sliderDefault();
+        set
+        {
+            var n = (int)Math.Round(Math.Clamp(value, 0, SliderMax));
+            if (HasOwnValue ? Value == n.ToString(System.Globalization.CultureInfo.InvariantCulture) : n == _sliderDefault()) return;
+            Value = n.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
+    public string SliderText => $"{(int)SliderValue:N0} ms";
+    public string SliderNote => HasOwnValue
+        ? "Set on this block."
+        : $"Follows Settings › Macros › Wait after clicks ({_sliderDefault():N0} ms).";
+
+    /// <summary>Back to following the Settings slider.</summary>
+    [RelayCommand]
+    private void UseSettingsValue() => Value = "";
+
+    /// <summary>The Settings slider moved: blocks that follow it show the new value.</summary>
+    public void RefreshSlider()
+    {
+        if (!IsSlider) return;
+        OnPropertyChanged(nameof(SliderValue));
+        OnPropertyChanged(nameof(SliderText));
+        OnPropertyChanged(nameof(SliderNote));
+    }
     /// <summary>Choice fields can change which other fields show, so the inspector rebuilds after them.</summary>
     public bool RebuildsInspector => IsChoice;
 
@@ -118,6 +159,8 @@ public sealed partial class BlockField : ObservableObject
         OnPropertyChanged(nameof(ProgramFolder));
         OnPropertyChanged(nameof(HasProgram));
         OnPropertyChanged(nameof(CanClear));
+        OnPropertyChanged(nameof(HasOwnValue));
+        RefreshSlider();
         if (_loading) return;
         string? error;
         try

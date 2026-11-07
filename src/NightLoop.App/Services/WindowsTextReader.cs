@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices.WindowsRuntime;
+using NightLoop.Engine.Runtime;
 using NightLoop.Engine.Screen;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
@@ -14,25 +15,45 @@ public sealed class WindowsTextReader : ITextReader
     /// <summary>Small captures are enlarged first: game UI text is often only 10–14 px tall.</summary>
     private const int SmallHeight = 360;
 
-    private readonly OcrEngine _engine;
+    /// <summary>Shown when a macro reads text on a PC without a text recognition language.</summary>
+    public const string NoLanguage = "Reading text needs Windows text recognition. Add a language with text recognition in Windows Settings > Time & language > Language.";
 
-    private WindowsTextReader(OcrEngine engine) => _engine = engine;
+    private readonly object _gate = new();
+    private OcrEngine? _engine;
+    private bool _tried;
 
-    /// <summary>Null when no installed language supports text recognition.</summary>
-    public static WindowsTextReader? TryCreate()
+    /// <summary>
+    /// Windows' text recognition is only started the first time a macro reads text, so Night-loop doesn't load it
+    /// (and its language data) at launch for people who never use text blocks.
+    /// </summary>
+    public static WindowsTextReader Create() => new();
+
+    private WindowsTextReader() { }
+
+    /// <summary>Whether this PC can read text. Starts text recognition if it hasn't been yet.</summary>
+    public bool IsAvailable => Engine() is not null;
+
+    private OcrEngine? Engine()
     {
-        try
+        lock (_gate)
         {
-            return OcrEngine.TryCreateFromUserProfileLanguages() is { } engine ? new WindowsTextReader(engine) : null;
-        }
-        catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or TypeLoadException or PlatformNotSupportedException)
-        {
-            return null;
+            if (_tried) return _engine;
+            _tried = true;
+            try
+            {
+                _engine = OcrEngine.TryCreateFromUserProfileLanguages();
+            }
+            catch (Exception ex) when (ex is System.Runtime.InteropServices.COMException or TypeLoadException or PlatformNotSupportedException)
+            {
+                _engine = null;
+            }
+            return _engine;
         }
     }
 
     public async Task<IReadOnlyList<TextLine>> ReadAsync(ScreenImage image, CancellationToken cancellationToken)
     {
+        var engine = Engine() ?? throw new MacroFaultException(NoLanguage);
         var max = (int)OcrEngine.MaxImageDimension;
         var scale = image.Height < SmallHeight && image.Width * 2 <= max ? 2.0 : 1.0;
         if (image.Width * scale > max || image.Height * scale > max) scale = Math.Min((double)max / image.Width, (double)max / image.Height);
@@ -40,7 +61,7 @@ public sealed class WindowsTextReader : ITextReader
         var pixels = scale == 1.0 ? image.Bgra : Resize(image, w, h);
 
         using var bitmap = SoftwareBitmap.CreateCopyFromBuffer(pixels.AsBuffer(0, w * h * 4), BitmapPixelFormat.Bgra8, w, h, BitmapAlphaMode.Ignore);
-        var result = await _engine.RecognizeAsync(bitmap).AsTask(cancellationToken);
+        var result = await engine.RecognizeAsync(bitmap).AsTask(cancellationToken);
 
         var lines = new List<TextLine>(result.Lines.Count);
         foreach (var line in result.Lines)

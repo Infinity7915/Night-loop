@@ -42,6 +42,7 @@ public sealed partial class MainViewModel
                 ["whenFound"] = "click", ["onFail"] = "goto", ["failLabel"] = "farm", ["note"] = "spin until the pickup prompt is on screen",
             }),
             (BlockTypes.WaitRandom, new() { ["minMs"] = 400, ["maxMs"] = 900 }),
+            (BlockTypes.Click, new() { ["button"] = "left", ["clicks"] = 1, ["x"] = 960, ["y"] = 620, ["relativeTo"] = "gameWindow", ["note"] = "open the shop" }),
             (BlockTypes.Key, new() { ["key"] = "LeftShift", ["action"] = "down", ["note"] = "sprint" }),
             (BlockTypes.HoldKey, new() { ["key"] = "W", ["holdMs"] = 1200 }),
             (BlockTypes.Wait, new() { ["ms"] = 180 }),
@@ -69,6 +70,7 @@ public sealed partial class MainViewModel
             "open" => BlockTypes.WindowOpen,
             "close" => BlockTypes.WindowClose,
             "scan" => BlockTypes.ScanTurn,
+            "click" => BlockTypes.Click,
             _ => BlockTypes.WindowPosition,
         };
         SelectedBlock = Blocks.FirstOrDefault(r => r.Block.Type == pick);

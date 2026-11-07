@@ -91,6 +91,12 @@ public static class BlockTypes
     /// <summary>Blocks that act on what they found and have an "After found" choice (go on, leave the loop, go to a label, stop).</summary>
     public static bool HasAfterFound(string type) => type is FindClick or ScanTurn;
 
+    /// <summary>Blocks that click, with their own "Wait after click" (blank follows Settings › Macros).</summary>
+    public static bool HasWaitAfterClick(string type) => type is Click or Drag or FindClick or ScanTurn;
+
+    /// <summary>The "Wait after click" setting on clicking blocks, in ms.</summary>
+    public const string WaitAfterKey = "waitAfterMs";
+
     /// <summary>Blocks with an "On fail" choice (continue, retry, go to label, stop).</summary>
     public static bool HasOnFail(string type) => type is WaitForText or WaitForImage or WaitForImageGone or DetectPixelColor or DetectPixelColorGone or FindClick or ScanTurn;
 

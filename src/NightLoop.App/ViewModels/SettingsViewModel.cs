@@ -1,6 +1,7 @@
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using NightLoop.App.Themes;
+using NightLoop.Contracts.MacroDocument;
 
 namespace NightLoop.App.ViewModels;
 
@@ -72,6 +73,42 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
             OnPropertyChanged();
         }
     }
+
+    /// <summary>The wait sliders go from 0 to this (ms).</summary>
+    public int WaitMax => MacroLimits.WaitAfterMaxMs;
+
+    /// <summary>Settings › Macros › Wait after clicks. Running macros pick up the change straight away. Kept on this PC.</summary>
+    public double WaitAfterClicksMs
+    {
+        get => _shell.Local.WaitAfterClicksMs;
+        set
+        {
+            var ms = (int)Math.Round(Math.Clamp(value, 0, WaitMax));
+            if (_shell.Local.WaitAfterClicksMs == ms) return;
+            _shell.Local.WaitAfterClicksMs = ms;
+            _shell.Macros?.SetWaits(ms, _shell.Local.WaitAfterBlocksMs);
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(WaitAfterClicksText));
+        }
+    }
+
+    /// <summary>Settings › Macros › Wait after every block. Kept on this PC.</summary>
+    public double WaitAfterBlocksMs
+    {
+        get => _shell.Local.WaitAfterBlocksMs;
+        set
+        {
+            var ms = (int)Math.Round(Math.Clamp(value, 0, WaitMax));
+            if (_shell.Local.WaitAfterBlocksMs == ms) return;
+            _shell.Local.WaitAfterBlocksMs = ms;
+            _shell.Macros?.SetWaits(_shell.Local.WaitAfterClicksMs, ms);
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(WaitAfterBlocksText));
+        }
+    }
+
+    public string WaitAfterClicksText => $"{(int)WaitAfterClicksMs:N0} ms";
+    public string WaitAfterBlocksText => $"{(int)WaitAfterBlocksMs:N0} ms";
 
     /// <summary>Closing the window hides Night-loop to the tray instead of quitting. Kept on this PC.</summary>
     public bool CloseToTray

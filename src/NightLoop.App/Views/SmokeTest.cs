@@ -118,6 +118,8 @@ public static class SmokeTest
             ("macros-open-window", () => new MacrosView { DataContext = SampleMacros("open") }, 1060, 1300),
             ("macros-close-window", () => new MacrosView { DataContext = SampleMacros("close") }, 1060, 2100),
             ("macros-scan-turn", () => new MacrosView { DataContext = SampleMacros("scan") }, 1060, 2100),
+            // A Click block with its Wait after click slider.
+            ("macros-click", () => new MacrosView { DataContext = SampleMacros("click") }, 1060, 2100),
             ("auth-code", () => new AuthView { DataContext = AuthIn(AuthMode.Code) }, 1280, 800),
             ("auth-forgot", () => new AuthView { DataContext = AuthIn(AuthMode.Forgot) }, 1280, 800),
             ("auth-reset", () => new AuthView { DataContext = AuthIn(AuthMode.Reset) }, 1280, 800),
@@ -149,6 +151,7 @@ public static class SmokeTest
             failures += Draw(app, folder, palette.Id, themed);
         }
         CheckMinimizeFocus(folder);
+        failures += CheckWindowsParts(folder);
         return failures == 0 ? 0 : 1;
     }
 
@@ -196,6 +199,60 @@ public static class SmokeTest
             lines.Add("check failed: " + ex.Message);
         }
         File.WriteAllLines(Path.Combine(folder, "minimize-check.txt"), lines);
+    }
+
+    /// <summary>
+    /// The parts that talk to Windows directly: the tray icon (Shell_NotifyIcon, no WinForms) and text recognition,
+    /// whose Windows SDK part is trimmed in published builds. Missing code there shows up as a load error here, so the
+    /// release (which runs this on the published build) fails instead of shipping it. A PC without a text recognition
+    /// language only gets a note. Results go to windows-parts.txt.
+    /// </summary>
+    private static int CheckWindowsParts(string folder)
+    {
+        var lines = new List<string>();
+        var failures = 0;
+        try
+        {
+            using var tray = Services.TrayIcon.Create(() => { }, () => { });
+            lines.Add($"tray icon: ok, notification sent={Services.TrayIcon.Notify("Night-loop smoke test", "Checking the tray icon.")}");
+        }
+        catch (Exception ex)
+        {
+            failures++;
+            lines.Add("tray icon: FAILED " + ex);
+        }
+        try
+        {
+            var reader = Services.WindowsTextReader.Create();
+            if (!reader.IsAvailable) lines.Add("text reading: no text recognition language on this PC (not a failure)");
+            else
+            {
+                var text = new System.Windows.Controls.TextBlock
+                {
+                    Text = "Collect 25 coins", FontSize = 36, Foreground = Brushes.Black, Background = Brushes.White, Padding = new Thickness(20),
+                };
+                text.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                text.Arrange(new Rect(text.DesiredSize));
+                var (w, h) = ((int)Math.Ceiling(text.DesiredSize.Width), (int)Math.Ceiling(text.DesiredSize.Height));
+                var bitmap = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+                bitmap.Render(text);
+                var pixels = new byte[w * h * 4];
+                bitmap.CopyPixels(pixels, w * 4, 0);
+                var image = new Engine.Screen.ScreenImage(0, 0, w, h, pixels);
+                var found = Task.Run(() => reader.ReadAsync(image, CancellationToken.None)).GetAwaiter().GetResult();
+                var read = string.Join(" | ", found.Select(l => l.Text));
+                lines.Add($"text reading: ok, read \"{read}\"");
+            }
+        }
+        catch (Exception ex)
+        {
+            failures++;
+            lines.Add("text reading: FAILED " + ex);
+        }
+        File.WriteAllLines(Path.Combine(folder, "windows-parts.txt"), lines);
+        foreach (var line in lines) Console.WriteLine(line);
+        if (failures > 0) File.WriteAllText(Path.Combine(folder, "windows-parts.error.txt"), string.Join(Environment.NewLine, lines));
+        return failures;
     }
 
     private static int Draw(Application app, string folder, string mode, (string Name, Func<FrameworkElement> Make, int Width, int Height)[] screens)

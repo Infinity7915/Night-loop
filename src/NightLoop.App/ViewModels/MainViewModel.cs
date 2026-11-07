@@ -63,13 +63,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _games = games;
         _settings = settings ?? new LocalSettings();
         _editorFollowsScroll = _settings.EditorFollowsScroll;
+        Waits = new BlockWaits { AfterClicksMs = _settings.WaitAfterClicksMs, AfterBlocksMs = _settings.WaitAfterBlocksMs };
         _games.TargetChanged += OnTargetChanged;
         _runs = new RunManager(new Win32InputSender(), _windows)
         {
             Screen = _screen,
-            Text = WindowsTextReader.TryCreate(),
+            Text = WindowsTextReader.Create(), // starts Windows text recognition only when a macro first reads text
             IsKeyDown = KeyState.IsDown,
             SaveScreenshot = Screenshots.Save,
+            Waits = Waits,
         };
         _runs.RunStepChanged += (run, index) => OnUi(() => { if (run == _run) Highlight(index); });
         _runs.RunStateChanged += (run, state) => OnUi(() =>
@@ -636,6 +638,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             Application.Current?.Dispatcher.BeginInvoke(() => { if (SelectedBlock == row) BuildInspector(); }, DispatcherPriority.Background);
     }
 
+    /// <summary>Settings › Macros' extra waits, shared with every run (they read it live).</summary>
+    public BlockWaits Waits { get; }
+
+    /// <summary>The Settings wait sliders moved: runs use the new values right away, and the open block shows them.</summary>
+    public void SetWaits(int afterClicksMs, int afterBlocksMs)
+    {
+        Waits.AfterClicksMs = afterClicksMs;
+        Waits.AfterBlocksMs = afterBlocksMs;
+        foreach (var field in InspectorFields) field.RefreshSlider();
+    }
+
     private void BuildInspector()
     {
         InspectorFields.Clear();
@@ -646,7 +659,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var names = LibraryNames();
         var labels = _doc.Blocks.Where(b => b.Type == BlockTypes.Label).Select(b => b.GetString("name") ?? "").Where(n => n.Length > 0).ToList();
         foreach (var f in def?.Fields ?? [])
-            if (f.ShowIf?.Invoke(row.Block) != false) InspectorFields.Add(new BlockField(row, f, OnFieldChanged, names, labels));
+            if (f.ShowIf?.Invoke(row.Block) != false) InspectorFields.Add(new BlockField(row, f, OnFieldChanged, names, labels, () => Waits.AfterClicksMs));
         foreach (var tool in ToolsFor(row.Block)) InspectorTools.Add(tool);
         if (row.Block.Type is not (BlockTypes.Comment or BlockTypes.Description))
             InspectorFields.Add(new BlockField(row, NoteField, OnFieldChanged));

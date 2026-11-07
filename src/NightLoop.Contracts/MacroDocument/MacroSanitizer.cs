@@ -19,7 +19,7 @@ public static class MacroSanitizer
         "match", "matchCase", "matchColor", "maxIterations", "maxMs", "maxTurns", "message", "method", "minMs", "mode",
         "monitor", "moveMs", "ms", "name", "note", "onFail", "path", "process", "region", "relativeTo",
         "sizeTolerancePct", "sound", "stepPx", "steps", "target", "text", "timeoutMs", "to", "tolerance", "tolerancePx",
-        "until", "value", "wait", "when", "whenFound", "width", "x", "y",
+        "until", "value", "wait", "waitAfterMs", "when", "whenFound", "width", "x", "y",
     };
 
     /// <summary>Every setting an If / Repeat until condition can have.</summary>
