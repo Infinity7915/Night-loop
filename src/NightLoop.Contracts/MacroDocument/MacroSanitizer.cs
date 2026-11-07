@@ -13,7 +13,7 @@ public static class MacroSanitizer
     /// <summary>Every block setting the app reads or writes, on any block type.</summary>
     public static readonly HashSet<string> BlockKeys = new(StringComparer.Ordinal)
     {
-        "action", "afterFound", "amount", "amountPx", "anchor", "args", "autoResume", "button", "clicks", "color",
+        "action", "afterFound", "amount", "amountPx", "anchor", "args", "autoResume", "button", "clickXPct", "clickYPct", "clicks", "color",
         "condition", "confidencePct", "count", "delayMs", "direction", "durationMs", "failLabel", "file", "forever",
         "foundLabel", "from", "height", "holdMs", "how", "ifRunning", "image", "imageData", "key", "keys", "kind", "macroName",
         "match", "matchCase", "matchColor", "maxIterations", "maxMs", "maxTurns", "message", "method", "minMs", "mode",

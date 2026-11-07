@@ -60,15 +60,16 @@ public static class DetectProbe
     {
         if (Vision.BestImageMatch(ctx, what) is not { } m) return new ProbeResult(false, "The picture is bigger than the area to look in.");
         var score = (int)Math.Floor(m.Score * 100);
+        var at = Vision.PointIn(m, what);
         var size = Math.Abs(m.Scale - 1) < 0.005 ? "" : $" at {Math.Round(m.Scale * 100)}% of its size";
         if (!m.ColorOk && score >= what.ConfidencePct)
-            return new ProbeResult(false, $"Found the shape{size} ({score}% alike), but not in the picture's colors. Match colors is on, so it won't click a different-colored one.", (m.X, m.Y));
+            return new ProbeResult(false, $"Found the shape{size} ({score}% alike), but not in the picture's colors. Match colors is on, so it won't click a different-colored one.", at);
         if (score >= what.ConfidencePct)
-            return new ProbeResult(true, $"Found the picture at {m.X}, {m.Y}{size} ({score}% alike).", (m.X, m.Y));
+            return new ProbeResult(true, $"Found the picture at {at.X}, {at.Y}{size} ({score}% alike).", at);
         var hint = what.SizeTolerancePct is not null
             ? " If it looks smaller or bigger in the game than when you captured it, clear Size tolerance so it's automatic."
             : " Try a lower Confidence, or capture a smaller, more distinctive part.";
-        return new ProbeResult(false, $"Didn't find the picture. The closest spot was {score}% alike{size} (needs {what.ConfidencePct}%).{hint}", (m.X, m.Y));
+        return new ProbeResult(false, $"Didn't find the picture. The closest spot was {score}% alike{size} (needs {what.ConfidencePct}%).{hint}", at);
     }
 
     private static ProbeResult Pixel(Block b, RunContext ctx)

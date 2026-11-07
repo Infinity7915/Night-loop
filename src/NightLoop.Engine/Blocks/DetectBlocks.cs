@@ -48,7 +48,7 @@ internal static class DetectBlocks
         var what = Target(b);
         var found = await Vision.WaitForAsync(ctx, what, b.GetInt("timeoutMs", 0));
         if (found is not { } p) return false;
-        ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor);
+        ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor, what.ClickX, what.ClickY);
         await ClickFoundAsync(b, ctx, p);
         return true;
     }
@@ -88,7 +88,7 @@ internal static class DetectBlocks
                 // Turning has stopped. Look once more after the view settles, so the click lands where the target is now.
                 await ctx.PauseExactAsync(ScanSettleMs);
                 if (await Vision.FindAsync(ctx, what) is { } settled) p = settled;
-                ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor);
+                ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor, what.ClickX, what.ClickY);
                 switch (b.GetString("whenFound", "click"))
                 {
                     case "click" when method == "mouseMove":
@@ -135,7 +135,8 @@ internal static class DetectBlocks
     /// </summary>
     private static async Task<((int X, int Y) Point, double Ratio)> CenterAsync(RunContext ctx, FoundTarget target, int tolerance, string method, bool tilt = true)
     {
-        var what = new LookFor(target.Kind, target.Value, target.ImageData, target.Tolerance, target.ConfidencePct, Region: null, SizeTolerancePct: target.SizeTolerancePct, MatchColor: target.MatchColor);
+        var what = new LookFor(target.Kind, target.Value, target.ImageData, target.Tolerance, target.ConfidencePct, Region: null, SizeTolerancePct: target.SizeTolerancePct, MatchColor: target.MatchColor,
+            ClickX: target.ClickX, ClickY: target.ClickY);
         var view = ctx.AreaFor(null).Center;
         var (ok, point, ratio) = await CenterAxisAsync(ctx, what, target, target.Point, view, tolerance, method, vertical: false, guess: null);
         // Sideways sensitivity is a good first guess for up and down. Arrow keys only turn sideways: in most games
@@ -232,8 +233,10 @@ internal static class DetectBlocksLook
     public static LookFor Target(Block b)
     {
         var kind = b.GetString("target", "text");
+        var (cx, cy) = ClickSpot.Read(b);
         return new LookFor(kind, b.GetString("value", ""), ImageData: b.GetString("imageData"),
             Tolerance: b.GetInt("tolerance", 10), ConfidencePct: b.GetInt("confidencePct", 90),
-            Contains: true, MatchCase: false, Region: b.Params["region"], SizeTolerancePct: SizeTolerance(b.GetInt("sizeTolerancePct")), MatchColor: b.GetBool("matchColor") != false);
+            Contains: true, MatchCase: false, Region: b.Params["region"], SizeTolerancePct: SizeTolerance(b.GetInt("sizeTolerancePct")), MatchColor: b.GetBool("matchColor") != false,
+            ClickX: kind == "image" ? cx : 0.5, ClickY: kind == "image" ? cy : 0.5);
     }
 }

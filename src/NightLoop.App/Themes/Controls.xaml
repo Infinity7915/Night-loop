@@ -16,6 +16,7 @@
   <views:HexToBrushConverter x:Key="HexToBrush" />
   <views:NullToVisibleConverter x:Key="NullToVisible" />
   <views:StringsEqualConverter x:Key="StringsEqual" />
+  <views:ShareToOffsetConverter x:Key="ShareToOffset" />
 
   <FontFamily x:Key="Icons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
   <FontFamily x:Key="Mono">Cascadia Mono, Consolas</FontFamily>

@@ -32,6 +32,11 @@ public sealed partial class MainViewModel
     /// <summary>The picture the selected block looks for, as Night-loop compares it (grayscale). Null when it has none.</summary>
     [ObservableProperty] private ImageSource? _inspectorImage;
     [ObservableProperty] private string _inspectorImageText = "";
+    /// <summary>Find &amp; click / Scan &amp; turn with a picture: the click spot can be set on the preview.</summary>
+    [ObservableProperty] private bool _inspectorCanSetClickSpot;
+    /// <summary>Where the click spot is in the preview, 0–1 across and down.</summary>
+    [ObservableProperty] private double _inspectorClickX = 0.5;
+    [ObservableProperty] private double _inspectorClickY = 0.5;
     /// <summary>"You've reached the limit…" after pressing New macro with every slot used.</summary>
     [ObservableProperty] private bool _showLimit;
 
@@ -106,6 +111,8 @@ public sealed partial class MainViewModel
 
         if (b.Type is BlockTypes.WaitForImage or BlockTypes.WaitForImageGone || (finds && target == "image") || condition == "imageVisible")
             yield return new(hasImage ? "Capture the picture again" : "Capture image from screen", "image");
+        if (finds && target == "image" && hasImage && ClicksPicture(b))
+            yield return new("Set click spot in picture", "clickspot");
         if (fields.Any(f => f.Key == "region") || condition is "textVisible" or "imageVisible")
             yield return new("Select region on screen", "region");
         if (fields.Any(f => f.Key == "color") || (finds && target == "pixel") || condition == "pixelColor")
@@ -115,6 +122,10 @@ public sealed partial class MainViewModel
         if (b.Type == BlockTypes.WindowPosition) yield return new("Use current window position", "position");
         if (DetectProbe.CanTest(b)) yield return new(b.Type is BlockTypes.If or BlockTypes.RepeatUntil ? "Check it on screen now" : "Test on screen now", "test");
     }
+
+    /// <summary>Whether this block clicks (or turns toward) the picture it finds, so its click spot matters.</summary>
+    private static bool ClicksPicture(Block b) =>
+        b.Type == BlockTypes.FindClick || (b.Type == BlockTypes.ScanTurn && b.GetString("whenFound", "click") != "continue");
 
     /// <summary>The saved picture of a picture block or an "Image visible" condition.</summary>
     private static string? ImageDataOf(Block b) =>
@@ -127,6 +138,7 @@ public sealed partial class MainViewModel
     {
         InspectorImage = null;
         InspectorImageText = "";
+        InspectorCanSetClickSpot = false;
         if (b is null || ImageDataOf(b) is not { Length: > 0 } data) return;
         if (b.Type is BlockTypes.FindClick or BlockTypes.ScanTurn && b.GetString("target", "text") != "image") return;
         if (!ImageTemplate.TryDecode(data, out var t) || t is null)
@@ -140,6 +152,12 @@ public sealed partial class MainViewModel
         InspectorImageText = t.HasColor
             ? $"Looking for this picture · {t.Width}×{t.Height}, at any size. With Match colors on, its colors have to match too."
             : $"Looking for this picture · {t.Width}×{t.Height}, at any size. It was captured before colors were saved, so only its shape counts. Capture it again to match colors.";
+        if (b.Type is BlockTypes.FindClick or BlockTypes.ScanTurn && ClicksPicture(b))
+        {
+            (InspectorClickX, InspectorClickY) = ClickSpot.Read(b);
+            InspectorCanSetClickSpot = true;
+            InspectorImageText += $" {ClickSpotPicker.Describe(InspectorClickX, InspectorClickY)} (the dot). Click the picture to move it.";
+        }
     }
 
     [RelayCommand]
@@ -158,6 +176,7 @@ public sealed partial class MainViewModel
                 "region" => await PickRegionAsync(b),
                 "image" => await CaptureImageAsync(b),
                 "test" => await TestOnScreenAsync(b),
+                "clickspot" => PickClickSpot(b),
                 _ => false,
             };
             if (!changed) return;
@@ -169,6 +188,44 @@ public sealed partial class MainViewModel
         {
             Status = $"Couldn't read the screen: {ex.Message}";
         }
+    }
+
+    /// <summary>Opens the picture big so the person can click the exact spot to click once it is found.</summary>
+    private bool PickClickSpot(Block b)
+    {
+        if (InspectorImage is not BitmapSource picture) return false;
+        var (x, y) = ClickSpot.Read(b);
+        if (ClickSpotPicker.Pick(Application.Current?.MainWindow, picture, x, y) is not { } spot) return false;
+        StoreClickSpot(b, spot.X, spot.Y);
+        return true;
+    }
+
+    /// <summary>The preview in the inspector was clicked: move the click spot there.</summary>
+    public void SetClickSpot(double x, double y)
+    {
+        if (SelectedBlock is not { } row || IsRecording || IsPlaying || !InspectorCanSetClickSpot) return;
+        StoreClickSpot(row.Block, x, y);
+        row.Refresh();
+        OnRowChanged(row);
+        BuildInspector();
+    }
+
+    /// <summary>Saves the spot as whole percents; the middle is left blank, as blocks had it before there was a spot.</summary>
+    private void StoreClickSpot(Block b, double x, double y)
+    {
+        var px = (int)Math.Round(Math.Clamp(x, 0, 1) * 100);
+        var py = (int)Math.Round(Math.Clamp(y, 0, 1) * 100);
+        if (px == 50 && py == 50)
+        {
+            b.Params.Remove(BlockTypes.ClickXKey);
+            b.Params.Remove(BlockTypes.ClickYKey);
+        }
+        else
+        {
+            b.Params[BlockTypes.ClickXKey] = px;
+            b.Params[BlockTypes.ClickYKey] = py;
+        }
+        Status = ClickSpotPicker.Describe(px / 100.0, py / 100.0) + " once it is found.";
     }
 
     /// <summary>The process a window block works on: its own, else the target game.</summary>
