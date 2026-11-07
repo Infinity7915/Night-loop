@@ -10,6 +10,11 @@
   Anything inside these comment marks is hidden. Delete everything else to show "Nothing new right now."
 -->
 
+# Updated Terms and a new Privacy Policy
+
+- Night-loop now has its own Privacy Policy, and the Terms of Service were updated to match (November 7, 2026). Both are linked from the Create account screen and on GitHub.
+- Questions about your data, privacy or legal requests? Use the contact page: api.night-loop.win/contact
+
 # What's new in 0.9.2
 
 - If, Loop and Repeat until blocks can be collapsed: click the arrow on the right of the row to hide the blocks inside, and again to show them. Everything starts expanded, and hidden blocks still play.

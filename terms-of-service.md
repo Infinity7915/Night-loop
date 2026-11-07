@@ -1,10 +1,10 @@
 # Night-loop Terms of Service
 
-**Version:** 2026-11-05
-**Effective date:** November 5, 2026
+**Version:** 2026-11-07
+**Effective date:** November 7, 2026
 
-These Terms of Service ("Terms") are an agreement between you and the operator of Night-loop ("Night-loop",
-"we", "us" or "our"). They cover the Night-loop desktop application for Windows (the "App"), the Night-loop
+These Terms of Service ("Terms") are an agreement between you and **Cryo**, who runs Night-loop (the "operator";
+"Night-loop", "we", "us" or "our"). Contact: the [contact page](https://api.night-loop.win/contact). They cover the Night-loop desktop application for Windows (the "App"), the Night-loop
 account server at `api.night-loop.win` (the "Service"), and this GitHub repository, together the "Night-loop
 software and services".
 
@@ -39,58 +39,15 @@ Delete account).
 - An account can be signed in on one PC at a time. Signing in on another PC signs the first one out.
 - You can change your username up to the limit shown in the App, and delete your account at any time.
 
-## 4. What Night-loop records and stores
+## 4. Your privacy
 
-Night-loop is built to collect as little as it can. In short:
-
-**On your PC only (never sent to the Service):**
-
-- **Recordings while you record.** Only while you press **Record**, the App captures your keyboard keys, mouse
-  buttons, mouse movement (if "Record mouse movement" is on) and scroll wheel, and turns them into macro blocks.
-  It does not record anything when you aren't recording.
-- **The screen, when a macro looks at it.** Detect blocks (Wait for text, Wait for image, Image gone, Pixel gone,
-  Find & click and others) and screen tools read pixels or text from your screen on your PC. Screen pictures
-  and text read from the screen are not uploaded, except a picture you choose to save inside a macro.
-- **Screenshots** taken by the Screenshot block, saved to your Pictures folder.
-- **Local settings** (theme, target game, hotkeys, tray and editor options) in `%LOCALAPPDATA%\NightLoop`, and
-  your sign-in token, encrypted with Windows DPAPI.
-- **Error logs** in `%LOCALAPPDATA%\NightLoop\logs`, which stay on your PC unless you send them to us.
-
-**On the Service (our server):**
-
-| What | Why | How it's protected |
-| --- | --- | --- |
-| Email address | Sign-in, codes, security notices | Encrypted (AES-256-GCM); looked up by a keyed hash |
-| Password | Sign-in | Never stored; only a one-way Argon2id hash |
-| Username and user number | Shown in the App | Plain text (it's a display name) |
-| Macros and macro groups on your account (names, blocks, saved pictures; Night-loop's property, section 5) | So your macros follow your account | Encrypted (AES-256-GCM) |
-| Macro settings (hotkeys, target game, trigger mode, block count) | Listing your macros | Plain text |
-| PC name (e.g. "Windows 11 · DESKTOP-7Q2") | Device list and "new sign-in" emails | Encrypted (AES-256-GCM) |
-| A hash of your PC's hardware ID and a random install ID | Recognising your PC for two-factor sign-in | One-way hash only |
-| Session and "trust this PC" tokens, email codes | Keeping you signed in, confirming changes | One-way hashes only |
-| IP address | Rate limits and the security log | Hashed for rate limits; shortened (last part removed) in the security log |
-| Security log (sign-ins, changes to your account) | Protecting your account | Kept 180 days; never contains passwords, codes or tokens |
-| Date you accepted these Terms, and their version | Proof of agreement | Plain text |
-| **Date your account was created** | Usage statistics | Plain text |
-| **Total time Night-loop has been open and signed in** (in seconds) | Usage statistics | Plain text |
-
-The total time is added up from the App's regular check-in with the Service (about once a minute while it's open
-and signed in, including while it's hidden in the system tray).
-
-**Third parties.** We don't sell your data and don't use it for advertising. The only outside services involved
-are our hosting providers (Cloudflare and Neon, which run the Service and its database), our email provider
-(which sees your address and the email we send you), GitHub (which hosts the App's downloads, updates and
-announcements; GitHub sees your IP address when the App checks for updates), and, if enabled, Have I Been Pwned's
-password check (which only ever sees the first 5 characters of a hash of your password).
-
-**Security.** Data on the Service is protected as described above, and all connections use HTTPS. No system is
-perfectly secure. Encryption protects a copy of the database, but someone who took over the running server
-itself could read what the server can read. We will tell affected users about a breach as the law requires.
-
-**Your rights.** Depending on where you live (for example under the GDPR or the CCPA), you may have rights to
-access, correct, delete or get a copy of your personal data, and to object to some uses of it. Download a copy of
-your account data or delete your account in Settings › Account; for anything else, contact us (section 14). After you delete your account, it's disabled
-straight away and deleted for good after 30 days.
+How Night-loop collects, uses, stores and protects personal data, who else sees it, and your rights are set out
+in the [Privacy Policy](privacy-policy.md), which is part of these Terms. In short: recordings and screen reading
+stay on your PC; the Service stores your email (encrypted), a hash of your password, your macros (encrypted),
+your PC name (encrypted), a security log, the date your account was created and how long the App has been open
+and signed in. We don't sell your data or use it for advertising. Download a copy of your account data or delete
+your account in Settings › Account; for anything else, use the
+[contact page](https://api.night-loop.win/contact).
 
 ## 5. Macros are Night-loop's property
 
@@ -107,7 +64,7 @@ straight away and deleted for good after 30 days.
 - Macros can only be created and changed with the App's macro editor. They can't be exported, imported, copied out
   of the Service, moved to another account, or used with any other program or server, and you agree not to try
   (including with a modified copy of the App).
-- Your account details (email, username and the other data in section 4) are not macros: they stay yours, and you
+- Your account details (email, username and the other data in the Privacy Policy) are not macros: they stay yours, and you
   can download a copy in Settings › Account › Download my data.
 - You're still responsible for what your macros do, and for having the right to use any picture or text you put
   in them.
@@ -193,6 +150,6 @@ while using Night-loop, to the extent the law allows.
 - **Governing law.** These Terms are governed by the laws of the place where the operator of Night-loop is based,
   without regard to conflict-of-law rules, except where the law of your country gives you consumer protections
   that can't be overridden.
-- **Contact.** Questions about these Terms or your data: open an issue in this repository
-  ([github.com/Infinity7915/Night-loop/issues](https://github.com/Infinity7915/Night-loop/issues)). Please don't
-  post personal details in a public issue; ask for a private contact there instead.
+- **Contact.** Questions about these Terms or your data, and legal notices: the
+  [contact page](https://api.night-loop.win/contact). Bug reports and feature ideas can go in this
+  repository's [issues](https://github.com/Infinity7915/Night-loop/issues); please don't post personal details there.
