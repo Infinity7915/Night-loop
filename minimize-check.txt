@@ -1,0 +1,2 @@
+WindowState = Minimized: in front before=True, still in front after minimize=False
+ShowWindow(SW_MINIMIZE): in front before=True, still in front after minimize=False
