@@ -25,8 +25,6 @@ public sealed partial class MainViewModel
     private readonly DispatcherTimer _toastTimer;
     /// <summary>A new macro nobody has touched yet: changing the target game rebuilds it instead of saving it.</summary>
     private bool _pristine;
-    /// <summary>Where recorded blocks go: after the block highlighted when recording started (null: at the end).</summary>
-    private Block? _recordAfter;
 
     [ObservableProperty] private bool _isToastVisible;
     /// <summary>The picture the selected block looks for, as Night-loop compares it (grayscale). Null when it has none.</summary>
@@ -67,8 +65,8 @@ public sealed partial class MainViewModel
 
     /// <summary>
     /// The ready-made blocks every new macro starts with (Settings › Macros turns them off): line the game window up,
-    /// a labelled loop to fill in, then a notification. Returns the block to select (inside the loop), so Record and
-    /// Add block put new blocks there.
+    /// a labelled loop to fill in, then a notification. Returns the block to select (inside the loop), so Add block
+    /// puts new blocks there.
     /// </summary>
     private int AddStarterBlocks(MacroDoc doc)
     {
@@ -85,8 +83,8 @@ public sealed partial class MainViewModel
         Add(BlockTypes.Description, new()
         {
             ["text"] = game is null
-                ? "What this macro does. Record or add blocks inside the loop."
-                : $"What this macro does. Focus, Resize and Position run first so every click lands in the same place in {game} each run.\nRecord or add blocks inside the loop.",
+                ? "What this macro does. Add blocks inside the loop."
+                : $"What this macro does. Focus, Resize and Position run first so every click lands in the same place in {game} each run.\nAdd blocks inside the loop.",
         });
         Add(BlockTypes.Label, new() { ["name"] = "start" });
         Add(BlockTypes.Loop, new() { ["count"] = 10 });
@@ -163,7 +161,7 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private async Task UseToolAsync(InspectorTool tool)
     {
-        if (SelectedBlock is not { } row || IsRecording || IsPlaying) return;
+        if (SelectedBlock is not { } row || IsPlaying) return;
         var b = row.Block;
         try
         {
@@ -203,7 +201,7 @@ public sealed partial class MainViewModel
     /// <summary>The preview in the inspector was clicked: move the click spot there.</summary>
     public void SetClickSpot(double x, double y)
     {
-        if (SelectedBlock is not { } row || IsRecording || IsPlaying || !InspectorCanSetClickSpot) return;
+        if (SelectedBlock is not { } row || IsPlaying || !InspectorCanSetClickSpot) return;
         StoreClickSpot(row.Block, x, y);
         row.Refresh();
         OnRowChanged(row);

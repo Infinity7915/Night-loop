@@ -215,7 +215,7 @@ public sealed partial class MainViewModel
 
     private async Task DeleteMacroAsync(Guid id, string name)
     {
-        if (id == _macroId && (IsRecording || IsPlaying)) return;
+        if (id == _macroId && (IsPlaying)) return;
         try
         {
             if (_runsById.TryGetValue(id, out var run)) run.Stop();

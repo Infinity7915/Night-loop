@@ -42,8 +42,8 @@ Delete account).
 ## 4. Your privacy
 
 How Night-loop collects, uses, stores and protects personal data, who else sees it, and your rights are set out
-in the [Privacy Policy](privacy-policy.md), which is part of these Terms. In short: recordings and screen reading
-stay on your PC; the Service stores your email (encrypted), a hash of your password, your macros (encrypted),
+in the [Privacy Policy](privacy-policy.md), which is part of these Terms. In short: screen reading stays on your PC
+(the App doesn't record your keyboard or mouse); the Service stores your email (encrypted), a hash of your password, your macros (encrypted),
 your PC name (encrypted), a security log, the date your account was created and how long the App has been open
 and signed in. We don't sell your data or use it for advertising. Download a copy of your account data or delete
 your account in Settings › Account; for anything else, use the
@@ -52,8 +52,8 @@ your account in Settings › Account; for anything else, use the
 ## 5. Macros are Night-loop's property
 
 - **Macros created with Night-loop and stored on the Service are assets of Night-loop. They are not owned by
-  you.** This covers every macro and macro group, including its blocks, recordings, settings and any picture or
-  text saved inside it, whether you recorded it, built it in the editor, or both.
+  you.** This covers every macro and macro group, including its blocks, settings and any picture or text saved
+  inside it, whether you built it in the editor or recorded it with an earlier version of the App.
 - To the extent you have any rights in a macro (for example in a picture or text you added), you assign them to
   Night-loop when the macro is saved to the Service. Where the law doesn't allow that assignment, you instead give
   Night-loop a worldwide, perpetual, irrevocable, royalty-free and transferable license to use, copy, change,

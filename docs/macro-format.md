@@ -1,7 +1,7 @@
 # Macro format
 
 A macro is one JSON document. The authoritative definition is section 6 of the project schema; this page
-notes what the code implements and the small additions made for recording.
+notes what the code implements and the small additions made since.
 
 ```json
 {
@@ -46,7 +46,7 @@ These are optional params, so existing macros are unaffected:
 | Block | Param | Why |
 | --- | --- | --- |
 | `input.key` | `holdMs` defaults to 30 when missing | Games often miss a key held for less than a frame |
-| `input.click` | `action`: `press` (default), `down`, `up` | Recording "hold right mouse while pressing keys" needs separate down and up, like `input.key` |
+| `input.click` | `action`: `press` (default), `down`, `up` | "Hold right mouse while pressing keys" needs separate down and up, like `input.key` |
 | `input.click` | `holdMs` (default 20) | Replays how long the button was held |
 | `input.click` | `x`/`y` may be omitted | Clicks wherever the cursor is |
 | `input.scroll` | positive `amount` scrolls up | Matches Windows wheel direction |
@@ -99,17 +99,16 @@ The Macros screen builds this document block by block:
 - **Play** starts at the selected block ("Play from 7"), or at the top when nothing is selected. Keys an
   earlier Key down block left held are pressed first. Play stops at breakpoints; press it again to continue.
   (Step is gone for now.)
-- **Record** puts new blocks under the selected block, or at the end when the last block or nothing is
-  selected. Keys and buttons that overlap stay overlapped: Ctrl+T records as Ctrl down, T, Ctrl up, with the
-  real hold times. Blocks inside a held key are indented and show how long it was held.
+- **Add block** and **Paste** put new blocks under the selected block, or at the end when nothing is selected.
+  There is no Record (removed in 0.10.0): macros are built from blocks only. Blocks between a Key down and
+  its Key up are indented. Mouse move and Drag blocks recorded by older versions keep their `path` and still play.
 - Window blocks pick their program with File Explorer (or from the programs running now) instead of typing a
   name. Picture blocks show the captured picture, and **Test on screen** looks once and says what it found.
-- The sliders button sets the macro's start/stop key, trigger mode (toggle or hold), run alongside, repeat
-  count and whether Record keeps plain mouse movement.
+- The sliders button sets the macro's start/stop key, trigger mode (toggle or hold), run alongside and repeat
+  count.
 - New macros start with a starter sequence (Settings › Macros turns it off; the choice stays on this PC).
 - Saved macros can be put in groups (name and color), searched, given their own start/stop key, and switched
-  on and off from the list. The record key (F9 unless changed, next to Record), F6 and Ctrl+Alt+End are
-  reserved for Record, Play and Stop all.
+  on and off from the list. F6 and Ctrl+Alt+End are reserved for Play and Stop all.
 
 ## What the server keeps
 

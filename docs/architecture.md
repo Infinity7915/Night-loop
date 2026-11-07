@@ -31,7 +31,7 @@ NightLoop.App ──► NightLoop.Engine ──► NightLoop.Contracts ◄──
   the repo and caches it. Both talk only to GitHub. See [releasing.md](releasing.md).
 - **App** is WPF with CommunityToolkit.Mvvm. `Program.Main` runs Velopack's hooks before WPF starts. Pages are
   Loading → Sign in → Home / Macros / Settings; `Controls/PageHost` cross-fades between them (off when Windows
-  animation effects are off). `NightLoop.exe --smoke <folder>` draws every screen to a PNG for CI. It's per-monitor DPI aware (`app.manifest`) so recorded and replayed pixel coordinates match on every
+  animation effects are off). `NightLoop.exe --smoke <folder>` draws every screen to a PNG for CI. It's per-monitor DPI aware (`app.manifest`) so picked and replayed pixel coordinates match on every
   monitor.
 
 ## Replay pipeline
@@ -53,17 +53,11 @@ MacroDoc ──► MacroValidator ──► MacroCompiler ──► CompiledMacr
 - Runaway guard: 10,000 steps with no wait or input faults with "Loop with no wait".
 - `PreciseDelay` sleeps with `Task.Delay` and spins the last ~16 ms, because Windows timers tick every ~15 ms.
 
-## Recording pipeline
+## No recording
 
-```
-WH_KEYBOARD_LL / WH_MOUSE_LL ──► InputRecorder ──► RawInputEvent list ──► RecordingBuilder ──► blocks
-       (hook thread with its own message loop)                            (pure logic, unit-tested)
-```
-
-- Hook callbacks are `[UnmanagedCallersOnly]` static methods. They copy the event and return at once.
-- Input that Night-loop injects carries a marker in `dwExtraInfo` and is never recorded.
-- Clicks and keys aimed at Night-loop's own window (like the Record button) are skipped.
-- The stop hotkey is swallowed, and modifier presses left at the end (for Ctrl+F9 style hotkeys) are dropped.
+Night-loop doesn't record keyboard or mouse input (removed in 0.10.0): macros are built from blocks only.
+Mouse move and Drag blocks recorded by older versions can carry a `path` of points; the engine still plays
+them, so saved macros keep working, but nothing creates new ones.
 
 ## Hotkeys
 

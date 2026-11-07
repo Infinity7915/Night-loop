@@ -162,13 +162,6 @@ public sealed class LocalSettings(string path)
         });
     }
 
-    /// <summary>The start / stop recording key, like "F9" or "Ctrl+Shift+R". Null means the default (F9).</summary>
-    public string? RecordHotkey
-    {
-        get => ReadString("recordHotkey");
-        set => Write("recordHotkey", value);
-    }
-
     /// <summary>
     /// Settings › Macros › Editor shortcuts: keys picked for undo, copy, paste and so on, by action name, like
     /// { "undo": "Ctrl+Z" }. Actions left out use their default.

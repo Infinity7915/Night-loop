@@ -136,7 +136,7 @@ public static class MacroValidator
     }
 
     /// <summary>
-    /// A recorded mouse path: up to <see cref="MacroLimits.PathMaxPoints"/> [x, y, ms] points, ms rising from 0 to
+    /// A mouse path saved by the old recorder (still played, never made now): up to <see cref="MacroLimits.PathMaxPoints"/> [x, y, ms] points, ms rising from 0 to
     /// at most <paramref name="durationMs"/>.
     /// </summary>
     public static bool IsPath(JsonNode? node, int durationMs)
@@ -254,7 +254,7 @@ public static class MacroValidator
                 Need(OneOf("mode", MoveModes, "absolute"), "Move mode must be absolute or relative.");
                 Need(OneOf("relativeTo", RelativeTo, "screen"), "relativeTo must be screen or gameWindow.");
                 Need(OptIntIn("durationMs", 0, MacroLimits.WaitMaxMs), "Duration must be 0 ms – 1 hour.");
-                Need(IsPath(b.Params["path"], b.GetInt("durationMs", 0)), "The recorded mouse path is damaged. Record it again.");
+                Need(IsPath(b.Params["path"], b.GetInt("durationMs", 0)), "The saved mouse path is damaged. Delete this block and add a new Mouse move.");
                 break;
             case BlockTypes.Drag:
                 Need(b.GetPoint("from") is not null && b.GetPoint("to") is not null, "Drag needs from and to points.");
@@ -262,7 +262,7 @@ public static class MacroValidator
                 Need(OneOf("relativeTo", RelativeTo, "screen"), "relativeTo must be screen or gameWindow.");
                 Need(OptIntIn("durationMs", 0, MacroLimits.WaitMaxMs), "Duration must be 0 ms – 1 hour.");
                 Need(OptIntIn("moveMs", 0, MacroLimits.MoveMaxMs), "Move time must be 0–10,000 ms.");
-                Need(IsPath(b.Params["path"], b.GetInt("durationMs", 300)), "The recorded drag path is damaged. Record it again.");
+                Need(IsPath(b.Params["path"], b.GetInt("durationMs", 300)), "The saved drag path is damaged. Delete this block and add a new Drag.");
                 break;
             case BlockTypes.Scroll:
                 if (b.Params.ContainsKey("direction"))

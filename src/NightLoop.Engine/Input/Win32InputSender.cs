@@ -36,7 +36,7 @@ public sealed class Win32InputSender : IInputSender
         var nx = (int)Math.Clamp(((long)(x - left) * 65536 + 32768) / width, 0, 65535);
         var ny = (int)Math.Clamp(((long)(y - top) * 65536 + 32768) / height, 0, 65535);
         SendMouse(MOUSE_EVENT_FLAGS.MOUSEEVENTF_MOVE | MOUSE_EVENT_FLAGS.MOUSEEVENTF_ABSOLUTE | MOUSE_EVENT_FLAGS.MOUSEEVENTF_VIRTUALDESK, nx, ny, 0);
-        // Still a pixel off (unusual monitor layouts): put the cursor exactly where the recording had it.
+        // Still a pixel off (unusual monitor layouts): put the cursor exactly where the block wants it.
         if (PInvoke.GetCursorPos(out var now) && (now.X != x || now.Y != y)
             && x >= left && y >= top && x < left + width && y < top + height)
             PInvoke.SetCursorPos(x, y);

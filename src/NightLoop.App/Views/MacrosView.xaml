@@ -190,7 +190,7 @@
                 Background="{DynamicResource AccentSoft}" BorderBrush="{DynamicResource AccentSoftBorder}">
           <DockPanel>
             <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Change target" VerticalAlignment="Center"
-                    FontWeight="SemiBold" Command="{Binding ChangeTargetCommand}" IsEnabled="{Binding IsRecording, Converter={StaticResource Not}}" />
+                    FontWeight="SemiBold" Command="{Binding ChangeTargetCommand}" />
             <Grid DockPanel.Dock="Left" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center">
               <Ellipse Stroke="{DynamicResource AccentLink}" StrokeThickness="2" />
               <Ellipse Width="8" Height="8" Stroke="{DynamicResource AccentLink}" StrokeThickness="2" />
@@ -284,51 +284,7 @@
                 </WrapPanel>
               </StackPanel>
               <WrapPanel VerticalAlignment="Center" HorizontalAlignment="Left">
-                <Button Command="{Binding ToggleRecordCommand}" Margin="0,4,0,4" ToolTip="{Binding RecordToolTip}">
-                  <Button.Style>
-                    <Style TargetType="Button" BasedOn="{StaticResource Tall}">
-                      <Setter Property="Padding" Value="16,0" />
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding IsRecording}" Value="True">
-                          <Setter Property="Background" Value="{DynamicResource RecordSoft}" />
-                          <Setter Property="BorderBrush" Value="{DynamicResource Record}" />
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </Button.Style>
-                  <StackPanel Orientation="Horizontal">
-                    <Ellipse Width="10" Height="10" Fill="{DynamicResource Record}" Margin="0,0,8,0" VerticalAlignment="Center" />
-                    <TextBlock VerticalAlignment="Center">
-                      <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                          <Setter Property="Text" Value="Record" />
-                          <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsRecording}" Value="True">
-                              <Setter Property="Text" Value="Recording…" />
-                            </DataTrigger>
-                          </Style.Triggers>
-                        </Style>
-                      </TextBlock.Style>
-                    </TextBlock>
-                  </StackPanel>
-                </Button>
-                <!-- The record key: click it to change it (opens the options) -->
-                <Button Command="{Binding CaptureRecordHotkeyCommand}" Margin="10,4,0,4" Cursor="Hand" Focusable="False"
-                        ToolTip="Start / stop recording key. Click to change it.">
-                  <Button.Template>
-                    <ControlTemplate TargetType="Button">
-                      <Border x:Name="Chip" Style="{StaticResource KeyChip}">
-                        <TextBlock Text="{Binding RecordHotkeyText}" Style="{StaticResource KeyChipText}" />
-                      </Border>
-                      <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                          <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource Accent}" />
-                        </Trigger>
-                      </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                  </Button.Template>
-                </Button>
-                <Button Command="{Binding TogglePlayCommand}" MinWidth="88" Margin="16,4,0,4" Content="{Binding PlayText}"
+                <Button Command="{Binding TogglePlayCommand}" MinWidth="88" Margin="0,4,0,4" Content="{Binding PlayText}"
                         ToolTip="{Binding PlayToolTip}">
                   <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource TallPrimary}">
@@ -378,18 +334,6 @@
                   </StackPanel>
                 </DockPanel>
                 <DockPanel Margin="0,14,0,0">
-                  <Button DockPanel.Dock="Right" Content="{Binding RecordHotkeyLabel}" Command="{Binding CaptureRecordHotkeyCommand}"
-                          FontFamily="{StaticResource Mono}" FontSize="13" FontWeight="Normal" MinHeight="44" MaxWidth="280" Background="{DynamicResource Bg}"
-                          ToolTip="Click, then press a key. Backspace puts F9 back." />
-                  <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Start / stop recording key" FontWeight="SemiBold" />
-                    <TextBlock Text="Works from any window. Used for every macro on this PC." Style="{StaticResource SmallLabel}" Margin="0,2,0,0"
-                               TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding RecordHotkeyError}" FontSize="12" Foreground="{DynamicResource Warning}" Margin="0,2,0,0"
-                               TextWrapping="Wrap" Visibility="{Binding RecordHotkeyError, Converter={StaticResource TextToVisible}}" />
-                  </StackPanel>
-                </DockPanel>
-                <DockPanel Margin="0,14,0,0">
                   <Border DockPanel.Dock="Right" Style="{StaticResource SegmentBar}">
                     <StackPanel Orientation="Horizontal">
                       <RadioButton Style="{StaticResource Segment}" GroupName="EditorTrigger" Content="Toggle" MinWidth="72"
@@ -413,15 +357,6 @@
                   <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="Repeat" FontWeight="SemiBold" />
                     <TextBlock Text="How many times Play runs the whole macro." Style="{StaticResource SmallLabel}" Margin="0,2,0,0" />
-                  </StackPanel>
-                </DockPanel>
-                <DockPanel Margin="0,14,0,0">
-                  <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding RecordMouseMoves}"
-                            ToolTip="Record mouse movement" />
-                  <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Record mouse movement" FontWeight="SemiBold" />
-                    <TextBlock Text="Off: Record keeps clicks, drags and camera turns, and glides the mouse between clicks."
-                               Style="{StaticResource SmallLabel}" Margin="0,2,0,0" TextWrapping="Wrap" />
                   </StackPanel>
                 </DockPanel>
               </StackPanel>
@@ -684,7 +619,7 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <TextBlock Text="No blocks yet. Add one above or press Record." Style="{StaticResource Muted}" FontSize="14"
+                <TextBlock Text="No blocks yet. Add one above." Style="{StaticResource Muted}" FontSize="14"
                            HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="20,32"
                            Visibility="{Binding Blocks.Count, Converter={StaticResource ZeroToVisible}}" />
               </Grid>
@@ -1234,7 +1169,7 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <TextBlock Text="Nothing saved yet. Add blocks or record something, then press Save to account." Style="{StaticResource Muted}"
+            <TextBlock Text="Nothing saved yet. Add blocks, then press Save to account." Style="{StaticResource Muted}"
                        FontSize="14" Margin="20,28" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
                        Visibility="{Binding IsLibraryEmpty, Converter={StaticResource BoolToVisible}}" />
             <TextBlock Style="{StaticResource Muted}" FontSize="14" Margin="20,28" HorizontalAlignment="Center" TextWrapping="Wrap"

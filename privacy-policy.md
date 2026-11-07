@@ -20,8 +20,9 @@ email. Please don't post personal details in a public GitHub issue.
 
 These are never sent to the Service:
 
-- **Recordings while you record.** Only while you press **Record**, the App captures keyboard keys, mouse
-  buttons, mouse movement (if "Record mouse movement" is on) and the scroll wheel, and turns them into macro blocks.
+- **No input recording.** The App doesn't record your keyboard, mouse or scroll wheel. Macros are built from
+  blocks in the editor. (Versions before 0.10.0 could record input on your PC while you pressed Record; blocks
+  recorded then stay in your macros and still play.)
 - **The screen, when a macro looks at it.** Detect blocks (Wait for text, Wait for image, Find & click and
   others) read pixels or text from your screen on your PC. Nothing from the screen is uploaded, except a picture
   you choose to save inside a macro.
