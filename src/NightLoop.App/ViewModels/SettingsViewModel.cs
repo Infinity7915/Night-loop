@@ -75,6 +75,19 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>Holiday icons in the window, taskbar and tray (Services/Seasons.cs). Kept on this PC.</summary>
+    public bool SeasonalThemes
+    {
+        get => _shell.Local.SeasonalThemes;
+        set
+        {
+            if (_shell.Local.SeasonalThemes == value) return;
+            _shell.Local.SeasonalThemes = value;
+            Services.Seasons.Apply(value);
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>On-screen pickers keep the screen moving instead of freezing a screenshot. Off by default. Kept on this PC.</summary>
     public bool LivePicking
     {

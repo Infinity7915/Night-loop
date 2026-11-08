@@ -102,6 +102,15 @@
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
             </controls:SplitRow>
+            <DockPanel Margin="0,12,0,8">
+              <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding SeasonalThemes}" VerticalAlignment="Center"
+                        ToolTip="Seasonal themes" Margin="16,0,0,0" />
+              <StackPanel>
+                <TextBlock Text="Seasonal themes" FontWeight="SemiBold" FontSize="14" />
+                <TextBlock Text="Around holidays the Night-loop icon dresses up: the North Pole with northern lights and a Santa hat for Christmas week, a witch hat and jack-o'-lantern for Halloween, and more for New Year, Valentine's, St. Patrick's, Easter, the 4th of July and Thanksgiving."
+                           Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+            </DockPanel>
             <controls:SplitRow Margin="0,12,0,0">
               <TextBlock Text="Mode" Style="{StaticResource RowLabel}" />
               <Border Style="{StaticResource SegmentBar}" HorizontalAlignment="Left" IsEnabled="{Binding ModeApplies}"

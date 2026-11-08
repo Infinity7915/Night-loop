@@ -47,6 +47,9 @@
   <ItemGroup>
     <Resource Include="Assets\icon.png" />
     <EmbeddedResource Include="Assets\icon.ico" LogicalName="NightLoop.icon.ico" />
+    <!-- Seasonal themes: window/taskbar pictures and tray icons. -->
+    <Resource Include="Assets\Seasons\*.png" />
+    <EmbeddedResource Include="Assets\Seasons\*.ico" LogicalName="NightLoop.season.%(Filename).ico" />
     <None Include="Assets\icon.svg" />
   </ItemGroup>
   <ItemGroup>
