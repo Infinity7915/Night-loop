@@ -18,6 +18,7 @@
 # What's new in 0.10.2
 
 - Seasonal themes now follow your Windows region. China and other East Asian regions get Lunar New Year (red lanterns and a pagoda) and the Mid-Autumn Festival (a harvest moon, the jade rabbit and mooncakes). The US gets the 4th of July and Thanksgiving, and Canada gets its own Thanksgiving week. Your location isn't used or saved.
+- 14 more country looks: Diwali, Holi, Eid, Day of the Dead, Carnival, Hanami, Canada Day, Bastille Day, Bonfire Night, Australia Day, King's Day and Oktoberfest. Each one shows only in its country, at the right time of year.
 
 # What's new in 0.10.1
 
