@@ -107,7 +107,7 @@
                         ToolTip="Seasonal themes" Margin="16,0,0,0" />
               <StackPanel>
                 <TextBlock Text="Seasonal themes" FontWeight="SemiBold" FontSize="14" />
-                <TextBlock Text="Around holidays the Night-loop icon dresses up: the North Pole with northern lights and a Santa hat for Christmas week, a witch hat and jack-o'-lantern for Halloween, and more for New Year, Valentine's, St. Patrick's, Easter, the 4th of July and Thanksgiving."
+                <TextBlock Text="Around holidays the Night-loop icon dresses up: the North Pole with northern lights and a Santa hat for Christmas week, a witch hat and jack-o'-lantern for Halloween, and more for New Year, Valentine's, St. Patrick's, Easter, the 4th of July and Thanksgiving. Holidays follow your Windows region (Lunar New Year and Mid-Autumn in China, for example). Your location isn't used or saved."
                            Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
               </StackPanel>
             </DockPanel>
