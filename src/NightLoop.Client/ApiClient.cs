@@ -183,6 +183,11 @@ public sealed class ApiClient
         {
             throw new ServerUnreachableException("The Night-loop server took too long to answer.", ex);
         }
+        catch (Exception ex) when (ex is System.Net.WebException or IOException && !ct.IsCancellationRequested)
+        {
+            // Android's network stack reports a dropped connection ("Socket closed") this way instead.
+            throw new ServerUnreachableException("Can't reach the Night-loop server. Check your connection.", ex);
+        }
 
         using (res)
         {
