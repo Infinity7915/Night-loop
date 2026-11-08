@@ -18,7 +18,7 @@ public static class MacroPlatforms
     /// <summary>Blocks that only make sense on a phone: touch, Android buttons and apps.</summary>
     public static readonly IReadOnlySet<string> AndroidOnly = new HashSet<string>(StringComparer.Ordinal)
     {
-        BlockTypes.Tap, BlockTypes.LongPress, BlockTypes.Swipe, BlockTypes.SwipeHold, BlockTypes.DeviceButton, BlockTypes.AppOpen, BlockTypes.WaitForApp,
+        BlockTypes.Tap, BlockTypes.LongPress, BlockTypes.Swipe, BlockTypes.SwipeHold, BlockTypes.SwipeScan, BlockTypes.WalkTo, BlockTypes.DeviceButton, BlockTypes.AppOpen, BlockTypes.WaitForApp,
     };
 
     /// <summary>

@@ -39,6 +39,18 @@ internal sealed class FakeTouch : ITouchSender
         Log.Add($"release after {HoldChecks}");
     }
 
+    public async Task SteerAsync(int x, int y, Func<Task<(int X, int Y)?>> next, CancellationToken ct)
+    {
+        Log.Add($"down {x},{y}");
+        for (var i = 0; i < 50; i++)
+        {
+            if (await next() is not { } p) break;
+            Log.Add($"move {p.X},{p.Y}");
+            await Task.Delay(5, ct);
+        }
+        Log.Add("up");
+    }
+
     public void PressButton(string button) => Log.Add($"button {button}");
 
     public bool OpenApp(string package)

@@ -234,7 +234,10 @@ public static class MacroValidator
         void OnFail() => Need(OneOf("onFail", FailActions, "continue"), "On fail must be continue, retry, go to label or stop.");
         void AfterFound() => Need(OneOf("afterFound", FoundActions, "next"), "After found must be next block, leave loop, go to label or stop.");
 
-        if (b.Type is BlockTypes.FindClick or BlockTypes.ScanTurn)
+        if (BlockTypes.HasTapWhenFound(b.Type))
+            Need(OneOf("whenFound", ["none", "tap", "click"], "none"), "When found must be tap or nothing.");
+
+        if (b.Type is BlockTypes.FindClick or BlockTypes.ScanTurn or BlockTypes.SwipeScan or BlockTypes.WalkTo or BlockTypes.WaitForImage)
         {
             Need(OptIntIn(BlockTypes.ClickXKey, 0, 100) && OptIntIn(BlockTypes.ClickYKey, 0, 100), "The click spot must be 0–100% across and down the picture.");
         }
@@ -471,6 +474,24 @@ public static class MacroValidator
                 Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be up to 1 hour, or Infinite.");
                 if (b.Params.ContainsKey("condition") && b.Params["condition"] is not null)
                     ValidateCondition(b.GetObject("condition"), b.Id, issues, 0);
+                break;
+            case BlockTypes.SwipeScan:
+            case BlockTypes.WalkTo:
+                Need(b.GetPoint("from") is { } sf && sf.X is >= 0 and <= MacroLimits.ScreenMaxPx && sf.Y is >= 0 and <= MacroLimits.ScreenMaxPx
+                     && b.GetPoint("to") is { } st && st.X is >= 0 and <= MacroLimits.ScreenMaxPx && st.Y is >= 0 and <= MacroLimits.ScreenMaxPx,
+                    b.Type == BlockTypes.WalkTo ? "Walk to needs the joystick's middle and a spot to push it to." : "Swipe and scan needs a start and an end spot.");
+                Need(OneOf("target", ["text", "image"], "image"), "Look for must be text or a picture.");
+                if (b.GetString("target", "image") == "text")
+                    Need(Text("value", MacroLimits.TypeTextMaxLength), "Say what text to look for (1–200 characters).");
+                Need(OptIntIn("durationMs", 1, MacroLimits.TouchHoldMaxMs), "Swipe time must be 1–60,000 ms.");
+                Need(OptIntIn("maxTurns", 1, MacroLimits.ScanTurnsMax), "Max swipes must be 1–360.");
+                Need(OptIntIn("tolerancePx", 1, MacroLimits.ScreenMaxPx), "How near must be a number of pixels.");
+                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be up to 1 hour, or Infinite.");
+                Need(OptIntIn("confidencePct", 1, 100), "Confidence must be 1–100%.");
+                if (b.Params["condition"] is not null && b.Params.ContainsKey("condition"))
+                    ValidateCondition(b.GetObject("condition"), b.Id, issues, 0);
+                Image();
+                OnFail();
                 break;
             case BlockTypes.DeviceButton:
                 Need(OneOf("button", DeviceButtons), "Button must be Back, Home, Recents or Notifications.");
