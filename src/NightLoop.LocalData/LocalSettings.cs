@@ -119,6 +119,13 @@ public sealed class LocalSettings(string path)
         set => WriteNode("seasonalThemes", value);
     }
 
+    /// <summary>Settings › Appearance: seasonal themes show every country's holidays, not only this region's. Off unless turned on.</summary>
+    public bool GlobalSeasonalThemes
+    {
+        get => Read()?["globalSeasonalThemes"] is JsonValue v && v.TryGetValue(out bool on) && on;
+        set => WriteNode("globalSeasonalThemes", value);
+    }
+
     /// <summary>
     /// Settings › Macros: the on-screen pickers (click position, color, area, picture) leave the screen moving and
     /// draw a crosshair, the position and the outline on top, instead of freezing a screenshot. Off unless turned on.

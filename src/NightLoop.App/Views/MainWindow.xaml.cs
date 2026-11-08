@@ -105,7 +105,8 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         ThemeManager.ApplyTitleBar(this);
-        Seasons.Apply(new NightLoop.LocalData.LocalSettings().SeasonalThemes);
+        var local = new NightLoop.LocalData.LocalSettings();
+        Seasons.Apply(local.SeasonalThemes || local.GlobalSeasonalThemes, local.GlobalSeasonalThemes);
         TrayIcon.Create(ShowFromTray, ExitFromTray);
     }
 

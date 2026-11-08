@@ -83,7 +83,31 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         {
             if (_shell.Local.SeasonalThemes == value) return;
             _shell.Local.SeasonalThemes = value;
-            Services.Seasons.Apply(value);
+            // Only one of the two seasonal switches can be on.
+            if (value && _shell.Local.GlobalSeasonalThemes)
+            {
+                _shell.Local.GlobalSeasonalThemes = false;
+                OnPropertyChanged(nameof(GlobalSeasonalThemes));
+            }
+            Services.Seasons.Apply(value || _shell.Local.GlobalSeasonalThemes, _shell.Local.GlobalSeasonalThemes);
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Seasonal themes show every country's holidays. Kept on this PC.</summary>
+    public bool GlobalSeasonalThemes
+    {
+        get => _shell.Local.GlobalSeasonalThemes;
+        set
+        {
+            if (_shell.Local.GlobalSeasonalThemes == value) return;
+            _shell.Local.GlobalSeasonalThemes = value;
+            if (value && _shell.Local.SeasonalThemes)
+            {
+                _shell.Local.SeasonalThemes = false;
+                OnPropertyChanged(nameof(SeasonalThemes));
+            }
+            Services.Seasons.Apply(value || _shell.Local.SeasonalThemes, value);
             OnPropertyChanged();
         }
     }
