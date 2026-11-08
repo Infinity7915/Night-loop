@@ -34,6 +34,8 @@ public sealed class RunManager(IInputSender input, IWindowService? windows = nul
     public Func<int, bool>? IsKeyDown { get; set; }
     /// <summary>utility.screenshot.</summary>
     public Action<ScreenImage, string>? SaveScreenshot { get; set; }
+    /// <summary>Taps, swipes and Android buttons (Night-loop for Android only).</summary>
+    public ITouchSender? Touch { get; set; }
 
     public IReadOnlyList<MacroRun> ActiveRuns
     {
@@ -65,6 +67,7 @@ public sealed class RunManager(IInputSender input, IWindowService? windows = nul
             IsKeyDown = IsKeyDown,
             SaveScreenshot = SaveScreenshot,
             Waits = Waits,
+            Touch = Touch,
         };
         var run = new MacroRun(macro, env, settings);
         run.StateChanged += (r, s) => RunStateChanged?.Invoke(r, s);

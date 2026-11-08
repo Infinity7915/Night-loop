@@ -12,7 +12,8 @@ public static class MacroValidator
     private static readonly HashSet<string> KeyActions = ["press", "down", "up"];
     private static readonly HashSet<string> RelativeTo = ["screen", "gameWindow"];
     private static readonly HashSet<string> Directions = ["left", "right", "up", "down"];
-    private static readonly HashSet<string> ConditionKinds = ["textVisible", "imageVisible", "pixelColor", "windowFocused", "processRunning", "keyHeld", "not", "all", "any"];
+    private static readonly HashSet<string> ConditionKinds = ["textVisible", "imageVisible", "pixelColor", "windowFocused", "processRunning", "keyHeld", "appInFront", "not", "all", "any"];
+    private static readonly HashSet<string> DeviceButtons = ["back", "home", "recents", "notifications"];
     private static readonly HashSet<string> MoveModes = ["absolute", "relative"];
     private static readonly HashSet<string> FailActions = ["continue", "retry", "goto", "stop"];
     private static readonly HashSet<string> FoundActions = ["next", "exitLoop", "goto", "stop"];
@@ -56,6 +57,14 @@ public static class MacroValidator
                 issues.Add(new(block.Id, $"Unknown block type \"{block.Type}\"."));
                 continue;
             }
+            var platform = MacroPlatforms.Of(doc);
+            if (MacroPlatforms.IsKnown(doc.Platform) && !MacroPlatforms.Allows(platform, block.Type))
+            {
+                issues.Add(new(block.Id, $"This block can't be used in {MacroPlatforms.Label(platform)} macros."));
+                continue;
+            }
+            if (MacroPlatforms.IsKnown(doc.Platform) && block.GetObject("condition") is { } condition && !ConditionAllowed(condition, platform, 0))
+                issues.Add(new(block.Id, $"This condition can't be checked in {MacroPlatforms.Label(platform)} macros."));
             ValidateParams(block, issues);
             ValidateCommon(block, issues);
         }
@@ -437,15 +446,55 @@ public static class MacroValidator
             case BlockTypes.RunMacro:
                 Need(Text("macroName", MacroLimits.NameMaxLength), "Run macro needs a macro name.");
                 break;
+            case BlockTypes.Tap:
+                Need(IntIn("x", 0, MacroLimits.ScreenMaxPx) && IntIn("y", 0, MacroLimits.ScreenMaxPx), "Tap needs a spot on the screen (x and y).");
+                Need(OptIntIn("count", MacroLimits.ClicksMin, MacroLimits.ClicksMax), "Taps must be 1–3.");
+                Need(OptIntIn("holdMs", 1, MacroLimits.TouchHoldMaxMs), "Press length must be 1–60,000 ms.");
+                break;
+            case BlockTypes.LongPress:
+                Need(IntIn("x", 0, MacroLimits.ScreenMaxPx) && IntIn("y", 0, MacroLimits.ScreenMaxPx), "Long press needs a spot on the screen (x and y).");
+                Need(OptIntIn("holdMs", 1, MacroLimits.TouchHoldMaxMs), "Hold time must be 1–60,000 ms.");
+                break;
+            case BlockTypes.Swipe:
+                Need(b.GetPoint("from") is { } f && f.X is >= 0 and <= MacroLimits.ScreenMaxPx && f.Y is >= 0 and <= MacroLimits.ScreenMaxPx
+                     && b.GetPoint("to") is { } t && t.X is >= 0 and <= MacroLimits.ScreenMaxPx && t.Y is >= 0 and <= MacroLimits.ScreenMaxPx,
+                    "Swipe needs a start and an end spot on the screen.");
+                Need(OptIntIn("durationMs", 1, MacroLimits.TouchHoldMaxMs), "Swipe time must be 1–60,000 ms.");
+                break;
+            case BlockTypes.DeviceButton:
+                Need(OneOf("button", DeviceButtons), "Button must be Back, Home, Recents or Notifications.");
+                break;
+            case BlockTypes.AppOpen:
+                Need(IsPackage(b.GetString("package")), "Pick the app to open.");
+                Need(OptBool("wait"), "Wait for it to open must be yes or no.");
+                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be up to 1 hour, or Infinite.");
+                break;
+            case BlockTypes.WaitForApp:
+                Need(IsPackage(b.GetString("package")), "Pick the app to wait for.");
+                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be up to 1 hour, or Infinite.");
+                break;
         }
     }
+
+    private static bool ConditionAllowed(JsonObject c, string platform, int depth)
+    {
+        var kind = (c["kind"] as JsonValue)?.TryGetValue(out string? k) == true ? k : null;
+        if (kind is null || depth > 4) return true; // ValidateCondition reports these
+        if (!MacroPlatforms.AllowsCondition(platform, kind)) return false;
+        if (c["condition"] is JsonObject inner && !ConditionAllowed(inner, platform, depth + 1)) return false;
+        return c["conditions"] is not JsonArray children
+            || children.OfType<JsonObject>().All(child => ConditionAllowed(child, platform, depth + 1));
+    }
+
+    private static bool IsPackage(string? package) =>
+        package is { Length: > 0 and <= 255 } && package.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '.' or '_');
 
     private static void ValidateCondition(JsonObject? c, string blockId, List<MacroIssue> issues, int depth)
     {
         var kind = (c?["kind"] as JsonValue)?.TryGetValue(out string? k) == true ? k : null;
         if (c is null || kind is null || !ConditionKinds.Contains(kind))
         {
-            issues.Add(new(blockId, "Condition kind must be textVisible, imageVisible, pixelColor, windowFocused, processRunning, keyHeld, not, all or any."));
+            issues.Add(new(blockId, "Condition kind must be textVisible, imageVisible, pixelColor, windowFocused, processRunning, keyHeld, appInFront, not, all or any."));
             return;
         }
         if (depth > 4)
@@ -474,6 +523,10 @@ public static class MacroValidator
             case "windowFocused":
                 if (c["name"] is { } focused && !((focused as JsonValue)?.TryGetValue(out string? window) == true && window.Length <= MacroLimits.PathMaxLength))
                     issues.Add(new(blockId, "The window's program name is too long."));
+                break;
+            case "appInFront":
+                if (!IsPackage((c["package"] as JsonValue)?.TryGetValue(out string? app) == true ? app : null))
+                    issues.Add(new(blockId, "App in front needs the app's package name, like com.roblox.client."));
                 break;
             case "keyHeld":
                 if ((c["key"] as JsonValue)?.TryGetValue(out string? key) != true || key is null || !KeyCatalog.IsKnown(key))

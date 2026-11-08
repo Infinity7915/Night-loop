@@ -1043,9 +1043,9 @@
                                 <DockPanel Margin="20,14">
                                   <WrapPanel DockPanel.Dock="Right" VerticalAlignment="Center" HorizontalAlignment="Right">
                                     <Button Content="Save" Command="{Binding SaveCommand}" FontSize="13" Margin="8,0,0,0"
-                                            Visibility="{Binding HasDraft, Converter={StaticResource BoolToVisible}}" />
+                                            Visibility="{Binding CanSave, Converter={StaticResource BoolToVisible}}" />
                                     <Button Content="Open" Command="{Binding OpenCommand}" FontSize="13" Margin="8,0,0,0"
-                                            Visibility="{Binding IsInEditor, Converter={StaticResource BoolToVisible}, ConverterParameter=invert}" />
+                                            Visibility="{Binding CanOpen, Converter={StaticResource BoolToVisible}}" />
                                     <Button Command="{Binding DeleteCommand}" ToolTip="Delete">
                                       <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource ConfirmDelete}">
@@ -1065,13 +1065,14 @@
                                         </Style>
                                       </Button.Style>
                                     </Button>
-                                    <Border Style="{StaticResource KeyChip}" Margin="8,0,0,0" ToolTip="Start / stop key">
+                                    <Border Style="{StaticResource KeyChip}" Margin="8,0,0,0" ToolTip="Start / stop key"
+                                            Visibility="{Binding IsPc, Converter={StaticResource BoolToVisible}}">
                                       <TextBlock Text="{Binding HotkeyChip}" Style="{StaticResource KeyChipText}" />
                                     </Border>
                                     <ToggleButton Style="{StaticResource OptionsButton}" IsChecked="{Binding ShowOptions}" Margin="8,0,0,0"
                                                   ToolTip="Options" />
                                     <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding IsRunning}" Margin="12,0,0,0"
-                                              ToolTip="Run this macro" />
+                                              ToolTip="Run this macro" Visibility="{Binding IsPc, Converter={StaticResource BoolToVisible}}" />
                                   </WrapPanel>
                                   <StackPanel Margin="0,0,12,0" VerticalAlignment="Center">
                                     <WrapPanel>
@@ -1080,6 +1081,10 @@
                                       <Border Style="{StaticResource RoundPill}" Background="{DynamicResource Accent}" Margin="0,2,6,2"
                                               Visibility="{Binding IsInEditor, Converter={StaticResource BoolToVisible}}">
                                         <TextBlock Text="In editor" Style="{StaticResource PillText}" Foreground="{DynamicResource AccentText}" />
+                                      </Border>
+                                      <Border Style="{StaticResource RoundPill}" Background="{DynamicResource AccentSoft}" Margin="0,2,6,2"
+                                              Visibility="{Binding IsAndroid, Converter={StaticResource BoolToVisible}}">
+                                        <TextBlock Text="Android" Style="{StaticResource PillText}" />
                                       </Border>
                                       <Border Style="{StaticResource RoundPill}" Background="{DynamicResource WarningSoft}" Margin="0,2,6,2"
                                               Visibility="{Binding HasDraft, Converter={StaticResource BoolToVisible}}">

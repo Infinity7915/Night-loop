@@ -99,7 +99,7 @@ public sealed partial class MainViewModel
         }
         DraftCount = _rows.Count(r => r.HasDraft);
         IsLibraryEmpty = _rows.Count == 0;
-        _nameToId = _rows.GroupBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+        _nameToId = _rows.Where(r => !r.IsAndroid).GroupBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
     }
 
@@ -153,7 +153,7 @@ public sealed partial class MainViewModel
 
     // ---- Row actions ----
 
-    internal Task OpenRowAsync(SavedMacroRow row) => row.IsInEditor ? Task.CompletedTask : OpenAsync(row.Id);
+    internal Task OpenRowAsync(SavedMacroRow row) => row.IsInEditor || row.IsAndroid ? Task.CompletedTask : OpenAsync(row.Id);
 
     internal async Task SaveRowAsync(SavedMacroRow row)
     {
@@ -439,8 +439,16 @@ public sealed partial class SavedMacroRow : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Detail))]
     private DateTimeOffset _updatedAt;
-    [ObservableProperty] private bool _hasDraft;
-    [ObservableProperty] private bool _isInEditor;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSave))]
+    private bool _hasDraft;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanOpen))]
+    private bool _isInEditor;
+    /// <summary>Made in Night-loop for Android: shown so the count adds up, but it can't open or run here.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanOpen), nameof(CanSave), nameof(IsPc), nameof(Detail))]
+    private bool _isAndroid;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StateText))]
     private bool _isRunningState;
@@ -458,7 +466,12 @@ public sealed partial class SavedMacroRow : ObservableObject
     /// <summary>First press of delete turns the button into "Delete?"; the second deletes.</summary>
     [ObservableProperty] private bool _confirmingDelete;
 
-    public string Detail => $"{BlockCount} blocks · edited {Edited(UpdatedAt)}";
+    public string Detail => IsAndroid
+        ? $"Android macro · {BlockCount} blocks · edited {Edited(UpdatedAt)} · open it in Night-loop for Android"
+        : $"{BlockCount} blocks · edited {Edited(UpdatedAt)}";
+    public bool IsPc => !IsAndroid;
+    public bool CanOpen => !IsInEditor && !IsAndroid;
+    public bool CanSave => HasDraft && !IsAndroid;
     public bool HasHotkey => Hotkey.Length > 0;
     /// <summary>The key chip, e.g. "Ctrl + F5".</summary>
     public string HotkeyChip => HasHotkey ? MainViewModel.KeyText(Hotkey) : "No key";
@@ -500,6 +513,7 @@ public sealed partial class SavedMacroRow : ObservableObject
         BlockCount = m.BlockCount;
         UpdatedAt = m.UpdatedAt;
         HasDraft = m.HasDraft;
+        IsAndroid = m.Platform == MacroPlatforms.Android;
         Hotkey = m.HotkeyStart ?? "";
         TriggerMode = m.TriggerMode;
         RunAlongside = m.RunAlongside;

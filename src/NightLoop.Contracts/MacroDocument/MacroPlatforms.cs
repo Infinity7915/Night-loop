@@ -14,4 +14,32 @@ public static class MacroPlatforms
 
     /// <summary>The platform a document belongs to: null and "pc" are both PC.</summary>
     public static string Of(MacroDoc doc) => doc.Platform ?? Pc;
+
+    /// <summary>Blocks that only make sense on a phone: touch, Android buttons and apps.</summary>
+    public static readonly IReadOnlySet<string> AndroidOnly = new HashSet<string>(StringComparer.Ordinal)
+    {
+        BlockTypes.Tap, BlockTypes.LongPress, BlockTypes.Swipe, BlockTypes.DeviceButton, BlockTypes.AppOpen, BlockTypes.WaitForApp,
+    };
+
+    /// <summary>
+    /// Blocks both apps run. Everything else (keyboard, mouse, camera, windows, screen reading) is PC only for now;
+    /// screen reading comes to Android in a later version and joins this list then.
+    /// </summary>
+    public static readonly IReadOnlySet<string> Shared = new HashSet<string>(StringComparer.Ordinal)
+    {
+        BlockTypes.Wait, BlockTypes.WaitRandom, BlockTypes.Pause, BlockTypes.Resume,
+        BlockTypes.If, BlockTypes.Else, BlockTypes.End, BlockTypes.Loop, BlockTypes.RepeatUntil,
+        BlockTypes.Label, BlockTypes.Goto, BlockTypes.Stop,
+        BlockTypes.Comment, BlockTypes.Description, BlockTypes.Notify, BlockTypes.PlaySound, BlockTypes.RunMacro,
+    };
+
+    /// <summary>Whether a block type can be used in a macro for this platform.</summary>
+    public static bool Allows(string platform, string blockType) =>
+        platform == Android ? AndroidOnly.Contains(blockType) || Shared.Contains(blockType) : !AndroidOnly.Contains(blockType);
+
+    /// <summary>If / Repeat until condition kinds per platform. "appInFront" is Android only.</summary>
+    public static bool AllowsCondition(string platform, string kind) =>
+        platform == Android ? kind is "appInFront" or "not" or "all" or "any" : kind != "appInFront";
+
+    public static string Label(string platform) => platform == Android ? "Android" : "PC";
 }

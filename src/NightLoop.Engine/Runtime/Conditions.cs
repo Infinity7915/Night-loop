@@ -38,6 +38,9 @@ public class BasicConditionEvaluator : IConditionEvaluator
             case "processRunning":
                 var name = Str(condition, "name");
                 return name is not null && (context.Environment.Windows?.IsProcessRunning(name) ?? false);
+            case "appInFront":
+                var touch = context.Environment.Touch ?? throw Bad("Checking apps only works in Night-loop for Android.");
+                return touch.ForegroundApp is { } front && front == Str(condition, "package");
             case "keyHeld":
                 var key = Str(condition, "key");
                 if (key is null || !KeyCatalog.TryGetVirtualKey(key, out var vk)) throw Bad($"Unknown key \"{key}\".");

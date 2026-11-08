@@ -55,6 +55,10 @@ public static class MacroLimits
     public const int BlockIdMaxLength = 64;
     /// <summary>The most text any one block setting can hold, apart from pictures, descriptions and conditions.</summary>
     public const int ParamMaxLength = 4096;
+    /// <summary>Touch blocks: screen coordinates are 0–20,000 px.</summary>
+    public const int ScreenMaxPx = 20_000;
+    /// <summary>Touch blocks: longest press or swipe.</summary>
+    public const int TouchHoldMaxMs = 60_000;
 
     /// <summary>
     /// Blocks in <paramref name="after"/> whose id isn't in <paramref name="before"/>: what an edit placed. Moving,

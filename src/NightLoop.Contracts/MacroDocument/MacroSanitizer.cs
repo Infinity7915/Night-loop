@@ -17,7 +17,7 @@ public static class MacroSanitizer
         "condition", "confidencePct", "count", "delayMs", "direction", "durationMs", "failLabel", "file", "forever",
         "foundLabel", "from", "height", "holdMs", "how", "ifRunning", "image", "imageData", "key", "keys", "kind", "macroName",
         "match", "matchCase", "matchColor", "maxIterations", "maxMs", "maxTurns", "message", "method", "minMs", "mode",
-        "monitor", "moveMs", "ms", "name", "note", "onFail", "path", "process", "region", "relativeTo",
+        "monitor", "moveMs", "ms", "name", "note", "onFail", "package", "path", "process", "region", "relativeTo",
         "sizeTolerancePct", "sound", "stepPx", "steps", "target", "text", "timeoutMs", "to", "tolerance", "tolerancePx",
         "until", "value", "wait", "waitAfterMs", "when", "whenFound", "width", "x", "y",
     };
@@ -26,7 +26,7 @@ public static class MacroSanitizer
     public static readonly HashSet<string> ConditionKeys = new(StringComparer.Ordinal)
     {
         "kind", "condition", "conditions", "name", "key", "color", "x", "y", "relativeTo", "tolerance", "text", "match",
-        "region", "image", "imageData", "confidencePct", "sizeTolerancePct", "matchColor",
+        "region", "image", "imageData", "confidencePct", "sizeTolerancePct", "matchColor", "package",
     };
 
     /// <summary>Drops unknown settings from every block and condition, in place. Returns how many were dropped.</summary>

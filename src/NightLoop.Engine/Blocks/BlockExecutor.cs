@@ -78,6 +78,13 @@ internal static class BlockExecutor
                 await WindowBlocks.CloseAsync(b, ctx);
                 return true;
 
+            case BlockTypes.AppOpen:
+                await TouchBlocks.OpenAppAsync(b, ctx);
+                return true;
+            case BlockTypes.WaitForApp:
+                await TouchBlocks.WaitForAppAsync(b, ctx);
+                return true;
+
             case BlockTypes.Notify:
                 var kind = b.GetString("kind", "toast");
                 if (kind is "toast" or "both") ctx.Environment.Notify?.Invoke(b.GetString("message", ""));
@@ -116,6 +123,10 @@ internal static class BlockExecutor
         BlockTypes.Type => InputBlocks.TypeAsync(b, ctx),
         BlockTypes.CameraTurn => InputBlocks.CameraTurnAsync(b, ctx),
         BlockTypes.CameraZoom => InputBlocks.ZoomAsync(b, ctx),
+        BlockTypes.Tap => TouchBlocks.TapAsync(b, ctx),
+        BlockTypes.LongPress => TouchBlocks.LongPressAsync(b, ctx),
+        BlockTypes.Swipe => TouchBlocks.SwipeAsync(b, ctx),
+        BlockTypes.DeviceButton => TouchBlocks.ButtonAsync(b, ctx),
         _ => throw new MacroFaultException("This older block was replaced by Scan & turn. Swap it for a Scan & turn block."),
     };
 
