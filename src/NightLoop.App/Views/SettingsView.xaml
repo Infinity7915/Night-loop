@@ -111,6 +111,15 @@
                            Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
               </StackPanel>
             </DockPanel>
+            <DockPanel Margin="0,4,0,8">
+              <CheckBox DockPanel.Dock="Right" Style="{StaticResource Switch}" IsChecked="{Binding GlobalSeasonalThemes}" VerticalAlignment="Center"
+                        ToolTip="Global themes" Margin="16,0,0,0" />
+              <StackPanel>
+                <TextBlock Text="Global themes" FontWeight="SemiBold" FontSize="14" />
+                <TextBlock Text="Instead of Seasonal themes (only one can be on): every country's holidays show when it's their time, not only your region's. When two overlap, the one whose main day is closer wins; if their main days are within 3 days of each other, it's a 50/50 pick for the day."
+                           Style="{StaticResource Muted}" FontSize="12" Margin="0,2,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+            </DockPanel>
             <controls:SplitRow Margin="0,12,0,0">
               <TextBlock Text="Mode" Style="{StaticResource RowLabel}" />
               <Border Style="{StaticResource SegmentBar}" HorizontalAlignment="Left" IsEnabled="{Binding ModeApplies}"
