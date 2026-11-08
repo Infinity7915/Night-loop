@@ -77,7 +77,7 @@ public class RunnerTests
 
         // The blocks before the label run once; after each Go to, the label block is the next one shown as playing.
         Assert.Equal(1, input.Log.Count(l => l == "down S"));
-        var seen = steps.ToArray();
+        var seen = steps.Where(i => i >= 0).ToArray(); // -1 = stopped, which can land right after a Go to
         var gotos = Enumerable.Range(0, seen.Length - 1).Where(i => seen[i] == 4).ToList();
         Assert.True(gotos.Count >= 4);
         Assert.All(gotos, i => Assert.Equal(1, seen[i + 1]));
