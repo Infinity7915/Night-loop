@@ -49,12 +49,14 @@ public class PlatformBlockTests
 
     private static Block Tap() => Block.Create("t", BlockTypes.Tap, new() { ["x"] = 10, ["y"] = 20 });
     private static Block Key() => Block.Create("k", BlockTypes.Key, new() { ["key"] = "A" });
+    private static Block Click() => Block.Create("c", BlockTypes.Click, new() { ["button"] = "left" });
 
     [Fact]
-    public void Android_macros_take_touch_blocks_but_not_keys()
+    public void Android_macros_take_touch_and_key_blocks_but_not_the_mouse()
     {
         Assert.Empty(MacroValidator.Validate(Doc(MacroPlatforms.Android, Tap())));
-        Assert.NotEmpty(MacroValidator.Validate(Doc(MacroPlatforms.Android, Key())));
+        Assert.Empty(MacroValidator.Validate(Doc(MacroPlatforms.Android, Key())));
+        Assert.NotEmpty(MacroValidator.Validate(Doc(MacroPlatforms.Android, Click())));
     }
 
     [Fact]
