@@ -28,6 +28,8 @@ public static class BlockTypes
     public const string WaitForImage = "timing.waitForImage";
     /// <summary>The opposite of Wait for image: wait until the picture is no longer on screen. Same params.</summary>
     public const string WaitForImageGone = "timing.waitForImageGone";
+    /// <summary>Wait until text is no longer on screen.</summary>
+    public const string WaitForTextGone = "timing.waitForTextGone";
     public const string Pause = "timing.pause";
     /// <summary>Unpause another macro. Params: target, from (paused/start).</summary>
     public const string Resume = "timing.resume";
@@ -96,7 +98,7 @@ public static class BlockTypes
     {
         Key, Click, Move, Drag, Scroll, Type, Combo, HoldKey,
         CameraTurn, CameraTurnUntilText, CameraTurnUntilImage, CameraZoom, CameraCenter,
-        Wait, WaitRandom, WaitForText, WaitForImage, WaitForImageGone, Pause, Resume, WaitForKey,
+        Wait, WaitRandom, WaitForText, WaitForTextGone, WaitForImage, WaitForImageGone, Pause, Resume, WaitForKey,
         DetectText, DetectImage, DetectPixelColor, DetectPixelColorGone, FindClick, ScanTurn,
         If, Else, End, Loop, RepeatUntil, Label, Goto, Stop,
         WindowResize, WindowPosition, WindowFocus, WaitForWindow, WindowOpen, WindowClose,
@@ -119,7 +121,7 @@ public static class BlockTypes
     public const string ClickYKey = "clickYPct";
 
     /// <summary>Blocks with an "On fail" choice (continue, retry, go to label, stop).</summary>
-    public static bool HasOnFail(string type) => type is WaitForText or WaitForImage or WaitForImageGone or DetectPixelColor or DetectPixelColorGone or FindClick or ScanTurn;
+    public static bool HasOnFail(string type) => type is WaitForText or WaitForTextGone or WaitForImage or WaitForImageGone or DetectPixelColor or DetectPixelColorGone or FindClick or ScanTurn;
 
     /// <summary>Blocks that open a section closed by logic.end.</summary>
     public static bool IsOpener(string type) => type is If or Loop or RepeatUntil;
@@ -133,7 +135,7 @@ public static class BlockTypes
     /// <summary>Blocks that read the screen for text or images. Pixel colors don't count: they need no text reading.</summary>
     public static bool NeedsVision(Block block) => block.Type switch
     {
-        WaitForText or WaitForImage or WaitForImageGone or DetectText or DetectImage or CameraTurnUntilText or CameraTurnUntilImage => true,
+        WaitForText or WaitForTextGone or WaitForImage or WaitForImageGone or DetectText or DetectImage or CameraTurnUntilText or CameraTurnUntilImage => true,
         FindClick or ScanTurn => block.GetString("target", "text") != "pixel",
         _ => false,
     };

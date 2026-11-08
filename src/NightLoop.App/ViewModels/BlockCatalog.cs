@@ -202,7 +202,7 @@ public static class BlockCatalog
             [F.MacroName("target", "Macro", all: true), F.Pick("from", "Continue from", ResumeFrom, "paused")],
             b => $"{MacroLabel(b.GetString("target", ""))} · {Label(ResumeFrom, b.GetString("from", "paused")).ToLowerInvariant()}"),
 
-        // ---- Detect (7) ----
+        // ---- Detect (8) ----
         new("waittext", BlockTypes.WaitForText, "Wait for text", "OCR", "Detect", "Read the screen until the exact characters appear.",
             () => new() { ["text"] = "Quest complete", ["match"] = "exact", ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
             [F.Text("text", "Text", MacroLimits.TypeTextMaxLength, mono: false), F.Pick("match", "Match", Matches, "exact"),
@@ -210,6 +210,13 @@ public static class BlockCatalog
              F.Region(), F.Timeout(),
              F.OnFail(), F.FailLabel()],
             b => $"\"{b.GetString("text", "")}\" · {b.GetString("match", "exact")} · {F.MsOrInfinite(b, "timeoutMs", 10_000)}"),
+        new("textgone", BlockTypes.WaitForTextGone, "Text gone", "!OCR", "Detect", "Wait until text is no longer on screen.",
+            () => new() { ["text"] = "Loading", ["match"] = "contains", ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
+            [F.Text("text", "Text", MacroLimits.TypeTextMaxLength, mono: false), F.Pick("match", "Match", Matches, "exact"),
+             F.YesNo("matchCase", "Case", fallback: false, yes: "Match case", no: "Ignore case"),
+             F.Region(), F.Timeout(),
+             F.OnFail(), F.FailLabel()],
+            b => $"\"{b.GetString("text", "")}\" gone · {b.GetString("match", "exact")} · {F.MsOrInfinite(b, "timeoutMs", 10_000)}"),
         new("waitimage", BlockTypes.WaitForImage, "Wait for image", "IMG", "Detect", "Wait until a saved picture shows up on screen.",
             () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 10_000, ["onFail"] = "continue" },
             [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.MatchColor(), F.Region(),

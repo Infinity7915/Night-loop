@@ -40,6 +40,9 @@ internal static class DetectBlocks
     public static async Task<bool> WaitForImageAsync(Block b, RunContext ctx) =>
         await Vision.WaitForAsync(ctx, Picture(b), b.GetInt("timeoutMs", 10_000)) is not null;
 
+    public static Task<bool> WaitForTextGoneAsync(Block b, RunContext ctx) =>
+        Vision.WaitForGoneAsync(ctx, Text(b), b.GetInt("timeoutMs", 10_000));
+
     public static Task<bool> WaitForImageGoneAsync(Block b, RunContext ctx) =>
         Vision.WaitForGoneAsync(ctx, Picture(b), b.GetInt("timeoutMs", 10_000));
 

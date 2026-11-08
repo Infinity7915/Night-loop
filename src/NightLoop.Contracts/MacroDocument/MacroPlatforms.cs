@@ -33,6 +33,9 @@ public static class MacroPlatforms
         BlockTypes.Label, BlockTypes.Goto, BlockTypes.Stop,
         BlockTypes.Comment, BlockTypes.Description, BlockTypes.Notify, BlockTypes.PlaySound, BlockTypes.RunMacro,
         BlockTypes.Key, BlockTypes.HoldKey, BlockTypes.Type,
+        // Screen reading: on Android through screen capture (asked once) and on-phone text recognition.
+        BlockTypes.WaitForText, BlockTypes.WaitForTextGone, BlockTypes.WaitForImage, BlockTypes.WaitForImageGone,
+        BlockTypes.DetectPixelColor, BlockTypes.DetectPixelColorGone,
     };
 
     /// <summary>Whether a block type can be used in a macro for this platform.</summary>
@@ -41,7 +44,7 @@ public static class MacroPlatforms
 
     /// <summary>If / Repeat until condition kinds per platform. "appInFront" is Android only.</summary>
     public static bool AllowsCondition(string platform, string kind) =>
-        platform == Android ? kind is "appInFront" or "not" or "all" or "any" : kind != "appInFront";
+        platform == Android ? kind is "appInFront" or "not" or "all" or "any" or "textVisible" or "imageVisible" or "pixelColor" : kind != "appInFront";
 
     public static string Label(string platform) => platform == Android ? "Android" : "PC";
 }
