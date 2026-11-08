@@ -22,8 +22,9 @@ public static class MacroPlatforms
     };
 
     /// <summary>
-    /// Blocks both apps run. Everything else (keyboard, mouse, camera, windows, screen reading) is PC only for now;
-    /// screen reading comes to Android in a later version and joins this list then.
+    /// Blocks both apps run. Everything else (mouse, camera, windows, screen reading) is PC only for now; screen
+    /// reading comes to Android in a later version and joins this list then. On Android, Key, Hold key and Type reach
+    /// the text box that has focus (Android 13+), through Night-loop's accessibility service.
     /// </summary>
     public static readonly IReadOnlySet<string> Shared = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -31,6 +32,7 @@ public static class MacroPlatforms
         BlockTypes.If, BlockTypes.Else, BlockTypes.End, BlockTypes.Loop, BlockTypes.RepeatUntil,
         BlockTypes.Label, BlockTypes.Goto, BlockTypes.Stop,
         BlockTypes.Comment, BlockTypes.Description, BlockTypes.Notify, BlockTypes.PlaySound, BlockTypes.RunMacro,
+        BlockTypes.Key, BlockTypes.HoldKey, BlockTypes.Type,
     };
 
     /// <summary>Whether a block type can be used in a macro for this platform.</summary>

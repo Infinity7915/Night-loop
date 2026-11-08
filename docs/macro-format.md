@@ -32,8 +32,8 @@ is unchanged. Macro list and macro responses carry `platform` (`"pc"` or `"andro
 macros apart without opening them. The Android app sends `X-Client-Platform: android` on every call.
 
 Each platform has its own blocks (`MacroPlatforms.Allows`). Android macros take the touch blocks below plus
-waits, pause/resume, If/Else/Loop/Repeat until/labels/stop, comment, description, notify, play sound and run
-macro. PC macros take every block except the touch blocks. The If/Repeat until condition `appInFront`
+waits, pause/resume, If/Else/Loop/Repeat until/labels/stop, comment, description, notify, play sound, run
+macro, and Key / Hold key / Type (sent to the focused text box, Android 13+). PC macros take every block except the touch blocks. The If/Repeat until condition `appInFront`
 (`package`) is Android only; Android macros can also use `not`, `all` and `any`.
 
 | Type | Params |
