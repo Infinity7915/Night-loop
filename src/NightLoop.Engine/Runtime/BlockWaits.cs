@@ -45,7 +45,7 @@ public sealed class BlockWaits
     /// <summary>Whether this block clicked: Find &amp; click and Scan &amp; turn only click when they find something.</summary>
     private static bool Clicked(Block block, bool found) => block.Type switch
     {
-        BlockTypes.Click or BlockTypes.Drag or BlockTypes.Tap or BlockTypes.LongPress or BlockTypes.Swipe => true,
+        BlockTypes.Click or BlockTypes.Drag or BlockTypes.Tap or BlockTypes.LongPress or BlockTypes.Swipe or BlockTypes.SwipeHold => true,
         BlockTypes.FindClick => found,
         BlockTypes.ScanTurn => found && block.GetString("whenFound", "click") == "click",
         _ => false,

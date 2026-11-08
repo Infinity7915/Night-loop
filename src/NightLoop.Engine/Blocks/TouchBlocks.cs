@@ -41,6 +41,26 @@ internal static class TouchBlocks
         ctx.DidWork = true;
     }
 
+    public static async Task SwipeHoldAsync(Block b, RunContext ctx)
+    {
+        var from = b.GetPoint("from") ?? throw new MacroFaultException("Swipe and hold needs a start spot.");
+        var to = b.GetPoint("to") ?? throw new MacroFaultException("Swipe and hold needs an end spot.");
+        var condition = b.GetObject("condition");
+        // With a check: hold until it's true (or the timeout passes). Without one: hold for holdMs.
+        var limitMs = condition is null ? Math.Max(1, b.GetInt("holdMs", 1000)) : b.GetInt("timeoutMs", 0);
+        var held = System.Diagnostics.Stopwatch.StartNew();
+        var started = false;
+        await Touch(ctx).SwipeHoldAsync(from.X, from.Y, to.X, to.Y, b.GetInt("durationMs", 300), async () =>
+        {
+            if (!started) { started = true; held.Restart(); }
+            ctx.Token.ThrowIfCancellationRequested();
+            if (limitMs > 0 && held.ElapsedMilliseconds >= limitMs) return false;
+            if (condition is null) return true;
+            return !await ctx.Environment.Conditions.EvaluateAsync(condition, ctx);
+        }, ctx.Token);
+        ctx.DidWork = true;
+    }
+
     public static Task ButtonAsync(Block b, RunContext ctx)
     {
         Touch(ctx).PressButton(b.GetString("button", "back"));

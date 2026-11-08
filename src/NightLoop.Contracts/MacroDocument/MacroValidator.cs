@@ -462,6 +462,16 @@ public static class MacroValidator
                     "Swipe needs a start and an end spot on the screen.");
                 Need(OptIntIn("durationMs", 1, MacroLimits.TouchHoldMaxMs), "Swipe time must be 1–60,000 ms.");
                 break;
+            case BlockTypes.SwipeHold:
+                Need(b.GetPoint("from") is { } hf && hf.X is >= 0 and <= MacroLimits.ScreenMaxPx && hf.Y is >= 0 and <= MacroLimits.ScreenMaxPx
+                     && b.GetPoint("to") is { } ht && ht.X is >= 0 and <= MacroLimits.ScreenMaxPx && ht.Y is >= 0 and <= MacroLimits.ScreenMaxPx,
+                    "Swipe and hold needs a start and an end spot on the screen.");
+                Need(OptIntIn("durationMs", 1, MacroLimits.TouchHoldMaxMs), "Swipe time must be 1–60,000 ms.");
+                Need(OptIntIn("holdMs", 1, MacroLimits.WaitMaxMs), "Hold time must be up to 1 hour.");
+                Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be up to 1 hour, or Infinite.");
+                if (b.Params.ContainsKey("condition") && b.Params["condition"] is not null)
+                    ValidateCondition(b.GetObject("condition"), b.Id, issues, 0);
+                break;
             case BlockTypes.DeviceButton:
                 Need(OneOf("button", DeviceButtons), "Button must be Back, Home, Recents or Notifications.");
                 break;

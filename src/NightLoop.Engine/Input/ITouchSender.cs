@@ -10,6 +10,12 @@ public interface ITouchSender
     Task TapAsync(int x, int y, int holdMs, CancellationToken ct);
     /// <summary>Drags a finger in a straight line over <paramref name="durationMs"/>.</summary>
     Task SwipeAsync(int fromX, int fromY, int toX, int toY, int durationMs, CancellationToken ct);
+    /// <summary>
+    /// Drags a finger from one spot to another over <paramref name="durationMs"/>, then keeps it down at the end.
+    /// While it's down, <paramref name="keepHolding"/> is asked again and again (the finger stays down while it
+    /// runs); the finger lifts once it answers false.
+    /// </summary>
+    Task SwipeHoldAsync(int fromX, int fromY, int toX, int toY, int durationMs, Func<Task<bool>> keepHolding, CancellationToken ct);
     /// <summary>back, home, recents or notifications.</summary>
     void PressButton(string button);
     /// <summary>Starts an app by package name. False when it isn't installed.</summary>

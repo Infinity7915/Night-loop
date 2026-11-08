@@ -87,6 +87,13 @@ public static class BlockTypes
     public const string LongPress = "touch.longPress";
     /// <summary>Swipe in a straight line. Params: from {x, y}, to {x, y}, durationMs (default 300).</summary>
     public const string Swipe = "touch.swipe";
+    /// <summary>
+    /// Swipe, then keep the finger down at the end (a joystick: the player keeps walking). Params: from, to,
+    /// durationMs (swipe time, default 300), holdMs (how long to hold, default 1000, used when there's no check),
+    /// condition (optional: hold until this check is true, e.g. text or a picture shows up or goes away),
+    /// timeoutMs (with a check: let go after this long anyway; 0 or missing = Infinite).
+    /// </summary>
+    public const string SwipeHold = "touch.swipeHold";
     /// <summary>Press an Android system button. Params: button (back, home, recents, notifications).</summary>
     public const string DeviceButton = "device.button";
     /// <summary>Open an app. Params: package (e.g. com.roblox.client), wait (wait until it's in front, default true), timeoutMs.</summary>
@@ -103,7 +110,7 @@ public static class BlockTypes
         If, Else, End, Loop, RepeatUntil, Label, Goto, Stop,
         WindowResize, WindowPosition, WindowFocus, WaitForWindow, WindowOpen, WindowClose,
         Comment, Description, Notify, PlaySound, RunMacro, Screenshot,
-        Tap, LongPress, Swipe, DeviceButton, AppOpen, WaitForApp,
+        Tap, LongPress, Swipe, SwipeHold, DeviceButton, AppOpen, WaitForApp,
     };
 
     /// <summary>Blocks that act on what they found and have an "After found" choice (go on, leave the loop, go to a label, stop).</summary>

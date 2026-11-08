@@ -128,6 +128,7 @@ internal static class BlockExecutor
         BlockTypes.Tap => TouchBlocks.TapAsync(b, ctx),
         BlockTypes.LongPress => TouchBlocks.LongPressAsync(b, ctx),
         BlockTypes.Swipe => TouchBlocks.SwipeAsync(b, ctx),
+        BlockTypes.SwipeHold => TouchBlocks.SwipeHoldAsync(b, ctx),
         BlockTypes.DeviceButton => TouchBlocks.ButtonAsync(b, ctx),
         _ => throw new MacroFaultException("This older block was replaced by Scan & turn. Swap it for a Scan & turn block."),
     };
