@@ -94,6 +94,21 @@ public static class BlockTypes
     /// timeoutMs (with a check: let go after this long anyway; 0 or missing = Infinite).
     /// </summary>
     public const string SwipeHold = "touch.swipeHold";
+    /// <summary>
+    /// Swipe again and again (turning the camera) until text or a picture is on screen. Params: from, to, durationMs,
+    /// target (text / image), value (the text), imageData…, maxTurns (default 12), whenFound (tap / none), onFail.
+    /// </summary>
+    public const string SwipeScan = "touch.swipeScan";
+    /// <summary>
+    /// Hold the joystick and walk toward a picture (or text), steering at it, until it's near the middle of the
+    /// screen or a check is true. Params: from (joystick middle), to (pushed forward), target, value, imageData…,
+    /// tolerancePx (how near the middle counts as there, default 200), condition (optional, stop when true instead),
+    /// timeoutMs (default 30 s, 0 = Infinite), whenFound (tap / none), onFail.
+    /// </summary>
+    public const string WalkTo = "touch.walkTo";
+
+    /// <summary>"whenFound" on Wait for text / picture / color: "tap" (Android) or "click" (PC) taps where it was found.</summary>
+    public static bool HasTapWhenFound(string type) => type is WaitForText or WaitForImage or DetectPixelColor or SwipeScan or WalkTo;
     /// <summary>Press an Android system button. Params: button (back, home, recents, notifications).</summary>
     public const string DeviceButton = "device.button";
     /// <summary>Open an app. Params: package (e.g. com.roblox.client), wait (wait until it's in front, default true), timeoutMs.</summary>
@@ -110,7 +125,7 @@ public static class BlockTypes
         If, Else, End, Loop, RepeatUntil, Label, Goto, Stop,
         WindowResize, WindowPosition, WindowFocus, WaitForWindow, WindowOpen, WindowClose,
         Comment, Description, Notify, PlaySound, RunMacro, Screenshot,
-        Tap, LongPress, Swipe, SwipeHold, DeviceButton, AppOpen, WaitForApp,
+        Tap, LongPress, Swipe, SwipeHold, SwipeScan, WalkTo, DeviceButton, AppOpen, WaitForApp,
     };
 
     /// <summary>Blocks that act on what they found and have an "After found" choice (go on, leave the loop, go to a label, stop).</summary>
@@ -128,7 +143,7 @@ public static class BlockTypes
     public const string ClickYKey = "clickYPct";
 
     /// <summary>Blocks with an "On fail" choice (continue, retry, go to label, stop).</summary>
-    public static bool HasOnFail(string type) => type is WaitForText or WaitForTextGone or WaitForImage or WaitForImageGone or DetectPixelColor or DetectPixelColorGone or FindClick or ScanTurn;
+    public static bool HasOnFail(string type) => type is SwipeScan or WalkTo or WaitForText or WaitForTextGone or WaitForImage or WaitForImageGone or DetectPixelColor or DetectPixelColorGone or FindClick or ScanTurn;
 
     /// <summary>Blocks that open a section closed by logic.end.</summary>
     public static bool IsOpener(string type) => type is If or Loop or RepeatUntil;
@@ -143,7 +158,7 @@ public static class BlockTypes
     public static bool NeedsVision(Block block) => block.Type switch
     {
         WaitForText or WaitForTextGone or WaitForImage or WaitForImageGone or DetectText or DetectImage or CameraTurnUntilText or CameraTurnUntilImage => true,
-        FindClick or ScanTurn => block.GetString("target", "text") != "pixel",
+        FindClick or ScanTurn or SwipeScan or WalkTo => block.GetString("target", "text") != "pixel",
         _ => false,
     };
 }

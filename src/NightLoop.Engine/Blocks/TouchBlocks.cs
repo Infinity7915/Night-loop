@@ -11,7 +11,7 @@ internal static class TouchBlocks
     /// <summary>Gap between the taps of a double or triple tap.</summary>
     internal const int TapGapMs = 80;
 
-    private static ITouchSender Touch(RunContext ctx) =>
+    internal static ITouchSender Touch(RunContext ctx) =>
         ctx.Environment.Touch ?? throw new MacroFaultException("Touch blocks only run in Night-loop for Android.");
 
     public static async Task TapAsync(Block b, RunContext ctx)

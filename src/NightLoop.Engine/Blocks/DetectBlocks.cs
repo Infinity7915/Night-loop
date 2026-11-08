@@ -24,21 +24,129 @@ internal static class DetectBlocks
         var tolerance = b.GetInt("tolerance", 10);
         var timeout = b.GetInt("timeoutMs", 5000);
         var waited = 0;
+        var hits = 0;
         while (true)
         {
             var px = ctx.Capture(new ScreenRect(p.X, p.Y, 1, 1))[0, 0];
-            if (px.IsNear(color, tolerance) != gone) return true;
+            // Two looks in a row must agree, so a flicker (or a frame from before the screen changed) doesn't count.
+            hits = px.IsNear(color, tolerance) != gone ? hits + 1 : 0;
+            if (hits >= 2) return gone || await AfterFoundAsync(b, ctx, p);
             if (timeout > 0 && waited >= timeout) return false;
             await ctx.PauseExactAsync(50);
             waited += 50;
         }
     }
 
+    // A find only counts once a second look agrees (confirm), so a stale frame or a flicker can't end the wait early.
     public static async Task<bool> WaitForTextAsync(Block b, RunContext ctx) =>
-        await Vision.WaitForAsync(ctx, Text(b), b.GetInt("timeoutMs", 10_000)) is not null;
+        await Vision.WaitForAsync(ctx, Text(b), b.GetInt("timeoutMs", 10_000), confirm: true) is { } p && await AfterFoundAsync(b, ctx, p);
 
     public static async Task<bool> WaitForImageAsync(Block b, RunContext ctx) =>
-        await Vision.WaitForAsync(ctx, Picture(b), b.GetInt("timeoutMs", 10_000)) is not null;
+        await Vision.WaitForAsync(ctx, Picture(b), b.GetInt("timeoutMs", 10_000), confirm: true) is { } p && await AfterFoundAsync(b, ctx, p);
+
+    /// <summary>"Tap when found": taps (Android) or clicks (PC) where the block found its target. Always true.</summary>
+    private static async Task<bool> AfterFoundAsync(Block b, RunContext ctx, (int X, int Y) p)
+    {
+        if (b.GetString("whenFound", "none") is not ("tap" or "click")) return true;
+        if (ctx.Environment.Touch is { } touch)
+        {
+            await touch.TapAsync(p.X, p.Y, 50, ctx.Token);
+            ctx.DidWork = true;
+        }
+        else
+        {
+            await ctx.InputAsync(async () =>
+            {
+                await InputBlocks.GlideForClickAsync(ctx, ctx.ToScreen(p.X, p.Y, null), null);
+                await InputBlocks.PressAsync(ctx, MouseButton.Left, 1);
+            });
+        }
+        return true;
+    }
+
+    /// <summary>touch.swipeScan: look; not there yet → swipe (turns the camera) and look again, up to maxTurns swipes.</summary>
+    public static async Task<bool> SwipeScanAsync(Block b, RunContext ctx)
+    {
+        var touch = TouchBlocks.Touch(ctx);
+        var from = b.GetPoint("from") ?? throw new MacroFaultException("Swipe and scan needs a start spot.");
+        var to = b.GetPoint("to") ?? throw new MacroFaultException("Swipe and scan needs an end spot.");
+        var what = Look(b);
+        var tries = b.GetInt("maxTurns", 12);
+        for (var i = 0; i <= tries; i++)
+        {
+            if (await Vision.FindAsync(ctx, what) is { } seen && await Vision.ConfirmAsync(ctx, what, seen, ScanSettleMs) is { } p)
+            {
+                ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor, what.ClickX, what.ClickY);
+                return await AfterFoundAsync(b, ctx, p);
+            }
+            if (i == tries) break;
+            await touch.SwipeAsync(from.X, from.Y, to.X, to.Y, b.GetInt("durationMs", 300), ctx.Token);
+            ctx.DidWork = true;
+            await ctx.PauseExactAsync(250); // let the camera stop moving before looking
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// touch.walkTo: holds the joystick and walks at the target, steering toward wherever it is on screen (above the
+    /// middle = straight ahead, left = ahead and left…), until it is within tolerancePx of the middle of the screen,
+    /// or the block's check is true. False when the time runs out first.
+    /// </summary>
+    public static async Task<bool> WalkToAsync(Block b, RunContext ctx)
+    {
+        var touch = TouchBlocks.Touch(ctx);
+        var from = b.GetPoint("from") ?? throw new MacroFaultException("Walk to needs the joystick's middle.");
+        var to = b.GetPoint("to") ?? throw new MacroFaultException("Walk to needs a spot to push the joystick to.");
+        var what = Look(b);
+        var condition = b.GetObject("condition");
+        var near = b.GetInt("tolerancePx", 200);
+        var timeout = b.GetInt("timeoutMs", 30_000);
+        var radius = Math.Max(10, Math.Sqrt(Math.Pow(to.X - from.X, 2) + Math.Pow(to.Y - from.Y, 2)));
+        var forward = Math.Atan2(to.Y - from.Y, to.X - from.X);
+        var screen = ctx.Environment.Screen?.Desktop ?? (0, 0, 0, 0);
+        var (midX, midY) = (screen.Left + screen.Width / 2, screen.Top + screen.Height / 2);
+        var angle = forward;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        (int X, int Y)? arrivedAt = null;
+        var timedOut = false;
+
+        await touch.SteerAsync(from.X, from.Y, async () =>
+        {
+            ctx.Token.ThrowIfCancellationRequested();
+            if (timeout > 0 && clock.ElapsedMilliseconds >= timeout)
+            {
+                timedOut = true;
+                return null;
+            }
+            var seen = await Vision.FindAsync(ctx, what);
+            if (condition is not null && await ctx.Environment.Conditions.EvaluateAsync(condition, ctx))
+            {
+                arrivedAt = seen ?? (midX, midY);
+                return null;
+            }
+            if (seen is { } p)
+            {
+                var (dx, dy) = (p.X - midX, p.Y - midY);
+                if (condition is null && Math.Sqrt(dx * dx + dy * dy) <= near)
+                {
+                    arrivedAt = p;
+                    return null;
+                }
+                // Straight above the middle = forward; turn the push by the target's angle off that line.
+                angle = forward + Math.Atan2(dx, -dy);
+            }
+            // Not seen right now: keep walking the way we were going.
+            return ((int)Math.Round(from.X + Math.Cos(angle) * radius), (int)Math.Round(from.Y + Math.Sin(angle) * radius));
+        }, ctx.Token);
+        ctx.DidWork = true;
+        if (timedOut || arrivedAt is not { } at) return false;
+        return await AfterFoundAsync(b, ctx, at);
+    }
+
+    /// <summary>What Swipe and scan / Walk to look for: a picture (default) or text.</summary>
+    private static LookFor Look(Block b) => b.GetString("target", "image") == "text"
+        ? DetectBlocksLook.Text(b) with { Value = b.GetString("value", "") , Contains = b.GetString("match", "contains") == "contains" }
+        : DetectBlocksLook.Picture(b);
 
     public static Task<bool> WaitForTextGoneAsync(Block b, RunContext ctx) =>
         Vision.WaitForGoneAsync(ctx, Text(b), b.GetInt("timeoutMs", 10_000));
@@ -232,8 +340,13 @@ internal static class DetectBlocksLook
     public static LookFor Text(Block b) => new("text", b.GetString("text", ""),
         Contains: b.GetString("match") == "contains", MatchCase: b.GetBool("matchCase") == true, Region: b.Params["region"]);
 
-    public static LookFor Picture(Block b) => new("image", b.GetString("image", ""), ImageData: b.GetString("imageData"),
-        ConfidencePct: b.GetInt("confidencePct", 90), Region: b.Params["region"], SizeTolerancePct: SizeTolerance(b.GetInt("sizeTolerancePct")), MatchColor: b.GetBool("matchColor") != false);
+    public static LookFor Picture(Block b)
+    {
+        var (cx, cy) = ClickSpot.Read(b);
+        return new("image", b.GetString("image", ""), ImageData: b.GetString("imageData"),
+            ConfidencePct: b.GetInt("confidencePct", 90), Region: b.Params["region"], SizeTolerancePct: SizeTolerance(b.GetInt("sizeTolerancePct")), MatchColor: b.GetBool("matchColor") != false,
+            ClickX: cx, ClickY: cy);
+    }
 
     public static LookFor Target(Block b)
     {

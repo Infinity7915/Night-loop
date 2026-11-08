@@ -228,7 +228,7 @@ public class PlaybackTests
             .Press("A").Build();
         var r = await RunAsync(doc, screen: screen);
         Assert.Equal(RunState.Stopped, r.Run.State);
-        Assert.Equal(4, screen.Captures);
+        Assert.Equal(5, screen.Captures); // found on the 4th look, confirmed on the 5th
         Assert.Equal(["down A", "up A"], r.Input.Log);
     }
 
@@ -247,7 +247,7 @@ public class PlaybackTests
         Assert.Empty(MacroValidator.Validate(doc));
         var r = await RunAsync(doc, screen: screen);
         Assert.Equal(RunState.Stopped, r.Run.State);
-        Assert.Equal(3, screen.Captures);
+        Assert.Equal(4, screen.Captures); // gone on the 3rd look, confirmed on the 4th
         Assert.Equal(["down A", "up A"], r.Input.Log);
     }
 

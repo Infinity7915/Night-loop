@@ -18,6 +18,10 @@ internal static class BlockExecutor
                 return await DetectBlocks.FindClickAsync(b, ctx);
             case BlockTypes.ScanTurn:
                 return await DetectBlocks.ScanTurnAsync(b, ctx);
+            case BlockTypes.SwipeScan:
+                return await DetectBlocks.SwipeScanAsync(b, ctx);
+            case BlockTypes.WalkTo:
+                return await DetectBlocks.WalkToAsync(b, ctx);
             case BlockTypes.CameraCenter:
                 await DetectBlocks.CameraCenterAsync(b, ctx);
                 return true;
