@@ -54,6 +54,8 @@ internal static class BlockExecutor
                 return await DetectBlocks.WaitForImageAsync(b, ctx);
             case BlockTypes.DetectPixelColor:
                 return await DetectBlocks.WaitForPixelAsync(b, ctx);
+            case BlockTypes.WaitForTextGone:
+                return await DetectBlocks.WaitForTextGoneAsync(b, ctx);
             case BlockTypes.WaitForImageGone:
                 return await DetectBlocks.WaitForImageGoneAsync(b, ctx);
             case BlockTypes.DetectPixelColorGone:

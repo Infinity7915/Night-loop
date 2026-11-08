@@ -312,6 +312,7 @@ public static class MacroValidator
                 Need(OptIntIn("timeoutMs", 0, MacroLimits.WaitMaxMs), "Timeout must be up to 1 hour, or Infinite.");
                 break;
             case BlockTypes.WaitForText:
+            case BlockTypes.WaitForTextGone:
                 Need(Text("text", MacroLimits.TypeTextMaxLength), "Wait for text needs the text to look for (1–200 characters).");
                 Need(OneOf("match", TextMatches, "exact"), "Match must be exact or contains.");
                 Need(OptBool("matchCase"), "Case must be on or off.");
