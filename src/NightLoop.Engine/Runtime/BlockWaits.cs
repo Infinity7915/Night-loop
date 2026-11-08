@@ -5,7 +5,8 @@ namespace NightLoop.Engine.Runtime;
 /// <summary>
 /// Settings › Macros' extra waits, read live by every run so a change applies to macros already running.
 /// <list type="bullet">
-/// <item><b>Wait after clicks</b>: after blocks that click (Click, Drag, Find &amp; click, Scan &amp; turn), unless the
+/// <item><b>Wait after clicks</b>: after blocks that click (Click, Drag, Find &amp; click, Scan &amp; turn; on Android Tap,
+/// Long press, Swipe), unless the
 /// block sets its own "Wait after click".</item>
 /// <item><b>Wait after every block</b>: after every other block. Clicking blocks only get it on top of their own wait
 /// when that wait isn't 0, so a quick click → drag → click chain stays quick.</item>
@@ -44,7 +45,7 @@ public sealed class BlockWaits
     /// <summary>Whether this block clicked: Find &amp; click and Scan &amp; turn only click when they find something.</summary>
     private static bool Clicked(Block block, bool found) => block.Type switch
     {
-        BlockTypes.Click or BlockTypes.Drag => true,
+        BlockTypes.Click or BlockTypes.Drag or BlockTypes.Tap or BlockTypes.LongPress or BlockTypes.Swipe => true,
         BlockTypes.FindClick => found,
         BlockTypes.ScanTurn => found && block.GetString("whenFound", "click") == "click",
         _ => false,
