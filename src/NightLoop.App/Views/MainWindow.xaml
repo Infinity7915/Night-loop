@@ -4,7 +4,7 @@
         xmlns:vm="clr-namespace:NightLoop.App.ViewModels"
         xmlns:views="clr-namespace:NightLoop.App.Views"
         xmlns:controls="clr-namespace:NightLoop.App.Controls"
-        Title="Night-loop" Icon="/Assets/icon.png"
+        Title="Night-loop" Icon="{DynamicResource AppIcon}"
         Width="1280" Height="800" MinWidth="560" MinHeight="400"
         WindowStartupLocation="CenterScreen" Style="{StaticResource NightWindow}" Topmost="{Binding AlwaysOnTop}">
   <Window.Resources>
@@ -40,7 +40,7 @@
             Visibility="{Binding ShowSidebar, Converter={StaticResource BoolToVisible}}">
       <DockPanel Margin="16,20">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
-          <Image Source="/Assets/icon.png" Width="34" Height="34" />
+          <Image Source="{DynamicResource AppIcon}" Width="34" Height="34" />
           <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
             <TextBlock Text="Night-loop" FontWeight="SemiBold" />
             <TextBlock Text="{Binding VersionText}" Style="{StaticResource Eyebrow}" />

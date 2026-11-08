@@ -71,6 +71,20 @@ public sealed class TrayIcon : IDisposable
         return true;
     }
 
+    /// <summary>Seasonal themes changed: load the icon again and show it.</summary>
+    public void RefreshIcon()
+    {
+        var old = _hicon;
+        _hicon = LoadIcon();
+        if (_added)
+        {
+            var data = Data(Native.NIF_ICON);
+            data.hIcon = _hicon;
+            Native.Shell_NotifyIcon(Native.NIM_MODIFY, ref data);
+        }
+        if (old != IntPtr.Zero) Native.DestroyIcon(old);
+    }
+
     private void Add()
     {
         var data = Data(Native.NIF_MESSAGE | Native.NIF_ICON | Native.NIF_TIP);
@@ -146,7 +160,7 @@ public sealed class TrayIcon : IDisposable
     {
         try
         {
-            using var stream = typeof(TrayIcon).Assembly.GetManifestResourceStream("NightLoop.icon.ico");
+            using var stream = typeof(TrayIcon).Assembly.GetManifestResourceStream(Seasons.IcoResource) ?? typeof(TrayIcon).Assembly.GetManifestResourceStream("NightLoop.icon.ico");
             if (stream is not null)
             {
                 using var copy = new MemoryStream();

@@ -112,6 +112,13 @@ public sealed class LocalSettings(string path)
         set => WriteNode("followPlayingBlock", value);
     }
 
+    /// <summary>Settings › Appearance: holiday icons around Christmas, Halloween and other holidays. Off unless turned on.</summary>
+    public bool SeasonalThemes
+    {
+        get => Read()?["seasonalThemes"] is JsonValue v && v.TryGetValue(out bool on) && on;
+        set => WriteNode("seasonalThemes", value);
+    }
+
     /// <summary>
     /// Settings › Macros: the on-screen pickers (click position, color, area, picture) leave the screen moving and
     /// draw a crosshair, the position and the outline on top, instead of freezing a screenshot. Off unless turned on.

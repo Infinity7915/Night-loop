@@ -9,6 +9,8 @@
         <ResourceDictionary Source="Themes/Dark.xaml" />
         <ResourceDictionary Source="Themes/Controls.xaml" />
       </ResourceDictionary.MergedDictionaries>
+      <!-- Services/Seasons.cs swaps this for a seasonal picture. -->
+      <BitmapImage x:Key="AppIcon" UriSource="/Assets/icon.png" />
     </ResourceDictionary>
   </Application.Resources>
 </Application>
