@@ -201,6 +201,54 @@ public class ColorMatchTests
         Assert.True(m.ColorOk);
     }
 
+    private static void Fill(byte[] px, int width, int x0, int y0, int size, byte r, byte g, byte b)
+    {
+        for (var y = y0; y < y0 + size; y++)
+        for (var x = x0; x < x0 + size; x++)
+        {
+            var i = (y * width + x) * 4;
+            px[i] = b;
+            px[i + 1] = g;
+            px[i + 2] = r;
+            px[i + 3] = 255;
+        }
+    }
+
+    [Fact]
+    public void Match_colors_waits_for_a_part_that_has_not_changed_color_yet()
+    {
+        // A red sprite with a green badge in its corner, as captured.
+        var shot = new byte[40 * 40 * 4];
+        DrawSprite(shot, 40, 0, 0, 40, Red);
+        Fill(shot, 40, 28, 28, 10, 40, 220, 60);
+        var picture = ImageTemplate.FromImage(new ScreenImage(0, 0, 40, 40, shot));
+
+        // On screen the badge is still gray: same shape, colors not there yet.
+        var px = new byte[200 * 200 * 4];
+        DrawSprite(px, 200, 80, 80, 40, Red);
+        Fill(px, 200, 108, 108, 10, 120, 120, 120);
+        var early = TemplateMatcher.Find(new ScreenImage(0, 0, 200, 200, px), picture, sizeTolerancePct: 0, matchColor: true)!.Value;
+        Assert.False(early.ColorOk);
+
+        // Once the badge turns green it matches.
+        Fill(px, 200, 108, 108, 10, 40, 220, 60);
+        var ready = TemplateMatcher.Find(new ScreenImage(0, 0, 200, 200, px), picture, sizeTolerancePct: 0, matchColor: true)!.Value;
+        Assert.True(ready.ColorOk);
+        Assert.InRange(ready.X, 98, 102);
+    }
+
+    [Fact]
+    public void Match_colors_waits_while_the_picture_is_still_dim()
+    {
+        var shot = new byte[40 * 40 * 4];
+        DrawSprite(shot, 40, 0, 0, 40, Red);
+        var red = ImageTemplate.FromImage(new ScreenImage(0, 0, 40, 40, shot));
+        var px = new byte[200 * 200 * 4];
+        DrawSprite(px, 200, 80, 80, 40, (Red.Item1 * 0.45, Red.Item2 * 0.45, Red.Item3 * 0.45));
+        var m = TemplateMatcher.Find(new ScreenImage(0, 0, 200, 200, px), red, sizeTolerancePct: 0, matchColor: true)!.Value;
+        Assert.False(m.ColorOk);
+    }
+
     [Fact]
     public void Old_gray_pictures_still_decode_and_skip_the_color_check()
     {
