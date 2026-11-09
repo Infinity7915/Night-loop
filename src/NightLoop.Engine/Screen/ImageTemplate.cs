@@ -171,6 +171,11 @@ public static class TemplateMatcher
 
     /// <summary>How far colors may be (0–255, per channel, averaged over the picture) for "Match colors".</summary>
     public const int ColorLimit = 45;
+    /// <summary>
+    /// How far the worst sixteenth of the picture may be. Higher than <see cref="ColorLimit"/> because edges shift a
+    /// pixel or two, but a badge or bar in another color (about a sixteenth of the picture or more) goes over it.
+    /// </summary>
+    public const int PartLimit = 75;
 
     /// <summary>Automatic size: from this much of the captured size (far away)…</summary>
     public const double AutoMinScale = 0.3;
@@ -232,7 +237,9 @@ public static class TemplateMatcher
 
     /// <summary>
     /// How different the colors are at a found spot: both are shrunk to a small grid, the screen's brightness is
-    /// evened out to the picture's (lighting changes in games), and the per-channel difference is averaged.
+    /// evened out to the picture's (a bit darker or lighter still counts), and the per-channel difference is averaged.
+    /// A part of the picture in the wrong color counts too: the worst sixteenth of the grid is held to
+    /// <see cref="PartLimit"/>, so a button whose badge or edge hasn't turned the captured color yet isn't a match.
     /// </summary>
     internal static double ColorDistance(ScreenImage screen, ImageTemplate t, (int X, int Y, int W, int H) at)
     {
@@ -243,16 +250,27 @@ public static class TemplateMatcher
         var seen = ImageTemplate.ColorThumb(screen, at.X, at.Y, at.W, at.H, gw, gh);
         double sumWant = 0, sumSeen = 0;
         for (var i = 0; i < mine.Length; i++) { sumWant += mine[i]; sumSeen += seen[i]; }
-        var gain = sumSeen < 1 ? 1 : Math.Clamp(sumWant / sumSeen, 0.6, 1.6);
+        var gain = sumSeen < 1 ? 1 : Math.Clamp(sumWant / sumSeen, MinGain, MaxGain);
+        var cells = new double[mine.Length / 3];
         double total = 0;
         for (var i = 0; i < mine.Length; i += 3)
         {
             var d = 0.0;
             for (var c = 0; c < 3; c++) d = Math.Max(d, Math.Abs(mine[i + c] - Math.Min(255, seen[i + c] * gain)));
+            cells[i / 3] = d;
             total += d;
         }
-        return total / (mine.Length / 3);
+        var average = total / cells.Length;
+        Array.Sort(cells);
+        var worstCount = Math.Max(1, cells.Length / 16);
+        double worst = 0;
+        for (var i = cells.Length - worstCount; i < cells.Length; i++) worst += cells[i];
+        // Scaled so both limits compare with ColorLimit.
+        return Math.Max(average, worst / worstCount * ColorLimit / PartLimit);
     }
+
+    /// <summary>How much darker or lighter the screen may be than the picture and still have its colors.</summary>
+    private const double MinGain = 0.75, MaxGain = 1.35;
 
     private static double ColorDistance(ScreenImage screen, ImageTemplate t, Found f) => ColorDistance(screen, t, (f.X, f.Y, f.W, f.H));
 
