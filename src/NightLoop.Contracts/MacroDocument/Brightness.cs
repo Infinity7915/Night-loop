@@ -1,36 +1,32 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 
 namespace NightLoop.Contracts.MacroDocument;
 
 /// <summary>
-/// Picture blocks with Match colors on: how much dimmer or brighter than the captured picture a spot on screen may be,
-/// in whole percents (<see cref="BlockTypes.BrightnessKey"/>). Blank is <see cref="DefaultPct"/> (about as captured,
-/// with room for screen noise). Blocks from before the number had a switch (<see cref="BlockTypes.AverageColorsKey"/>):
-/// on reads as <see cref="OldAveragePct"/>, the range it allowed.
+/// Picture blocks with Match colors on. With the "Dimmer or brighter" switch (<see cref="BlockTypes.AverageColorsKey"/>)
+/// on, the screen's colors are averaged to the picture's brightness, so any dimmer or brighter copy matches. Off: a
+/// copy may be at most <see cref="BlockTypes.BrightnessKey"/> percent dimmer or brighter (blank = <see cref="DefaultPct"/>).
 /// </summary>
 public static class Brightness
 {
-    public const int MinPct = 0, MaxPct = 100, DefaultPct = 6, OldAveragePct = 50;
+    public const int MinPct = 0, MaxPct = 100, DefaultPct = 3;
 
-    /// <summary>The range in percents from a block's or a condition's settings.</summary>
-    public static int Read(JsonObject? p)
+    /// <summary>The range in percents, or null when the switch says to average the colors instead.</summary>
+    public static int? Read(JsonObject? p)
     {
         if (p is null) return DefaultPct;
-        if (BlockParams.AsInt(p[BlockTypes.BrightnessKey]) is { } pct) return Math.Clamp(pct, MinPct, MaxPct);
-        return (p[BlockTypes.AverageColorsKey] as JsonValue)?.TryGetValue(out bool on) == true && on ? OldAveragePct : DefaultPct;
+        if ((p[BlockTypes.AverageColorsKey] as JsonValue)?.TryGetValue(out bool on) == true && on) return null;
+        return BlockParams.AsInt(p[BlockTypes.BrightnessKey]) is { } pct ? Math.Clamp(pct, MinPct, MaxPct) : DefaultPct;
     }
 
-    /// <summary>What the number box shows: the saved number, the old switch's range, or blank for the default.</summary>
+    /// <summary>What the number box shows: the saved number, or blank for the default.</summary>
     public static string Shown(JsonObject? p) =>
-        p is null ? ""
-        : BlockParams.AsInt(p[BlockTypes.BrightnessKey]) is { } pct ? pct.ToString(System.Globalization.CultureInfo.InvariantCulture)
-        : (p[BlockTypes.AverageColorsKey] as JsonValue)?.TryGetValue(out bool on) == true && on ? OldAveragePct.ToString(System.Globalization.CultureInfo.InvariantCulture)
-        : "";
+        p is not null && BlockParams.AsInt(p[BlockTypes.BrightnessKey]) is { } pct ? pct.ToString(CultureInfo.InvariantCulture) : "";
 
-    /// <summary>Saves the number box (blank = default) and drops the old switch it replaces.</summary>
+    /// <summary>Saves the number box (blank = default).</summary>
     public static void Write(JsonObject p, int? pct)
     {
-        p.Remove(BlockTypes.AverageColorsKey);
         if (pct is { } v) p[BlockTypes.BrightnessKey] = Math.Clamp(v, MinPct, MaxPct);
         else p.Remove(BlockTypes.BrightnessKey);
     }

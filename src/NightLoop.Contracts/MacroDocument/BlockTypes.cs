@@ -147,8 +147,8 @@ public static class BlockTypes
     public const string AverageColorsKey = "averageColors";
 
     /// <summary>
-    /// Picture blocks with Match colors on: how much dimmer or brighter a copy may be, 0–100 % (see <see cref="Brightness"/>).
-    /// Replaces <see cref="AverageColorsKey"/>, which older blocks still have.
+    /// Picture blocks with Match colors and Dimmer or brighter off: how much dimmer or brighter a copy may be, 0–100 %
+    /// (see <see cref="Brightness"/>).
     /// </summary>
     public const string BrightnessKey = "brightnessPct";
     /// <summary>…and 0–100 % down. Both blank = the middle.</summary>

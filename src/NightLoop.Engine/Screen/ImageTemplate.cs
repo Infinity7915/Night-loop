@@ -184,7 +184,7 @@ public static class TemplateMatcher
     /// <paramref name="sizeTolerancePct"/>: how much smaller or bigger it may look (0 = only the captured size);
     /// null looks at every size from <see cref="AutoMinScale"/> to <see cref="AutoMaxScale"/>.
     /// </summary>
-    public static Match? Find(ScreenImage screen, ImageTemplate template, int? sizeTolerancePct = 0, bool matchColor = false, int brightnessPct = Brightness.DefaultPct)
+    public static Match? Find(ScreenImage screen, ImageTemplate template, int? sizeTolerancePct = 0, bool matchColor = false, int? brightnessPct = Brightness.DefaultPct)
     {
         var (min, max) = sizeTolerancePct is { } pct
             ? (1 - Math.Clamp(pct, 0, MaxSizeTolerancePct) / 100.0, 1 + Math.Clamp(pct, 0, MaxSizeTolerancePct) / 100.0)
@@ -195,8 +195,8 @@ public static class TemplateMatcher
     /// <summary>Best match at any size between <paramref name="minScale"/> and <paramref name="maxScale"/> of the captured one.</summary>
     /// With <paramref name="matchColor"/> (and a picture that has its colors saved), the best spot whose colors match
     /// too: two things with the same shape but different colors aren't mixed up. <paramref name="brightnessPct"/> is how
-    /// much dimmer or brighter than captured a copy may be (lighting in games); 0 = exactly as captured.
-    public static Match? Find(ScreenImage screen, ImageTemplate template, double minScale, double maxScale, bool matchColor = false, int brightnessPct = Brightness.DefaultPct)
+    /// much dimmer or brighter than captured a copy may be (lighting in games); null evens the brightness out instead.
+    public static Match? Find(ScreenImage screen, ImageTemplate template, double minScale, double maxScale, bool matchColor = false, int? brightnessPct = Brightness.DefaultPct)
     {
         var hay = new Haystack(ImageTemplate.ToGray(screen), screen.Width, screen.Height);
         var scales = Scales(template, minScale, maxScale, out var step);
@@ -210,7 +210,7 @@ public static class TemplateMatcher
         if (all.Count == 0) return null;
         var b = all[0];
         var checkColor = matchColor && template.HasColor;
-        var range = Math.Clamp(brightnessPct, Brightness.MinPct, Brightness.MaxPct) / 100.0;
+        double? range = brightnessPct is { } pct ? Math.Clamp(pct, Brightness.MinPct, Brightness.MaxPct) / 100.0 : null;
         var colorOk = true;
         if (checkColor)
         {
@@ -236,22 +236,59 @@ public static class TemplateMatcher
 
     /// <summary>
     /// How different the colors are at a found spot: both are shrunk to a small grid and the per-channel difference is
-    /// averaged. A spot up to <paramref name="range"/> (a share, 0.1 = 10%) dimmer or brighter than the picture is first
-    /// evened out to the picture's brightness (lighting changes in games); a spot further off doesn't match at all.
+    /// averaged. <paramref name="range"/> null (Dimmer or brighter on): the screen's brightness is first evened out to
+    /// the picture's, so a dimmer or brighter copy matches too. Otherwise a spot more than <paramref name="range"/>
+    /// (a share, 0.1 = 10%) dimmer or brighter than the picture doesn't match at all.
     /// </summary>
-    internal static double ColorDistance(ScreenImage screen, ImageTemplate t, (int X, int Y, int W, int H) at, double range)
+    internal static double ColorDistance(ScreenImage screen, ImageTemplate t, (int X, int Y, int W, int H) at, double? range)
     {
-        if (t.Rgb is not { } want) return 0;
+        if (t.Rgb is null) return 0;
+        if (range is not { } r)
+        {
+            var (mine, seen) = Thumbs(screen, t, at);
+            return Distance(mine, seen, 0.6, 1.6);
+        }
+        // A dimmer copy is often found a little too small (the dim edge blends into the background), and a box
+        // inside the picture only sees its middle, which is brighter. Measure where the colors line up best.
+        var (bestMine, bestSeen) = BestFit(screen, t, at);
+        var allowed = r + BrightnessNoise;
+        if (BrightnessOff(bestMine, bestSeen, allowed)) return 255;
+        return Distance(bestMine, bestSeen, 1 / (1 + allowed), 1 / Math.Max(0.01, 1 - allowed));
+    }
+
+    /// <summary>Added to every brightness range: screens never show a picture exactly as captured.</summary>
+    public const double BrightnessNoise = 0.03;
+
+    private static (byte[] Mine, byte[] Seen) Thumbs(ScreenImage screen, ImageTemplate t, (int X, int Y, int W, int H) at)
+    {
         var gw = Math.Min(t.ColorWidth, Math.Max(1, at.W / 2));
         var gh = Math.Min(t.ColorHeight, Math.Max(1, at.H / 2));
-        var mine = gw == t.ColorWidth && gh == t.ColorHeight ? want : ResizeRgb(want, t.ColorWidth, t.ColorHeight, gw, gh);
-        var seen = ImageTemplate.ColorThumb(screen, at.X, at.Y, at.W, at.H, gw, gh);
+        var mine = gw == t.ColorWidth && gh == t.ColorHeight ? t.Rgb! : ResizeRgb(t.Rgb!, t.ColorWidth, t.ColorHeight, gw, gh);
+        return (mine, ImageTemplate.ColorThumb(screen, at.X, at.Y, at.W, at.H, gw, gh));
+    }
+
+    /// <summary>The found box, or one a little bigger or smaller around the same middle, whose colors fit best once evened out.</summary>
+    private static (byte[] Mine, byte[] Seen) BestFit(ScreenImage screen, ImageTemplate t, (int X, int Y, int W, int H) at)
+    {
+        (byte[], byte[]) best = default;
+        var bestD = double.MaxValue;
+        foreach (var f in new[] { 1.0, 1.06, 1.12, 1.19, 1.26, 1.34, 1.42, 0.94, 0.88 })
+        {
+            int w = (int)Math.Round(at.W * f), h = (int)Math.Round(at.H * f);
+            int x = at.X + at.W / 2 - w / 2, y = at.Y + at.H / 2 - h / 2;
+            if (w < 2 || h < 2 || x < 0 || y < 0 || x + w > screen.Width || y + h > screen.Height) continue;
+            var pair = Thumbs(screen, t, (x, y, w, h));
+            var d = Distance(pair.Mine, pair.Seen, 0.4, 2.5);
+            if (d < bestD - 0.5) (bestD, best) = (d, pair); // a clearly better fit; otherwise keep the found size
+        }
+        return best.Item1 is null ? Thumbs(screen, t, at) : best;
+    }
+
+    private static double Distance(byte[] mine, byte[] seen, double minGain, double maxGain)
+    {
         double sumWant = 0, sumSeen = 0;
         for (var i = 0; i < mine.Length; i++) { sumWant += mine[i]; sumSeen += seen[i]; }
-        // The spot must be within the brightness range of the picture. The per-cell difference alone let a copy 30%
-        // dimmer through, since a dim copy keeps the same hues.
-        if (BrightnessOff(mine, seen, range)) return 255;
-        var gain = sumSeen < 1 ? 1 : Math.Clamp(sumWant / sumSeen, 1 / (1 + range), 1 / Math.Max(0.01, 1 - range));
+        var gain = sumSeen < 1 ? 1 : Math.Clamp(sumWant / sumSeen, minGain, maxGain);
         double total = 0;
         for (var i = 0; i < mine.Length; i += 3)
         {
@@ -281,7 +318,7 @@ public static class TemplateMatcher
         return false;
     }
 
-    private static double ColorDistance(ScreenImage screen, ImageTemplate t, Found f, double range) => ColorDistance(screen, t, (f.X, f.Y, f.W, f.H), range);
+    private static double ColorDistance(ScreenImage screen, ImageTemplate t, Found f, double? range) => ColorDistance(screen, t, (f.X, f.Y, f.W, f.H), range);
 
     private static byte[] ResizeRgb(byte[] rgb, int w, int h, int nw, int nh)
     {
