@@ -24,7 +24,7 @@ internal sealed record LookFor(
     bool MatchColor = false,
     double ClickX = 0.5,
     double ClickY = 0.5,
-    int BrightnessPct = Brightness.DefaultPct);
+    int? BrightnessPct = Brightness.DefaultPct);
 
 /// <summary>Finds text, pictures and colors on screen for the detect blocks and conditions.</summary>
 internal static class Vision

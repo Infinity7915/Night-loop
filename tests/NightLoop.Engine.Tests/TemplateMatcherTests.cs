@@ -198,7 +198,7 @@ public class ColorMatchTests
         var px = new byte[200 * 200 * 4];
         DrawSprite(px, 200, 80, 80, 40, (Red.Item1 * 0.6, Red.Item2 * 0.6, Red.Item3 * 0.6));
         var screen = new ScreenImage(0, 0, 200, 200, px);
-        Assert.True(TemplateMatcher.Find(screen, red, sizeTolerancePct: 0, matchColor: true, brightnessPct: Brightness.OldAveragePct)!.Value.ColorOk);
+        Assert.True(TemplateMatcher.Find(screen, red, sizeTolerancePct: 0, matchColor: true, brightnessPct: null)!.Value.ColorOk);
         // Off (the default): the colors must match as captured, so the dim copy is not taken for it.
         Assert.False(TemplateMatcher.Find(screen, red, sizeTolerancePct: 0, matchColor: true)!.Value.ColorOk);
     }
@@ -221,7 +221,7 @@ public class ColorMatchTests
             var m0 = TemplateMatcher.Find(screen, picture, sizeTolerancePct: 0, matchColor: true)!.Value;
             // Not found as a match a block would take (colors right and at least 90% alike).
             Assert.False(m0.ColorOk && m0.Score >= 0.9, $"{tint} {m0}");
-            Assert.True(TemplateMatcher.Find(screen, picture, sizeTolerancePct: 0, matchColor: true, brightnessPct: Brightness.OldAveragePct)!.Value.ColorOk);
+            Assert.True(TemplateMatcher.Find(screen, picture, sizeTolerancePct: 0, matchColor: true, brightnessPct: null)!.Value.ColorOk);
         }
     }
 
@@ -245,11 +245,11 @@ public class ColorMatchTests
     }
 
     [Fact]
-    public void Old_dimmer_or_brighter_switch_reads_as_a_range()
+    public void Dimmer_or_brighter_switch_averages_instead_of_the_range()
     {
         Assert.Equal(Brightness.DefaultPct, Brightness.Read(new System.Text.Json.Nodes.JsonObject()));
-        Assert.Equal(Brightness.OldAveragePct, Brightness.Read(new System.Text.Json.Nodes.JsonObject { [BlockTypes.AverageColorsKey] = true }));
-        Assert.Equal(12, Brightness.Read(new System.Text.Json.Nodes.JsonObject { [BlockTypes.AverageColorsKey] = true, [BlockTypes.BrightnessKey] = 12 }));
+        Assert.Null(Brightness.Read(new System.Text.Json.Nodes.JsonObject { [BlockTypes.AverageColorsKey] = true, [BlockTypes.BrightnessKey] = 12 }));
+        Assert.Equal(12, Brightness.Read(new System.Text.Json.Nodes.JsonObject { [BlockTypes.AverageColorsKey] = false, [BlockTypes.BrightnessKey] = 12 }));
     }
 
     [Fact]
