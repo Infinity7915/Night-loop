@@ -219,7 +219,7 @@ public static class BlockCatalog
             b => $"\"{b.GetString("text", "")}\" gone · {b.GetString("match", "exact")} · {F.MsOrInfinite(b, "timeoutMs", 10_000)}"),
         new("waitimage", BlockTypes.WaitForImage, "Wait for image", "IMG", "Detect", "Wait until a saved picture shows up on screen.",
             () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 0, ["onFail"] = "continue" },
-            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.MatchColor(), F.AverageColors(), F.Region(),
+            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.MatchColor(), F.Brightness(), F.Region(),
              F.Timeout(),
              F.OnFail(), F.FailLabel()],
             b => $"{ImageName(b)} · {b.GetInt("confidencePct", 90)}% · {F.MsOrInfinite(b, "timeoutMs", 10_000)}"),
@@ -231,7 +231,7 @@ public static class BlockCatalog
             b => $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)} = {b.GetString("color", "")} · {F.MsOrInfinite(b, "timeoutMs", 5000)}"),
         new("imagegone", BlockTypes.WaitForImageGone, "Image gone", "!IMG", "Detect", "Wait until a saved picture is no longer on screen.",
             () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 0, ["onFail"] = "continue" },
-            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.MatchColor(), F.AverageColors(), F.Region(),
+            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.MatchColor(), F.Brightness(), F.Region(),
              F.Timeout(),
              F.OnFail(), F.FailLabel()],
             b => $"{ImageName(b)} gone · {b.GetInt("confidencePct", 90)}% · {F.MsOrInfinite(b, "timeoutMs", 10_000)}"),
@@ -632,14 +632,32 @@ internal static class F
     public static FieldDef MatchColor() =>
         YesNo("matchColor", "Match colors", fallback: true, yes: "On", no: "Off") with { Hint = MatchColorHint };
 
-    private const string AverageColorsHint =
-        "On: a dimmer or brighter copy of the picture matches too (the colors are averaged to its brightness first), " +
-        "for games whose lighting changes. Off: the colors must match the picture as you captured it.";
+    private const string BrightnessHint =
+        "How much dimmer or brighter than the captured picture it may look on screen, for games whose lighting changes. " +
+        "Blank is 6 (as captured, with room for screen noise). 0 is exactly as captured; 30 lets a copy 30% dimmer or brighter match.";
 
-    /// <summary>Picture blocks with Match colors on: let a dimmer or brighter copy match. Off unless turned on.</summary>
-    public static FieldDef AverageColors() =>
-        YesNo(BlockTypes.AverageColorsKey, "Dimmer or brighter", fallback: false, yes: "Also match", no: "Exact colors")
-            with { Hint = AverageColorsHint, ShowIf = b => b.GetBool("matchColor") != false };
+    /// <summary>Picture blocks with Match colors on: the brightness range in percents (blank = <see cref="Brightness.DefaultPct"/>).</summary>
+    public static FieldDef Brightness() =>
+        new FieldDef(BlockTypes.BrightnessKey, "Brightness range %", FieldKind.Text,
+            b => NightLoop.Contracts.MacroDocument.Brightness.Shown(b.Params),
+            (b, text) => SetBrightness(b.Params, text),
+            Placeholder: NightLoop.Contracts.MacroDocument.Brightness.DefaultPct.ToString(CultureInfo.InvariantCulture), Hint: BrightnessHint, MaxLength: 12)
+            with { ShowIf = b => b.GetBool("matchColor") != false };
+
+    private static string? SetBrightness(JsonObject p, string text)
+    {
+        var t = text.Trim().TrimEnd('%').Trim();
+        if (t.Length == 0)
+        {
+            NightLoop.Contracts.MacroDocument.Brightness.Write(p, null);
+            return null;
+        }
+        if (!int.TryParse(t, NumberStyles.None, CultureInfo.InvariantCulture, out var n)) return "Enter a whole number.";
+        if (n is < NightLoop.Contracts.MacroDocument.Brightness.MinPct or > NightLoop.Contracts.MacroDocument.Brightness.MaxPct)
+            return $"Use {NightLoop.Contracts.MacroDocument.Brightness.MinPct} to {NightLoop.Contracts.MacroDocument.Brightness.MaxPct}.";
+        NightLoop.Contracts.MacroDocument.Brightness.Write(p, n);
+        return null;
+    }
 
     private const string ClickSpotHint =
         "Where to click once the picture is found: 0 is its left (or top) edge, 100 its right (or bottom), blank the " +
@@ -656,7 +674,7 @@ internal static class F
                 hint: "How alike the spot has to be. Lower finds it more easily but may click the wrong thing.") with { ShowIf = b => Is(b, "image") },
             SizeTolerance() with { ShowIf = b => Is(b, "image") },
             MatchColor() with { ShowIf = b => Is(b, "image") },
-            AverageColors() with { ShowIf = b => Is(b, "image") && b.GetBool("matchColor") != false },
+            Brightness() with { ShowIf = b => Is(b, "image") && b.GetBool("matchColor") != false },
             Int(BlockTypes.ClickXKey, "Click spot across %", ClickSpot.MinPct, ClickSpot.MaxPct, optional: true, placeholder: "50",
                 hint: ClickSpotHint) with { ShowIf = b => Is(b, "image") && Clicks(b) },
             Int(BlockTypes.ClickYKey, "Click spot down %", ClickSpot.MinPct, ClickSpot.MaxPct, optional: true, placeholder: "50") with { ShowIf = b => Is(b, "image") && Clicks(b) },
@@ -683,18 +701,17 @@ internal static class F
                     return null;
                 },
                 [new("true", "On"), new("false", "Off")], Hint: MatchColorHint) with { ShowIf = IsImage },
-            new FieldDef("condition." + BlockTypes.AverageColorsKey, "Dimmer or brighter", FieldKind.Choice,
-                b => Conditions.Inner(b.GetObject("condition"))?[BlockTypes.AverageColorsKey] is JsonValue v && v.TryGetValue(out bool on) && on ? "true" : "false",
-                (b, value) =>
+            new FieldDef("condition." + BlockTypes.BrightnessKey, "Brightness range %", FieldKind.Text,
+                b => NightLoop.Contracts.MacroDocument.Brightness.Shown(Conditions.Inner(b.GetObject("condition"))),
+                (b, text) =>
                 {
                     var condition = b.GetObject("condition")?.DeepClone() as JsonObject ?? [];
                     if (Conditions.Inner(condition) is not { } inner) return null;
-                    if (value == "true") inner[BlockTypes.AverageColorsKey] = true;
-                    else inner.Remove(BlockTypes.AverageColorsKey);
+                    if (SetBrightness(inner, text) is { } error) return error;
                     b.Params["condition"] = condition;
                     return null;
                 },
-                [new("true", "Also match"), new("false", "Exact colors")], Hint: AverageColorsHint)
+                Placeholder: NightLoop.Contracts.MacroDocument.Brightness.DefaultPct.ToString(CultureInfo.InvariantCulture), Hint: BrightnessHint, MaxLength: 12)
                 with { ShowIf = b => IsImage(b) && !(Conditions.Inner(b.GetObject("condition"))?["matchColor"] is JsonValue m && m.TryGetValue(out bool mc) && !mc) },
             ConditionInt("sizeTolerancePct", "Size tolerance %", 0, MacroLimits.SizeToleranceMaxPct, "Auto", SizeToleranceHint)
                 with { ShowIf = IsImage, Get = b => AutoSize(BlockParams.AsInt(Conditions.Inner(b.GetObject("condition"))?["sizeTolerancePct"])) },

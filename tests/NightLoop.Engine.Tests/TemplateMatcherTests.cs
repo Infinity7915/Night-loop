@@ -198,7 +198,7 @@ public class ColorMatchTests
         var px = new byte[200 * 200 * 4];
         DrawSprite(px, 200, 80, 80, 40, (Red.Item1 * 0.6, Red.Item2 * 0.6, Red.Item3 * 0.6));
         var screen = new ScreenImage(0, 0, 200, 200, px);
-        Assert.True(TemplateMatcher.Find(screen, red, sizeTolerancePct: 0, matchColor: true, averageColors: true)!.Value.ColorOk);
+        Assert.True(TemplateMatcher.Find(screen, red, sizeTolerancePct: 0, matchColor: true, brightnessPct: Brightness.OldAveragePct)!.Value.ColorOk);
         // Off (the default): the colors must match as captured, so the dim copy is not taken for it.
         Assert.False(TemplateMatcher.Find(screen, red, sizeTolerancePct: 0, matchColor: true)!.Value.ColorOk);
     }
@@ -221,8 +221,35 @@ public class ColorMatchTests
             var m0 = TemplateMatcher.Find(screen, picture, sizeTolerancePct: 0, matchColor: true)!.Value;
             // Not found as a match a block would take (colors right and at least 90% alike).
             Assert.False(m0.ColorOk && m0.Score >= 0.9, $"{tint} {m0}");
-            Assert.True(TemplateMatcher.Find(screen, picture, sizeTolerancePct: 0, matchColor: true, averageColors: true)!.Value.ColorOk);
+            Assert.True(TemplateMatcher.Find(screen, picture, sizeTolerancePct: 0, matchColor: true, brightnessPct: Brightness.OldAveragePct)!.Value.ColorOk);
         }
+    }
+
+    [Fact]
+    public void Brightness_range_sets_how_much_dimmer_a_copy_may_be()
+    {
+        var shot = new byte[40 * 40 * 4];
+        DrawSprite(shot, 40, 0, 0, 40, Red);
+        var red = ImageTemplate.FromImage(new ScreenImage(0, 0, 40, 40, shot));
+        bool Takes(double brightness, int pct)
+        {
+            var px = new byte[200 * 200 * 4];
+            DrawSprite(px, 200, 80, 80, 40, (Red.Item1 * brightness, Red.Item2 * brightness, Red.Item3 * brightness));
+            var m = TemplateMatcher.Find(new ScreenImage(0, 0, 200, 200, px), red, sizeTolerancePct: 0, matchColor: true, brightnessPct: pct)!.Value;
+            return m.ColorOk && m.Score >= 0.9;
+        }
+        Assert.True(Takes(0.85, 20));
+        Assert.True(Takes(1.15, 20));
+        Assert.False(Takes(0.7, 20));
+        Assert.False(Takes(1.3, 20));
+    }
+
+    [Fact]
+    public void Old_dimmer_or_brighter_switch_reads_as_a_range()
+    {
+        Assert.Equal(Brightness.DefaultPct, Brightness.Read(new System.Text.Json.Nodes.JsonObject()));
+        Assert.Equal(Brightness.OldAveragePct, Brightness.Read(new System.Text.Json.Nodes.JsonObject { [BlockTypes.AverageColorsKey] = true }));
+        Assert.Equal(12, Brightness.Read(new System.Text.Json.Nodes.JsonObject { [BlockTypes.AverageColorsKey] = true, [BlockTypes.BrightnessKey] = 12 }));
     }
 
     [Fact]

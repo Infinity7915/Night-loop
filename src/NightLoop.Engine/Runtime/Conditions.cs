@@ -59,7 +59,7 @@ public class BasicConditionEvaluator : IConditionEvaluator
                     ConfidencePct: BlockParams.AsInt(condition["confidencePct"]) ?? 90, Region: condition["region"],
                     SizeTolerancePct: DetectBlocksLook.SizeTolerance(BlockParams.AsInt(condition["sizeTolerancePct"])),
                     MatchColor: !((condition["matchColor"] as JsonValue)?.TryGetValue(out bool mc) == true && !mc),
-                    AverageColors: (condition[BlockTypes.AverageColorsKey] as JsonValue)?.TryGetValue(out bool avg) == true && avg)) is not null;
+                    BrightnessPct: Brightness.Read(condition))) is not null;
             default:
                 throw Bad($"\"{kind}\" conditions can't be checked in this version of Night-loop.");
         }

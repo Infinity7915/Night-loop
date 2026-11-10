@@ -1,3 +1,4 @@
+using NightLoop.Contracts.MacroDocument;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using NightLoop.Engine.Runtime;
@@ -23,7 +24,7 @@ internal sealed record LookFor(
     bool MatchColor = false,
     double ClickX = 0.5,
     double ClickY = 0.5,
-    bool AverageColors = false);
+    int BrightnessPct = Brightness.DefaultPct);
 
 /// <summary>Finds text, pictures and colors on screen for the detect blocks and conditions.</summary>
 internal static class Vision
@@ -43,7 +44,7 @@ internal static class Vision
 
             case "image":
                 var template = Template(what.ImageData);
-                var match = TemplateMatcher.Find(image, template, what.SizeTolerancePct, what.MatchColor, what.AverageColors);
+                var match = TemplateMatcher.Find(image, template, what.SizeTolerancePct, what.MatchColor, what.BrightnessPct);
                 return match is { } m && m.ColorOk && m.Score * 100 >= what.ConfidencePct ? PointIn(m, template, what) : null;
 
             default:
@@ -74,7 +75,7 @@ internal static class Vision
 
     /// <summary>The best spot for a picture right now, however poor, for the editor's test look to explain a miss.</summary>
     public static TemplateMatcher.Match? BestImageMatch(RunContext ctx, LookFor what) =>
-        TemplateMatcher.Find(ctx.Capture(ctx.AreaFor(what.Region)), Template(what.ImageData), what.SizeTolerancePct, what.MatchColor, what.AverageColors);
+        TemplateMatcher.Find(ctx.Capture(ctx.AreaFor(what.Region)), Template(what.ImageData), what.SizeTolerancePct, what.MatchColor, what.BrightnessPct);
 
     /// <summary>Two looks this close together count as the same, steady spot.</summary>
     public const int SteadyPx = 16;

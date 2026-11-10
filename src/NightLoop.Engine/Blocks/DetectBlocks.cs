@@ -76,7 +76,7 @@ internal static class DetectBlocks
         {
             if (await Vision.FindAsync(ctx, what) is { } seen && await Vision.ConfirmAsync(ctx, what, seen, ScanSettleMs) is { } p)
             {
-                ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor, what.ClickX, what.ClickY, what.AverageColors);
+                ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor, what.ClickX, what.ClickY, what.BrightnessPct);
                 return await AfterFoundAsync(b, ctx, p);
             }
             if (i == tries) break;
@@ -159,7 +159,7 @@ internal static class DetectBlocks
         var what = Target(b);
         var found = await Vision.WaitForAsync(ctx, what, b.GetInt("timeoutMs", 0), confirm: true);
         if (found is not { } p) return false;
-        ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor, what.ClickX, what.ClickY, what.AverageColors);
+        ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor, what.ClickX, what.ClickY, what.BrightnessPct);
         await ClickFoundAsync(b, ctx, p);
         return true;
     }
@@ -199,7 +199,7 @@ internal static class DetectBlocks
             // clicks before the target is really there.
             if (await Vision.FindAsync(ctx, what) is { } seen && await Vision.ConfirmAsync(ctx, what, seen, ScanSettleMs) is { } p)
             {
-                ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor, what.ClickX, what.ClickY, what.AverageColors);
+                ctx.LastFound = new FoundTarget(what.Kind, what.Value, what.ImageData, what.Tolerance, what.Region, p, what.ConfidencePct, what.SizeTolerancePct, what.MatchColor, what.ClickX, what.ClickY, what.BrightnessPct);
                 switch (b.GetString("whenFound", "click"))
                 {
                     case "click" when method == "mouseMove":
@@ -249,7 +249,7 @@ internal static class DetectBlocks
     private static async Task<(bool Ok, (int X, int Y) Point, double Ratio)> CenterAsync(RunContext ctx, FoundTarget target, int tolerance, string method, bool tilt = true)
     {
         var what = new LookFor(target.Kind, target.Value, target.ImageData, target.Tolerance, target.ConfidencePct, Region: null, SizeTolerancePct: target.SizeTolerancePct, MatchColor: target.MatchColor,
-            ClickX: target.ClickX, ClickY: target.ClickY, AverageColors: target.AverageColors);
+            ClickX: target.ClickX, ClickY: target.ClickY, BrightnessPct: target.BrightnessPct);
         var view = ctx.AreaFor(null).Center;
         var (ok, point, ratio) = await CenterAxisAsync(ctx, what, target, target.Point, view, tolerance, method, vertical: false, guess: null);
         // Sideways sensitivity is a good first guess for up and down. Arrow keys only turn sideways: in most games
@@ -345,7 +345,7 @@ internal static class DetectBlocksLook
         var (cx, cy) = ClickSpot.Read(b);
         return new("image", b.GetString("image", ""), ImageData: b.GetString("imageData"),
             ConfidencePct: b.GetInt("confidencePct", 90), Region: b.Params["region"], SizeTolerancePct: SizeTolerance(b.GetInt("sizeTolerancePct")), MatchColor: b.GetBool("matchColor") != false,
-            ClickX: cx, ClickY: cy, AverageColors: b.GetBool(BlockTypes.AverageColorsKey) == true);
+            ClickX: cx, ClickY: cy, BrightnessPct: Brightness.Read(b.Params));
     }
 
     public static LookFor Target(Block b)
@@ -355,6 +355,6 @@ internal static class DetectBlocksLook
         return new LookFor(kind, b.GetString("value", ""), ImageData: b.GetString("imageData"),
             Tolerance: b.GetInt("tolerance", 10), ConfidencePct: b.GetInt("confidencePct", 90),
             Contains: true, MatchCase: false, Region: b.Params["region"], SizeTolerancePct: SizeTolerance(b.GetInt("sizeTolerancePct")), MatchColor: b.GetBool("matchColor") != false,
-            ClickX: kind == "image" ? cx : 0.5, ClickY: kind == "image" ? cy : 0.5, AverageColors: b.GetBool(BlockTypes.AverageColorsKey) == true);
+            ClickX: kind == "image" ? cx : 0.5, ClickY: kind == "image" ? cy : 0.5, BrightnessPct: Brightness.Read(b.Params));
     }
 }

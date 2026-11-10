@@ -56,7 +56,7 @@ public static class DetectProbe
         var what = b.Type is BlockTypes.FindClick or BlockTypes.ScanTurn ? DetectBlocksLook.Target(b) : DetectBlocksLook.Picture(b);
         if (what.ImageData is not { Length: > 0 } data || !ImageTemplate.TryDecode(data, out var t) || t is null)
             return new(false, "Capture the picture first.");
-        var m = TemplateMatcher.Find(shot, t, what.SizeTolerancePct, what.MatchColor, what.AverageColors);
+        var m = TemplateMatcher.Find(shot, t, what.SizeTolerancePct, what.MatchColor, what.BrightnessPct);
         if (m is not { } found || found.Score * 100 < what.ConfidencePct || !found.ColorOk)
             return new(false, "The picture isn't on screen right now. Show it on screen, then pick the spot again.");
         var w = Math.Max(1, (int)Math.Round(t.Width * found.Scale));
