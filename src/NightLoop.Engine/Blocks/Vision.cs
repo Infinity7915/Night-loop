@@ -153,6 +153,8 @@ internal static class Vision
         if (s_templates.TryGetValue(data, out var cached)) return cached;
         if (!ImageTemplate.TryDecode(data, out var t) || t is null)
             throw new MacroFaultException("The saved picture is damaged. Capture it again.");
+        if (t.IsPlain)
+            throw new MacroFaultException("The saved picture is all one plain color, so it would match any plain screen (like a white loading screen). Pick it again around something with detail, like an icon or text.");
         s_templates.AddOrUpdate(data, t);
         return t;
     }

@@ -153,3 +153,31 @@ public class ShrunkPictureTests
         Assert.Equal(1, t!.CapturedScale);
     }
 }
+
+public class PlainPictureTests
+{
+    private static ImageTemplate Make(Func<int, int, (byte R, byte G, byte B)> color, int w = 60, int h = 30)
+    {
+        var px = new byte[w * h * 4];
+        for (var y = 0; y < h; y++)
+        for (var x = 0; x < w; x++)
+        {
+            var (r, g, b) = color(x, y);
+            var i = (y * w + x) * 4;
+            px[i] = b; px[i + 1] = g; px[i + 2] = r; px[i + 3] = 255;
+        }
+        Assert.True(ImageTemplate.TryDecode(ImageTemplate.FromImage(new ScreenImage(0, 0, w, h, px)).Encode(), out var t));
+        return t!;
+    }
+
+    [Fact]
+    public void A_white_picture_is_plain() => Assert.True(Make((_, _) => (250, 250, 250)).IsPlain);
+
+    [Fact]
+    public void A_white_picture_with_a_little_screen_noise_is_plain() =>
+        Assert.True(Make((x, y) => ((byte)(248 + (x * 7 + y * 3) % 4), 250, 250)).IsPlain);
+
+    [Fact]
+    public void A_picture_with_a_small_icon_is_not_plain() =>
+        Assert.False(Make((x, y) => x is > 24 and < 36 && y is > 8 and < 22 ? ((byte)40, (byte)40, (byte)40) : ((byte)250, (byte)250, (byte)250)).IsPlain);
+}

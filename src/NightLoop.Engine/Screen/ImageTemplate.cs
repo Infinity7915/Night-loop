@@ -47,6 +47,25 @@ public sealed class ImageTemplate
     /// <summary>One byte per pixel, top row first.</summary>
     public byte[] Gray { get; }
 
+    /// <summary>
+    /// The picture is (almost) one plain color, like part of a white loading screen. A plain picture matches any
+    /// plain area of that color, so it can't tell screens apart; the apps refuse it.
+    /// </summary>
+    public bool IsPlain
+    {
+        get
+        {
+            if (Gray.Length == 0) return true;
+            double sum = 0, sq = 0;
+            foreach (var g in Gray) { sum += g; sq += g * g; }
+            var mean = sum / Gray.Length;
+            return sq / Gray.Length - mean * mean < PlainSpread * PlainSpread;
+        }
+    }
+
+    /// <summary>Gray levels a picture's pixels must spread by (standard deviation) not to count as plain.</summary>
+    public const double PlainSpread = 3;
+
     /// <param name="capturedScale">How much <paramref name="image"/> was shrunk from the screen to fit <see cref="MaxSide"/>.</param>
     public static ImageTemplate FromImage(ScreenImage image, double capturedScale = 1)
     {
