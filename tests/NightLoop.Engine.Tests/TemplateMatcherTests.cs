@@ -203,6 +203,39 @@ public class ColorMatchTests
         Assert.False(TemplateMatcher.Find(screen, red, sizeTolerancePct: 0, matchColor: true)!.Value.ColorOk);
     }
 
+    [Theory]
+    [InlineData(0.85)]
+    [InlineData(0.9)]
+    [InlineData(1.1)]
+    [InlineData(1.2)]
+    public void Exact_colors_refuse_a_slightly_dimmer_or_brighter_copy(double brightness)
+    {
+        foreach (var tint in new[] { Red, Blue, (0.5, 0.5, 0.5), (1.0, 1.0, 1.0) })
+        {
+            var shot = new byte[40 * 40 * 4];
+            DrawSprite(shot, 40, 0, 0, 40, tint);
+            var picture = ImageTemplate.FromImage(new ScreenImage(0, 0, 40, 40, shot));
+            var px = new byte[200 * 200 * 4];
+            DrawSprite(px, 200, 80, 80, 40, (tint.Item1 * brightness, tint.Item2 * brightness, tint.Item3 * brightness));
+            var screen = new ScreenImage(0, 0, 200, 200, px);
+            var m0 = TemplateMatcher.Find(screen, picture, sizeTolerancePct: 0, matchColor: true)!.Value;
+            // Not found as a match a block would take (colors right and at least 90% alike).
+            Assert.False(m0.ColorOk && m0.Score >= 0.9, $"{tint} {m0}");
+            Assert.True(TemplateMatcher.Find(screen, picture, sizeTolerancePct: 0, matchColor: true, averageColors: true)!.Value.ColorOk);
+        }
+    }
+
+    [Fact]
+    public void Exact_colors_allow_screen_noise()
+    {
+        var shot = new byte[40 * 40 * 4];
+        DrawSprite(shot, 40, 0, 0, 40, Red);
+        var red = ImageTemplate.FromImage(new ScreenImage(0, 0, 40, 40, shot));
+        var px = new byte[200 * 200 * 4];
+        DrawSprite(px, 200, 80, 80, 40, (Red.Item1 * 0.97, Red.Item2 * 0.97, Red.Item3 * 0.97));
+        Assert.True(TemplateMatcher.Find(new ScreenImage(0, 0, 200, 200, px), red, sizeTolerancePct: 0, matchColor: true)!.Value.ColorOk);
+    }
+
     [Fact]
     public void Exact_colors_still_match_the_same_picture()
     {
