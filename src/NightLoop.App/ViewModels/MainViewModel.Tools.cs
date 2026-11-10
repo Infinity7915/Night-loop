@@ -110,7 +110,10 @@ public sealed partial class MainViewModel
         if (b.Type is BlockTypes.WaitForImage or BlockTypes.WaitForImageGone || (finds && target == "image") || condition == "imageVisible")
             yield return new(hasImage ? "Capture the picture again" : "Capture image from screen", "image");
         if (finds && target == "image" && hasImage && ClicksPicture(b))
+        {
             yield return new("Set click spot in picture", "clickspot");
+            yield return new("Set click spot on screen", "clickscreen");
+        }
         if (fields.Any(f => f.Key == "region") || condition is "textVisible" or "imageVisible")
             yield return new("Select region on screen", "region");
         if (fields.Any(f => f.Key == "color") || (finds && target == "pixel") || condition == "pixelColor")
@@ -175,6 +178,7 @@ public sealed partial class MainViewModel
                 "image" => await CaptureImageAsync(b),
                 "test" => await TestOnScreenAsync(b),
                 "clickspot" => PickClickSpot(b),
+                "clickscreen" => await PickClickSpotOnScreenAsync(b),
                 _ => false,
             };
             if (!changed) return;
@@ -198,6 +202,23 @@ public sealed partial class MainViewModel
         return true;
     }
 
+    /// <summary>
+    /// "Set click spot on screen": with the picture showing on screen, click anywhere (inside the picture or beside
+    /// it); the spot is saved relative to the picture, so it follows it wherever it is found.
+    /// </summary>
+    private async Task<bool> PickClickSpotOnScreenAsync(Block b)
+    {
+        if (await PickAsync(PickMode.Point, "Click where to click once the picture is found (it must be on screen now)") is not { } r) return false;
+        var spot = DetectProbe.SpotFromScreen(b, r.Shot, r.X, r.Y);
+        if (!spot.Ok)
+        {
+            Status = spot.Message;
+            return false;
+        }
+        StoreClickSpot(b, spot.X, spot.Y);
+        return true;
+    }
+
     /// <summary>The preview in the inspector was clicked: move the click spot there.</summary>
     public void SetClickSpot(double x, double y)
     {
@@ -211,18 +232,7 @@ public sealed partial class MainViewModel
     /// <summary>Saves the spot as whole percents; the middle is left blank, as blocks had it before there was a spot.</summary>
     private void StoreClickSpot(Block b, double x, double y)
     {
-        var px = (int)Math.Round(Math.Clamp(x, 0, 1) * 100);
-        var py = (int)Math.Round(Math.Clamp(y, 0, 1) * 100);
-        if (px == 50 && py == 50)
-        {
-            b.Params.Remove(BlockTypes.ClickXKey);
-            b.Params.Remove(BlockTypes.ClickYKey);
-        }
-        else
-        {
-            b.Params[BlockTypes.ClickXKey] = px;
-            b.Params[BlockTypes.ClickYKey] = py;
-        }
+        var (px, py) = ClickSpot.Write(b, x, y);
         Status = ClickSpotPicker.Describe(px / 100.0, py / 100.0) + " once it is found.";
     }
 

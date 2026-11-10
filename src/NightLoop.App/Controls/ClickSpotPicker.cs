@@ -1,3 +1,4 @@
+using NightLoop.Contracts.MacroDocument;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -179,8 +180,5 @@ public sealed class ClickSpotPicker : Window
     }
 
     /// <summary>"Middle", or how far across and down, for the picker and the inspector.</summary>
-    public static string Describe(double x, double y) =>
-        Math.Abs(x - 0.5) < 0.005 && Math.Abs(y - 0.5) < 0.005
-            ? "Clicks the middle of the picture"
-            : $"Clicks {Math.Round(x * 100)}% across, {Math.Round(y * 100)}% down";
+    public static string Describe(double x, double y) => ClickSpot.Describe(x, y);
 }

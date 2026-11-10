@@ -182,18 +182,19 @@ public static class TemplateMatcher
     /// <paramref name="sizeTolerancePct"/>: how much smaller or bigger it may look (0 = only the captured size);
     /// null looks at every size from <see cref="AutoMinScale"/> to <see cref="AutoMaxScale"/>.
     /// </summary>
-    public static Match? Find(ScreenImage screen, ImageTemplate template, int? sizeTolerancePct = 0, bool matchColor = false)
+    public static Match? Find(ScreenImage screen, ImageTemplate template, int? sizeTolerancePct = 0, bool matchColor = false, bool averageColors = false)
     {
         var (min, max) = sizeTolerancePct is { } pct
             ? (1 - Math.Clamp(pct, 0, MaxSizeTolerancePct) / 100.0, 1 + Math.Clamp(pct, 0, MaxSizeTolerancePct) / 100.0)
             : (AutoMinScale, AutoMaxScale);
-        return Find(screen, template, min, max, matchColor);
+        return Find(screen, template, min, max, matchColor, averageColors);
     }
 
     /// <summary>Best match at any size between <paramref name="minScale"/> and <paramref name="maxScale"/> of the captured one.</summary>
     /// With <paramref name="matchColor"/> (and a picture that has its colors saved), the best spot whose colors match
-    /// too: two things with the same shape but different colors aren't mixed up.
-    public static Match? Find(ScreenImage screen, ImageTemplate template, double minScale, double maxScale, bool matchColor = false)
+    /// too: two things with the same shape but different colors aren't mixed up. <paramref name="averageColors"/> lets a
+    /// dimmer or brighter copy match (lighting in games); without it the colors must match as captured.
+    public static Match? Find(ScreenImage screen, ImageTemplate template, double minScale, double maxScale, bool matchColor = false, bool averageColors = false)
     {
         var hay = new Haystack(ImageTemplate.ToGray(screen), screen.Width, screen.Height);
         var scales = Scales(template, minScale, maxScale, out var step);
@@ -211,7 +212,7 @@ public static class TemplateMatcher
         if (checkColor)
         {
             // The best-shaped spot with the right colors; a same-shaped thing in another color is skipped.
-            var pick = all.FirstOrDefault(f => ColorDistance(screen, template, f) <= ColorLimit);
+            var pick = all.FirstOrDefault(f => ColorDistance(screen, template, f, averageColors) <= ColorLimit);
             if (pick.W > 0) b = pick;
             else colorOk = false;
         }
@@ -224,17 +225,18 @@ public static class TemplateMatcher
                 var s = b.Scale + d;
                 if (s < minScale - 1e-9 || s > maxScale + 1e-9) continue;
                 if (Polish(hay, template, b, s) is { } p && p.Score > b.Score
-                    && (!checkColor || !colorOk || ColorDistance(screen, template, p) <= ColorLimit)) b = p;
+                    && (!checkColor || !colorOk || ColorDistance(screen, template, p, averageColors) <= ColorLimit)) b = p;
             }
         }
         return new Match(screen.Left + b.X + b.W / 2, screen.Top + b.Y + b.H / 2, Math.Max(0, b.Score), b.Scale, colorOk);
     }
 
     /// <summary>
-    /// How different the colors are at a found spot: both are shrunk to a small grid, the screen's brightness is
-    /// evened out to the picture's (lighting changes in games), and the per-channel difference is averaged.
+    /// How different the colors are at a found spot: both are shrunk to a small grid and the per-channel difference is
+    /// averaged. With <paramref name="average"/> the screen's brightness is first evened out to the picture's (lighting
+    /// changes in games), so a dimmer or brighter copy matches too.
     /// </summary>
-    internal static double ColorDistance(ScreenImage screen, ImageTemplate t, (int X, int Y, int W, int H) at)
+    internal static double ColorDistance(ScreenImage screen, ImageTemplate t, (int X, int Y, int W, int H) at, bool average = true)
     {
         if (t.Rgb is not { } want) return 0;
         var gw = Math.Min(t.ColorWidth, Math.Max(1, at.W / 2));
@@ -243,7 +245,7 @@ public static class TemplateMatcher
         var seen = ImageTemplate.ColorThumb(screen, at.X, at.Y, at.W, at.H, gw, gh);
         double sumWant = 0, sumSeen = 0;
         for (var i = 0; i < mine.Length; i++) { sumWant += mine[i]; sumSeen += seen[i]; }
-        var gain = sumSeen < 1 ? 1 : Math.Clamp(sumWant / sumSeen, 0.6, 1.6);
+        var gain = !average || sumSeen < 1 ? 1 : Math.Clamp(sumWant / sumSeen, 0.6, 1.6);
         double total = 0;
         for (var i = 0; i < mine.Length; i += 3)
         {
@@ -254,7 +256,7 @@ public static class TemplateMatcher
         return total / (mine.Length / 3);
     }
 
-    private static double ColorDistance(ScreenImage screen, ImageTemplate t, Found f) => ColorDistance(screen, t, (f.X, f.Y, f.W, f.H));
+    private static double ColorDistance(ScreenImage screen, ImageTemplate t, Found f, bool average) => ColorDistance(screen, t, (f.X, f.Y, f.W, f.H), average);
 
     private static byte[] ResizeRgb(byte[] rgb, int w, int h, int nw, int nh)
     {

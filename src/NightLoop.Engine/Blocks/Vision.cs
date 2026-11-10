@@ -22,7 +22,8 @@ internal sealed record LookFor(
     int? SizeTolerancePct = 0,
     bool MatchColor = false,
     double ClickX = 0.5,
-    double ClickY = 0.5);
+    double ClickY = 0.5,
+    bool AverageColors = false);
 
 /// <summary>Finds text, pictures and colors on screen for the detect blocks and conditions.</summary>
 internal static class Vision
@@ -42,7 +43,7 @@ internal static class Vision
 
             case "image":
                 var template = Template(what.ImageData);
-                var match = TemplateMatcher.Find(image, template, what.SizeTolerancePct, what.MatchColor);
+                var match = TemplateMatcher.Find(image, template, what.SizeTolerancePct, what.MatchColor, what.AverageColors);
                 return match is { } m && m.ColorOk && m.Score * 100 >= what.ConfidencePct ? PointIn(m, template, what) : null;
 
             default:
@@ -64,8 +65,8 @@ internal static class Vision
         var w = Math.Max(1, (int)Math.Round(template.Width * m.Scale));
         var h = Math.Max(1, (int)Math.Round(template.Height * m.Scale));
         var (left, top) = (m.X - w / 2, m.Y - h / 2);
-        return (left + (int)Math.Round(Math.Clamp(what.ClickX, 0, 1) * (w - 1)),
-                top + (int)Math.Round(Math.Clamp(what.ClickY, 0, 1) * (h - 1)));
+        // Outside 0–1 is a spot beside the picture (picked on screen); it keeps the same place relative to it.
+        return (left + (int)Math.Round(what.ClickX * (w - 1)), top + (int)Math.Round(what.ClickY * (h - 1)));
     }
 
     /// <summary>Same, for the editor's test look.</summary>
@@ -73,7 +74,7 @@ internal static class Vision
 
     /// <summary>The best spot for a picture right now, however poor, for the editor's test look to explain a miss.</summary>
     public static TemplateMatcher.Match? BestImageMatch(RunContext ctx, LookFor what) =>
-        TemplateMatcher.Find(ctx.Capture(ctx.AreaFor(what.Region)), Template(what.ImageData), what.SizeTolerancePct, what.MatchColor);
+        TemplateMatcher.Find(ctx.Capture(ctx.AreaFor(what.Region)), Template(what.ImageData), what.SizeTolerancePct, what.MatchColor, what.AverageColors);
 
     /// <summary>Two looks this close together count as the same, steady spot.</summary>
     public const int SteadyPx = 16;

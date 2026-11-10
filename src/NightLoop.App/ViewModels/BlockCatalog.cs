@@ -219,7 +219,7 @@ public static class BlockCatalog
             b => $"\"{b.GetString("text", "")}\" gone · {b.GetString("match", "exact")} · {F.MsOrInfinite(b, "timeoutMs", 10_000)}"),
         new("waitimage", BlockTypes.WaitForImage, "Wait for image", "IMG", "Detect", "Wait until a saved picture shows up on screen.",
             () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 0, ["onFail"] = "continue" },
-            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.MatchColor(), F.Region(),
+            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.MatchColor(), F.AverageColors(), F.Region(),
              F.Timeout(),
              F.OnFail(), F.FailLabel()],
             b => $"{ImageName(b)} · {b.GetInt("confidencePct", 90)}% · {F.MsOrInfinite(b, "timeoutMs", 10_000)}"),
@@ -231,7 +231,7 @@ public static class BlockCatalog
             b => $"{b.GetInt("x", 0)}, {b.GetInt("y", 0)} = {b.GetString("color", "")} · {F.MsOrInfinite(b, "timeoutMs", 5000)}"),
         new("imagegone", BlockTypes.WaitForImageGone, "Image gone", "!IMG", "Detect", "Wait until a saved picture is no longer on screen.",
             () => new() { ["confidencePct"] = 90, ["timeoutMs"] = 0, ["onFail"] = "continue" },
-            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.MatchColor(), F.Region(),
+            [F.Image(), F.Int("confidencePct", "Confidence %", 1, 100), F.SizeTolerance(), F.MatchColor(), F.AverageColors(), F.Region(),
              F.Timeout(),
              F.OnFail(), F.FailLabel()],
             b => $"{ImageName(b)} gone · {b.GetInt("confidencePct", 90)}% · {F.MsOrInfinite(b, "timeoutMs", 10_000)}"),
@@ -632,9 +632,18 @@ internal static class F
     public static FieldDef MatchColor() =>
         YesNo("matchColor", "Match colors", fallback: true, yes: "On", no: "Off") with { Hint = MatchColorHint };
 
+    private const string AverageColorsHint =
+        "On: a dimmer or brighter copy of the picture matches too (the colors are averaged to its brightness first), " +
+        "for games whose lighting changes. Off: the colors must match the picture as you captured it.";
+
+    /// <summary>Picture blocks with Match colors on: let a dimmer or brighter copy match. Off unless turned on.</summary>
+    public static FieldDef AverageColors() =>
+        YesNo(BlockTypes.AverageColorsKey, "Dimmer or brighter", fallback: false, yes: "Also match", no: "Exact colors")
+            with { Hint = AverageColorsHint, ShowIf = b => b.GetBool("matchColor") != false };
+
     private const string ClickSpotHint =
-        "Where inside the picture to click once it is found: 0 is the left (or top) edge, 100 the right (or bottom), " +
-        "blank the middle. Easiest: click the spot on the picture below, or use \"Set click spot in picture\".";
+        "Where to click once the picture is found: 0 is its left (or top) edge, 100 its right (or bottom), blank the " +
+        "middle. Below 0 or above 100 is a spot beside the picture. Easiest: \"Set click spot in picture\" or \"Set click spot on screen\".";
 
     /// <summary>Find &amp; click / Scan &amp; turn: how close a picture or color has to be, shown for the kind being looked for.</summary>
     public static FieldDef[] LookTuning()
@@ -647,9 +656,10 @@ internal static class F
                 hint: "How alike the spot has to be. Lower finds it more easily but may click the wrong thing.") with { ShowIf = b => Is(b, "image") },
             SizeTolerance() with { ShowIf = b => Is(b, "image") },
             MatchColor() with { ShowIf = b => Is(b, "image") },
-            Int(BlockTypes.ClickXKey, "Click spot across %", 0, 100, optional: true, placeholder: "50",
+            AverageColors() with { ShowIf = b => Is(b, "image") && b.GetBool("matchColor") != false },
+            Int(BlockTypes.ClickXKey, "Click spot across %", ClickSpot.MinPct, ClickSpot.MaxPct, optional: true, placeholder: "50",
                 hint: ClickSpotHint) with { ShowIf = b => Is(b, "image") && Clicks(b) },
-            Int(BlockTypes.ClickYKey, "Click spot down %", 0, 100, optional: true, placeholder: "50") with { ShowIf = b => Is(b, "image") && Clicks(b) },
+            Int(BlockTypes.ClickYKey, "Click spot down %", ClickSpot.MinPct, ClickSpot.MaxPct, optional: true, placeholder: "50") with { ShowIf = b => Is(b, "image") && Clicks(b) },
             Int("tolerance", "Color tolerance", 0, 255, optional: true, placeholder: "10",
                 hint: "How far each color channel may be from the one picked.") with { ShowIf = b => Is(b, "pixel") },
         ];
@@ -673,6 +683,19 @@ internal static class F
                     return null;
                 },
                 [new("true", "On"), new("false", "Off")], Hint: MatchColorHint) with { ShowIf = IsImage },
+            new FieldDef("condition." + BlockTypes.AverageColorsKey, "Dimmer or brighter", FieldKind.Choice,
+                b => Conditions.Inner(b.GetObject("condition"))?[BlockTypes.AverageColorsKey] is JsonValue v && v.TryGetValue(out bool on) && on ? "true" : "false",
+                (b, value) =>
+                {
+                    var condition = b.GetObject("condition")?.DeepClone() as JsonObject ?? [];
+                    if (Conditions.Inner(condition) is not { } inner) return null;
+                    if (value == "true") inner[BlockTypes.AverageColorsKey] = true;
+                    else inner.Remove(BlockTypes.AverageColorsKey);
+                    b.Params["condition"] = condition;
+                    return null;
+                },
+                [new("true", "Also match"), new("false", "Exact colors")], Hint: AverageColorsHint)
+                with { ShowIf = b => IsImage(b) && !(Conditions.Inner(b.GetObject("condition"))?["matchColor"] is JsonValue m && m.TryGetValue(out bool mc) && !mc) },
             ConditionInt("sizeTolerancePct", "Size tolerance %", 0, MacroLimits.SizeToleranceMaxPct, "Auto", SizeToleranceHint)
                 with { ShowIf = IsImage, Get = b => AutoSize(BlockParams.AsInt(Conditions.Inner(b.GetObject("condition"))?["sizeTolerancePct"])) },
         ];
