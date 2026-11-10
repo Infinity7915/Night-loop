@@ -172,6 +172,9 @@ public static class TemplateMatcher
     /// <summary>How far colors may be (0–255, per channel, averaged over the picture) for "Match colors".</summary>
     public const int ColorLimit = 45;
 
+    /// <summary>Exact colors (no dimmer or brighter): how far the overall brightness may be off, as a share.</summary>
+    public const double ExactBrightness = 0.06;
+
     /// <summary>Automatic size: from this much of the captured size (far away)…</summary>
     public const double AutoMinScale = 0.3;
     /// <summary>…up to this much (close up).</summary>
@@ -245,6 +248,9 @@ public static class TemplateMatcher
         var seen = ImageTemplate.ColorThumb(screen, at.X, at.Y, at.W, at.H, gw, gh);
         double sumWant = 0, sumSeen = 0;
         for (var i = 0; i < mine.Length; i++) { sumWant += mine[i]; sumSeen += seen[i]; }
+        // Exact colors: the spot must be as bright as the picture (within a few percent for screen noise). The
+        // per-cell difference alone let a copy 30% dimmer through, since a dim copy keeps the same hues.
+        if (!average && BrightnessOff(mine, seen)) return 255;
         var gain = !average || sumSeen < 1 ? 1 : Math.Clamp(sumWant / sumSeen, 0.6, 1.6);
         double total = 0;
         for (var i = 0; i < mine.Length; i += 3)
@@ -254,6 +260,25 @@ public static class TemplateMatcher
             total += d;
         }
         return total / (mine.Length / 3);
+    }
+
+    /// <summary>
+    /// Whether any color channel is more than <see cref="ExactBrightness"/> dimmer or brighter on screen than in the
+    /// picture. Per channel, because a bright channel that is already at full (255) can't get brighter, while the
+    /// others still show it. Channels that are nearly black in the picture are skipped (no brightness to compare).
+    /// </summary>
+    private static bool BrightnessOff(byte[] want, byte[] seen)
+    {
+        for (var c = 0; c < 3; c++)
+        {
+            double w = 0, s = 0;
+            for (var i = c; i < want.Length; i += 3) { w += want[i]; s += seen[i]; }
+            var cells = want.Length / 3;
+            if (w / cells < 12) continue;
+            var ratio = s / w;
+            if (ratio < 1 - ExactBrightness || ratio > 1 + ExactBrightness) return true;
+        }
+        return false;
     }
 
     private static double ColorDistance(ScreenImage screen, ImageTemplate t, Found f, bool average) => ColorDistance(screen, t, (f.X, f.Y, f.W, f.H), average);
