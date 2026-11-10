@@ -362,7 +362,13 @@ public sealed partial class MainViewModel
     private async Task<bool> CaptureImageAsync(Block b)
     {
         if (await PickAsync(PickMode.Region, "Drag over the picture to look for (small and distinctive works best)") is not { } r) return false;
-        var data = ImageTemplate.FromImage(r.Shot.Crop(r.X, r.Y, r.Width, r.Height)).Encode();
+        var picked = ImageTemplate.FromImage(r.Shot.Crop(r.X, r.Y, r.Width, r.Height));
+        if (picked.IsPlain)
+        {
+            Status = "That area is all one plain color, so it would match any plain screen. Drag over something with detail, like an icon or text.";
+            return false;
+        }
+        var data = picked.Encode();
         if (data.Length > MacroLimits.ImageDataMaxLength)
         {
             Status = "That picture is too detailed to save. Drag over a smaller area.";
