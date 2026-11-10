@@ -144,6 +144,9 @@ internal static class Vision
     /// <summary>Whether a saved picture has its colors (pictures captured before 0.6.2 are gray only).</summary>
     public static bool HasColor(string? data) => !string.IsNullOrEmpty(data) && ImageTemplate.TryDecode(data, out var t) && t!.HasColor;
 
+    /// <summary>How much a saved picture was shrunk when picked (1 when it wasn't).</summary>
+    public static double CapturedScale(string? data) => ImageTemplate.TryDecode(data, out var t) && t is not null ? t.CapturedScale : 1;
+
     private static ImageTemplate Template(string? data)
     {
         if (string.IsNullOrEmpty(data)) throw new MacroFaultException("Pick a picture first: use \"Capture image from screen\" on this block.");
