@@ -231,6 +231,7 @@ public static class MacroValidator
             Need(OptIntIn("sizeTolerancePct", 0, MacroLimits.SizeToleranceMaxPct), $"Size tolerance must be 0–{MacroLimits.SizeToleranceMaxPct}%.");
             Need(OptBool("matchColor"), "Match colors must be on or off.");
             Need(OptBool(BlockTypes.AverageColorsKey), "Dimmer or brighter must be on or off.");
+            Need(OptIntIn(BlockTypes.BrightnessKey, Brightness.MinPct, Brightness.MaxPct), $"Brightness range must be {Brightness.MinPct}–{Brightness.MaxPct}%.");
         }
         void OnFail() => Need(OneOf("onFail", FailActions, "continue"), "On fail must be continue, retry, go to label or stop.");
         void AfterFound() => Need(OneOf("afterFound", FoundActions, "next"), "After found must be next block, leave loop, go to label or stop.");
@@ -591,6 +592,8 @@ public static class MacroValidator
                     issues.Add(new(blockId, "Match colors must be on or off."));
                 if (c[BlockTypes.AverageColorsKey] is not null && (c[BlockTypes.AverageColorsKey] as JsonValue)?.TryGetValue(out bool _) != true)
                     issues.Add(new(blockId, "Dimmer or brighter must be on or off."));
+                if (c[BlockTypes.BrightnessKey] is not null && BlockParams.AsInt(c[BlockTypes.BrightnessKey]) is not (>= Brightness.MinPct and <= Brightness.MaxPct))
+                    issues.Add(new(blockId, $"Brightness range must be {Brightness.MinPct}–{Brightness.MaxPct}%."));
                 if (c["sizeTolerancePct"] is not null && BlockParams.AsInt(c["sizeTolerancePct"]) is not (>= 0 and <= MacroLimits.SizeToleranceMaxPct))
                     issues.Add(new(blockId, $"Size tolerance must be 0–{MacroLimits.SizeToleranceMaxPct}%."));
                 break;
