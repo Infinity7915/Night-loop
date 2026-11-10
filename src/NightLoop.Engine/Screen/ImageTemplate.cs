@@ -236,8 +236,8 @@ public static class TemplateMatcher
         return FindAsSaved(screen, template, minScale, maxScale, matchColor, brightnessPct);
     }
 
-    /// <summary>The screen shrunk by <paramref name="by"/>, each pixel the average of the ones it covers. Its corner is 0, 0.</summary>
-    private static ScreenImage Shrunk(ScreenImage screen, double by)
+    /// <summary>The screen shrunk by <paramref name="by"/>, each pixel the average of the ones it covers. Its corner is 0, 0. Apps shrink big picked pictures with this too, so they match the shrunk screen.</summary>
+    public static ScreenImage Shrunk(ScreenImage screen, double by)
     {
         int w = Math.Max(1, (int)Math.Round(screen.Width / by)), h = Math.Max(1, (int)Math.Round(screen.Height / by));
         var src = screen.Bgra;
