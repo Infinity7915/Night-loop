@@ -139,6 +139,12 @@ public static class BlockTypes
 
     /// <summary>Find &amp; click / Scan &amp; turn with a picture: where inside the found picture to click, 0–100 % across.</summary>
     public const string ClickXKey = "clickXPct";
+
+    /// <summary>
+    /// Picture blocks with Match colors on: true lets a dimmer or brighter copy of the picture match (the screen's
+    /// colors are averaged to the picture's brightness first). Missing or false: the colors must match as captured.
+    /// </summary>
+    public const string AverageColorsKey = "averageColors";
     /// <summary>…and 0–100 % down. Both blank = the middle.</summary>
     public const string ClickYKey = "clickYPct";
 

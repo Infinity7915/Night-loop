@@ -190,15 +190,28 @@ public class ColorMatchTests
     }
 
     [Fact]
-    public void Colors_still_match_when_the_game_is_darker()
+    public void Dimmer_or_brighter_on_lets_a_darker_copy_match()
     {
         var shot = new byte[40 * 40 * 4];
         DrawSprite(shot, 40, 0, 0, 40, Red);
         var red = ImageTemplate.FromImage(new ScreenImage(0, 0, 40, 40, shot));
         var px = new byte[200 * 200 * 4];
-        DrawSprite(px, 200, 80, 80, 40, (Red.Item1 * 0.75, Red.Item2 * 0.75, Red.Item3 * 0.75));
-        var m = TemplateMatcher.Find(new ScreenImage(0, 0, 200, 200, px), red, sizeTolerancePct: 0, matchColor: true)!.Value;
-        Assert.True(m.ColorOk);
+        DrawSprite(px, 200, 80, 80, 40, (Red.Item1 * 0.6, Red.Item2 * 0.6, Red.Item3 * 0.6));
+        var screen = new ScreenImage(0, 0, 200, 200, px);
+        Assert.True(TemplateMatcher.Find(screen, red, sizeTolerancePct: 0, matchColor: true, averageColors: true)!.Value.ColorOk);
+        // Off (the default): the colors must match as captured, so the dim copy is not taken for it.
+        Assert.False(TemplateMatcher.Find(screen, red, sizeTolerancePct: 0, matchColor: true)!.Value.ColorOk);
+    }
+
+    [Fact]
+    public void Exact_colors_still_match_the_same_picture()
+    {
+        var shot = new byte[40 * 40 * 4];
+        DrawSprite(shot, 40, 0, 0, 40, Red);
+        var red = ImageTemplate.FromImage(new ScreenImage(0, 0, 40, 40, shot));
+        var px = new byte[200 * 200 * 4];
+        DrawSprite(px, 200, 80, 80, 40, Red);
+        Assert.True(TemplateMatcher.Find(new ScreenImage(0, 0, 200, 200, px), red, sizeTolerancePct: 0, matchColor: true)!.Value.ColorOk);
     }
 
     [Fact]

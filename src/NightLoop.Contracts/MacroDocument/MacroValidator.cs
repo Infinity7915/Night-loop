@@ -230,6 +230,7 @@ public static class MacroValidator
                 "The saved picture is too large. Capture a smaller area.");
             Need(OptIntIn("sizeTolerancePct", 0, MacroLimits.SizeToleranceMaxPct), $"Size tolerance must be 0–{MacroLimits.SizeToleranceMaxPct}%.");
             Need(OptBool("matchColor"), "Match colors must be on or off.");
+            Need(OptBool(BlockTypes.AverageColorsKey), "Dimmer or brighter must be on or off.");
         }
         void OnFail() => Need(OneOf("onFail", FailActions, "continue"), "On fail must be continue, retry, go to label or stop.");
         void AfterFound() => Need(OneOf("afterFound", FoundActions, "next"), "After found must be next block, leave loop, go to label or stop.");
@@ -239,7 +240,8 @@ public static class MacroValidator
 
         if (b.Type is BlockTypes.FindClick or BlockTypes.ScanTurn or BlockTypes.SwipeScan or BlockTypes.WalkTo or BlockTypes.WaitForImage)
         {
-            Need(OptIntIn(BlockTypes.ClickXKey, 0, 100) && OptIntIn(BlockTypes.ClickYKey, 0, 100), "The click spot must be 0–100% across and down the picture.");
+            Need(OptIntIn(BlockTypes.ClickXKey, ClickSpot.MinPct, ClickSpot.MaxPct) && OptIntIn(BlockTypes.ClickYKey, ClickSpot.MinPct, ClickSpot.MaxPct),
+                $"The click spot must be {ClickSpot.MinPct}–{ClickSpot.MaxPct}% across and down the picture.");
         }
 
         if (BlockTypes.HasWaitAfterClick(b.Type))
@@ -587,6 +589,8 @@ public static class MacroValidator
                     issues.Add(new(blockId, "Confidence must be 1–100%."));
                 if (c["matchColor"] is not null && (c["matchColor"] as JsonValue)?.TryGetValue(out bool _) != true)
                     issues.Add(new(blockId, "Match colors must be on or off."));
+                if (c[BlockTypes.AverageColorsKey] is not null && (c[BlockTypes.AverageColorsKey] as JsonValue)?.TryGetValue(out bool _) != true)
+                    issues.Add(new(blockId, "Dimmer or brighter must be on or off."));
                 if (c["sizeTolerancePct"] is not null && BlockParams.AsInt(c["sizeTolerancePct"]) is not (>= 0 and <= MacroLimits.SizeToleranceMaxPct))
                     issues.Add(new(blockId, $"Size tolerance must be 0–{MacroLimits.SizeToleranceMaxPct}%."));
                 break;

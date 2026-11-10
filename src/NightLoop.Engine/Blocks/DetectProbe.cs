@@ -10,6 +10,9 @@ namespace NightLoop.Engine.Blocks;
 /// <summary>What one test look found. Point is on the screen, when there is one.</summary>
 public sealed record ProbeResult(bool Found, string Message, (int X, int Y)? Point = null);
 
+/// <summary>A click spot picked on the screen: shares of the found picture (outside 0–1 = beside it), or why not.</summary>
+public sealed record ClickSpotPick(bool Ok, string Message, double X = 0.5, double Y = 0.5);
+
 /// <summary>
 /// "Test on screen now" in the block editor: looks once for what a Detect block or an If / Repeat until condition is
 /// set up to find, without clicking, turning or waiting. No input is sent.
@@ -41,6 +44,29 @@ public static class DetectProbe
         {
             return new ProbeResult(false, ex.Message);
         }
+    }
+
+    /// <summary>
+    /// "Set click spot on screen": finds the block's picture in <paramref name="shot"/> and turns the screen point
+    /// that was picked into the block's click spot, so it can be anywhere on screen, not only inside the picture. The
+    /// spot keeps its place next to the picture (and scales with it) wherever the picture is found later.
+    /// </summary>
+    public static ClickSpotPick SpotFromScreen(Block b, ScreenImage shot, int x, int y)
+    {
+        var what = b.Type is BlockTypes.FindClick or BlockTypes.ScanTurn ? DetectBlocksLook.Target(b) : DetectBlocksLook.Picture(b);
+        if (what.ImageData is not { Length: > 0 } data || !ImageTemplate.TryDecode(data, out var t) || t is null)
+            return new(false, "Capture the picture first.");
+        var m = TemplateMatcher.Find(shot, t, what.SizeTolerancePct, what.MatchColor, what.AverageColors);
+        if (m is not { } found || found.Score * 100 < what.ConfidencePct || !found.ColorOk)
+            return new(false, "The picture isn't on screen right now. Show it on screen, then pick the spot again.");
+        var w = Math.Max(1, (int)Math.Round(t.Width * found.Scale));
+        var h = Math.Max(1, (int)Math.Round(t.Height * found.Scale));
+        var (left, top) = (found.X - w / 2, found.Y - h / 2);
+        var sx = w > 1 ? (x - left) / (double)(w - 1) : 0.5;
+        var sy = h > 1 ? (y - top) / (double)(h - 1) : 0.5;
+        if (sx * 100 < ClickSpot.MinPct || sx * 100 > ClickSpot.MaxPct || sy * 100 < ClickSpot.MinPct || sy * 100 > ClickSpot.MaxPct)
+            return new(false, "That spot is too far from the picture (at most 10 picture widths away). Pick a spot closer to it.");
+        return new(true, "", sx, sy);
     }
 
     private static async Task<ProbeResult> FindAsync(RunContext ctx, LookFor what)

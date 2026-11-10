@@ -683,10 +683,21 @@ public class PlaybackTests
     }
 
     [Fact]
-    public void Click_spot_outside_the_picture_is_refused()
+    public void Click_spot_beside_the_picture_is_allowed_up_to_ten_widths()
     {
-        var doc = new MacroBuilder().Add(BlockTypes.FindClick, new() { ["target"] = "image", ["clickXPct"] = 101 }).Build();
-        Assert.Contains(MacroValidator.Validate(doc), i => i.Message.Contains("click spot"));
+        var beside = new MacroBuilder().Add(BlockTypes.FindClick, new() { ["target"] = "image", ["clickXPct"] = 250, ["clickYPct"] = -40 }).Build();
+        Assert.DoesNotContain(MacroValidator.Validate(beside), i => i.Message.Contains("click spot"));
+        var tooFar = new MacroBuilder().Add(BlockTypes.FindClick, new() { ["target"] = "image", ["clickXPct"] = ClickSpot.MaxPct + 1 }).Build();
+        Assert.Contains(MacroValidator.Validate(tooFar), i => i.Message.Contains("click spot"));
+    }
+
+    [Fact]
+    public void Click_spot_beside_the_picture_moves_and_scales_with_it()
+    {
+        var template = ImageTemplate.FromImage(new ScreenImage(0, 0, 24, 24, new byte[24 * 24 * 4]));
+        // Found at twice its size, middle at 200,100: 48 px square from 176,76. 200% across = 2 widths right of its left edge.
+        var what = new LookFor("image", "", ClickX: 2, ClickY: -0.5);
+        Assert.Equal((176 + 94, 76 - 24), Vision.PointIn(new TemplateMatcher.Match(200, 100, 1, 2), template, what));
     }
 
     [Fact]
