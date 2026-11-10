@@ -16,9 +16,12 @@ public sealed class ImageTemplate
     public const int ColorSide = 16;
     /// <summary>Largest side the app saves. Bigger captures are refused with a hint to pick a smaller area.</summary>
     public const int MaxSide = 200;
+    /// <summary>The most a picture is shrunk to fit <see cref="MaxSide"/> (a 2000 px box).</summary>
+    public const double MaxCapturedScale = 10;
 
-    private ImageTemplate(int width, int height, byte[] gray, int colorWidth = 0, int colorHeight = 0, byte[]? rgb = null)
+    private ImageTemplate(int width, int height, byte[] gray, int colorWidth = 0, int colorHeight = 0, byte[]? rgb = null, double capturedScale = 1)
     {
+        CapturedScale = capturedScale;
         Width = width;
         Height = height;
         Gray = gray;
@@ -33,18 +36,26 @@ public sealed class ImageTemplate
     public int ColorHeight { get; }
     public bool HasColor => Rgb is not null;
 
+    /// <summary>
+    /// How much bigger the picture is on screen than saved: a box bigger than <see cref="MaxSide"/> is shrunk to fit
+    /// (on phones), and this says by how much, so it's looked for at its real size. 1 for everything else.
+    /// </summary>
+    public double CapturedScale { get; }
+
     public int Width { get; }
     public int Height { get; }
     /// <summary>One byte per pixel, top row first.</summary>
     public byte[] Gray { get; }
 
-    public static ImageTemplate FromImage(ScreenImage image)
+    /// <param name="capturedScale">How much <paramref name="image"/> was shrunk from the screen to fit <see cref="MaxSide"/>.</param>
+    public static ImageTemplate FromImage(ScreenImage image, double capturedScale = 1)
     {
         if (image.Width > MaxSide || image.Height > MaxSide)
             throw new ArgumentException($"Pictures can be at most {MaxSide}×{MaxSide} px.", nameof(image));
         var cw = Math.Min(ColorSide, image.Width);
         var ch = Math.Min(ColorSide, image.Height);
-        return new ImageTemplate(image.Width, image.Height, ToGray(image), cw, ch, ColorThumb(image, 0, 0, image.Width, image.Height, cw, ch));
+        return new ImageTemplate(image.Width, image.Height, ToGray(image), cw, ch, ColorThumb(image, 0, 0, image.Width, image.Height, cw, ch),
+            Math.Clamp(capturedScale, 1, MaxCapturedScale));
     }
 
     /// <summary>Area-averaged RGB of part of an image, shrunk to <paramref name="cw"/>×<paramref name="ch"/>.</summary>
@@ -91,6 +102,13 @@ public sealed class ImageTemplate
                 z.WriteByte((byte)ColorWidth);
                 z.WriteByte((byte)ColorHeight);
                 z.Write(Rgb);
+                // Shrunk pictures add how much (in hundredths) at the end; older apps stop reading before it.
+                if (CapturedScale > 1.005)
+                {
+                    var pct = (int)Math.Round(CapturedScale * 100);
+                    z.WriteByte((byte)(pct >> 8));
+                    z.WriteByte((byte)pct);
+                }
             }
         }
         return (Rgb is null ? Prefix : ColorPrefix) + Convert.ToBase64String(raw.ToArray());
@@ -123,7 +141,10 @@ public sealed class ImageTemplate
             if (size[0] is < 1 or > ColorSide || size[1] is < 1 or > ColorSide) return false;
             var rgb = new byte[size[0] * size[1] * 3];
             z.ReadExactly(rgb);
-            template = new ImageTemplate(w, h, gray, size[0], size[1], rgb);
+            Span<byte> scale = stackalloc byte[2];
+            var captured = z.ReadAtLeast(scale, 2, throwOnEndOfStream: false) == 2
+                ? Math.Clamp(((scale[0] << 8) | scale[1]) / 100.0, 1, MaxCapturedScale) : 1;
+            template = new ImageTemplate(w, h, gray, size[0], size[1], rgb, captured);
             return true;
         }
         catch (Exception ex) when (ex is FormatException or InvalidDataException or EndOfStreamException)
@@ -197,6 +218,51 @@ public static class TemplateMatcher
     /// too: two things with the same shape but different colors aren't mixed up. <paramref name="brightnessPct"/> is how
     /// much dimmer or brighter than captured a copy may be (lighting in games); null evens the brightness out instead.
     public static Match? Find(ScreenImage screen, ImageTemplate template, double minScale, double maxScale, bool matchColor = false, int? brightnessPct = Brightness.DefaultPct)
+    {
+        // A picture shrunk when it was saved: shrink the screen the same way, look, and give the spot back in screen
+        // pixels. Its Scale is then the size on screen compared with the saved picture, as for any other picture.
+        var shrink = template.CapturedScale;
+        if (shrink > 1.005)
+        {
+            var small = Shrunk(screen, shrink);
+            if (FindAsSaved(small, template, minScale, maxScale, matchColor, brightnessPct) is not { } m) return null;
+            return m with
+            {
+                X = screen.Left + (int)Math.Round((m.X + 0.5) * screen.Width / small.Width),
+                Y = screen.Top + (int)Math.Round((m.Y + 0.5) * screen.Height / small.Height),
+                Scale = m.Scale * screen.Width / small.Width,
+            };
+        }
+        return FindAsSaved(screen, template, minScale, maxScale, matchColor, brightnessPct);
+    }
+
+    /// <summary>The screen shrunk by <paramref name="by"/>, each pixel the average of the ones it covers. Its corner is 0, 0. Apps shrink big picked pictures with this too, so they match the shrunk screen.</summary>
+    public static ScreenImage Shrunk(ScreenImage screen, double by)
+    {
+        int w = Math.Max(1, (int)Math.Round(screen.Width / by)), h = Math.Max(1, (int)Math.Round(screen.Height / by));
+        var src = screen.Bgra;
+        var px = new byte[w * h * 4];
+        for (var y = 0; y < h; y++)
+        {
+            int y0 = y * screen.Height / h, y1 = Math.Max(y0 + 1, (y + 1) * screen.Height / h);
+            for (var x = 0; x < w; x++)
+            {
+                int x0 = x * screen.Width / w, x1 = Math.Max(x0 + 1, (x + 1) * screen.Width / w);
+                long b = 0, g = 0, r = 0, n = 0;
+                for (var sy = y0; sy < y1; sy++)
+                for (var sx = x0; sx < x1; sx++)
+                {
+                    var i = (sy * screen.Width + sx) * 4;
+                    b += src[i]; g += src[i + 1]; r += src[i + 2]; n++;
+                }
+                var o = (y * w + x) * 4;
+                px[o] = (byte)(b / n); px[o + 1] = (byte)(g / n); px[o + 2] = (byte)(r / n); px[o + 3] = 255;
+            }
+        }
+        return new ScreenImage(0, 0, w, h, px);
+    }
+
+    private static Match? FindAsSaved(ScreenImage screen, ImageTemplate template, double minScale, double maxScale, bool matchColor, int? brightnessPct)
     {
         var hay = new Haystack(ImageTemplate.ToGray(screen), screen.Width, screen.Height);
         var scales = Scales(template, minScale, maxScale, out var step);

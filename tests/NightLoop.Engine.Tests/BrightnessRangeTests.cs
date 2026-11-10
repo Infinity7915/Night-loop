@@ -80,3 +80,76 @@ public class BrightnessRangeTests(ITestOutputHelper o)
         Assert.Equal(0, wrong);
     }
 }
+
+/// <summary>Phones shrink a picture bigger than 200 px to fit; it must still be found at its real size.</summary>
+public class ShrunkPictureTests
+{
+    static byte[] Scene(int w, int h, int ox, int oy, int size)
+    {
+        var px = new byte[w * h * 4];
+        for (var i = 0; i < px.Length; i += 4) { px[i] = 245; px[i + 1] = 245; px[i + 2] = 245; px[i + 3] = 255; }
+        for (var y = 0; y < size / 4; y++)
+        for (var x = 0; x < size; x++)
+        {
+            var i = ((oy + y) * w + ox + x) * 4;
+            var edge = y < 3 || y >= size / 4 - 3 || x < 3 || x >= size - 3;
+            var icon = Math.Pow(x - size / 10.0, 2) + Math.Pow(y - size / 8.0, 2) < Math.Pow(size / 25.0, 2);
+            var v = (byte)(edge || icon ? 90 : 225 - x * 60 / size);
+            px[i] = v; px[i + 1] = (byte)(v + 5); px[i + 2] = v; px[i + 3] = 255;
+        }
+        return px;
+    }
+
+    static ScreenImage Shrink(ScreenImage image, out double scale)
+    {
+        scale = Math.Max((double)image.Width / ImageTemplate.MaxSide, (double)image.Height / ImageTemplate.MaxSide);
+        int w = (int)(image.Width / scale), h = (int)(image.Height / scale);
+        // Like the phone app: each pixel the average of the ones it covers.
+        var px = new byte[w * h * 4];
+        for (var y = 0; y < h; y++)
+        for (var x = 0; x < w; x++)
+        {
+            int x0 = x * image.Width / w, x1 = Math.Max(x0 + 1, (x + 1) * image.Width / w);
+            int y0 = y * image.Height / h, y1 = Math.Max(y0 + 1, (y + 1) * image.Height / h);
+            for (var c = 0; c < 4; c++)
+            {
+                long sum = 0;
+                for (var sy = y0; sy < y1; sy++) for (var sx = x0; sx < x1; sx++) sum += image.Bgra[(sy * image.Width + sx) * 4 + c];
+                px[(y * w + x) * 4 + c] = (byte)(sum / ((x1 - x0) * (y1 - y0)));
+            }
+        }
+        return new ScreenImage(0, 0, w, h, px);
+    }
+
+    [Fact]
+    public void A_shrunk_picture_is_found_at_its_real_size_and_not_on_a_plain_screen()
+    {
+        const int W = 1080, H = 900, Size = 800;
+        var screen = new ScreenImage(0, 0, W, H, Scene(W, H, 140, 300, Size));
+        var crop = new byte[Size * (Size / 4) * 4];
+        for (var y = 0; y < Size / 4; y++) Array.Copy(screen.Bgra, ((300 + y) * W + 140) * 4, crop, y * Size * 4, Size * 4);
+        var small = Shrink(new ScreenImage(0, 0, Size, Size / 4, crop), out var scale);
+        Assert.True(ImageTemplate.TryDecode(ImageTemplate.FromImage(small, scale).Encode(), out var t));
+        Assert.InRange(t!.CapturedScale, scale - 0.01, scale + 0.01);
+
+        var m = TemplateMatcher.Find(screen, t, sizeTolerancePct: 0, matchColor: true)!.Value;
+        Assert.True(m.Score >= 0.9 && m.ColorOk, m.ToString());
+        Assert.InRange(m.X, 140 + Size / 2 - 8, 140 + Size / 2 + 8);
+        Assert.InRange(m.Y, 300 + Size / 8 - 8, 300 + Size / 8 + 8);
+        Assert.InRange(t.Width * m.Scale, Size - 10, Size + 10);
+
+        var plain = new byte[W * H * 4];
+        for (var i = 0; i < plain.Length; i++) plain[i] = (byte)(i % 4 == 3 ? 255 : 245);
+        var none = TemplateMatcher.Find(new ScreenImage(0, 0, W, H, plain), t, sizeTolerancePct: 0, matchColor: true);
+        Assert.False(none is { } n && n.Score >= 0.9 && n.ColorOk);
+    }
+
+    [Fact]
+    public void Pictures_without_a_size_note_read_as_not_shrunk()
+    {
+        var px = new byte[20 * 20 * 4];
+        for (var i = 0; i < px.Length; i++) px[i] = (byte)(i * 7);
+        Assert.True(ImageTemplate.TryDecode(ImageTemplate.FromImage(new ScreenImage(0, 0, 20, 20, px)).Encode(), out var t));
+        Assert.Equal(1, t!.CapturedScale);
+    }
+}

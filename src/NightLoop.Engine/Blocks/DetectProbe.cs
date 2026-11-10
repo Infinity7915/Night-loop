@@ -87,7 +87,8 @@ public static class DetectProbe
         if (Vision.BestImageMatch(ctx, what) is not { } m) return new ProbeResult(false, "The picture is bigger than the area to look in.");
         var score = (int)Math.Floor(m.Score * 100);
         var at = Vision.PointIn(m, what);
-        var size = Math.Abs(m.Scale - 1) < 0.005 ? "" : $" at {Math.Round(m.Scale * 100)}% of its size";
+        var shown = m.Scale / Vision.CapturedScale(what.ImageData); // compared with how it was picked
+        var size = Math.Abs(shown - 1) < 0.005 ? "" : $" at {Math.Round(shown * 100)}% of its size";
         if (!m.ColorOk && score >= what.ConfidencePct)
             return new ProbeResult(false, $"Found the shape{size} ({score}% alike), but not in the picture's colors. Match colors is on, so it won't click a different-colored one.", at);
         if (score >= what.ConfidencePct)
