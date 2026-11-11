@@ -45,7 +45,7 @@ internal static class Vision
             case "image":
                 var template = Template(what.ImageData);
                 var match = TemplateMatcher.Find(image, template, what.SizeTolerancePct, what.MatchColor, what.BrightnessPct);
-                return match is { } m && m.ColorOk && m.Score * 100 >= what.ConfidencePct ? PointIn(m, template, what) : null;
+                return match is { } m && m.ColorOk && AlikeEnough(m.Score, what.ConfidencePct) ? PointIn(m, template, what) : null;
 
             default:
                 var reader = ctx.Environment.Text
@@ -54,6 +54,15 @@ internal static class Vision
                 return TextSearch.Find(lines, what.Value, what.Contains, what.MatchCase)?.Center;
         }
     }
+
+    /// <summary>A match score as the whole percent the editor shows (0.996 is 100%).</summary>
+    public static int Percent(double score) => (int)Math.Round(Math.Clamp(score, 0, 1) * 100, MidpointRounding.AwayFromZero);
+
+    /// <summary>
+    /// Whether a picture found is alike enough for the block's Confidence. Compared in whole percents like the editor
+    /// shows them, so 100% means "looks the same", not every last pixel identical (which almost never happens).
+    /// </summary>
+    public static bool AlikeEnough(double score, int confidencePct) => Percent(score) >= confidencePct;
 
     /// <summary>
     /// The block's chosen spot inside a found picture. The picture may be found smaller or bigger than captured, so

@@ -362,7 +362,8 @@ public sealed partial class MainViewModel
     private async Task<bool> CaptureImageAsync(Block b)
     {
         if (await PickAsync(PickMode.Region, "Drag over the picture to look for (small and distinctive works best)") is not { } r) return false;
-        var picked = ImageTemplate.FromImage(r.Shot.Crop(r.X, r.Y, r.Width, r.Height));
+        // A box bigger than 200 px is shrunk to fit and remembers its real size (it used to be refused).
+        var picked = ImageTemplate.FromBox(r.Shot.Crop(r.X, r.Y, r.Width, r.Height));
         if (picked.IsPlain)
         {
             Status = "That area is all one plain color, so it would match any plain screen. Drag over something with detail, like an icon or text.";

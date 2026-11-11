@@ -14,14 +14,17 @@ public sealed class ImageTemplate
     private const string ColorPrefix = "nl2:";
     /// <summary>The color copy is at most this many pixels a side: enough to tell a red coin from a blue one.</summary>
     public const int ColorSide = 16;
-    /// <summary>Largest side the app saves. Bigger captures are refused with a hint to pick a smaller area.</summary>
+    /// <summary>Largest side a saved picture has. A bigger box is shrunk to fit (see <see cref="FromBox"/>).</summary>
     public const int MaxSide = 200;
-    /// <summary>The most a picture is shrunk to fit <see cref="MaxSide"/> (a 2000 px box).</summary>
-    public const double MaxCapturedScale = 10;
+    /// <summary>The most a picture is shrunk to fit <see cref="MaxSide"/> (a 4000 px box).</summary>
+    public const double MaxCapturedScale = 20;
 
-    private ImageTemplate(int width, int height, byte[] gray, int colorWidth = 0, int colorHeight = 0, byte[]? rgb = null, double capturedScale = 1)
+    private ImageTemplate(int width, int height, byte[] gray, int colorWidth = 0, int colorHeight = 0, byte[]? rgb = null, double capturedScale = 1,
+        int boxWidth = 0, int boxHeight = 0)
     {
         CapturedScale = capturedScale;
+        BoxWidth = boxWidth;
+        BoxHeight = boxHeight;
         Width = width;
         Height = height;
         Gray = gray;
@@ -41,6 +44,14 @@ public sealed class ImageTemplate
     /// (on phones), and this says by how much, so it's looked for at its real size. 1 for everything else.
     /// </summary>
     public double CapturedScale { get; }
+
+    /// <summary>
+    /// For a shrunk picture: the exact size of the box it was picked from, in screen pixels (0 when not known: not
+    /// shrunk, or saved before 0.10.12). The matcher uses it to line the screen's pixels up with the picture's.
+    /// </summary>
+    public int BoxWidth { get; }
+    /// <inheritdoc cref="BoxWidth"/>
+    public int BoxHeight { get; }
 
     public int Width { get; }
     public int Height { get; }
@@ -75,6 +86,21 @@ public sealed class ImageTemplate
         var ch = Math.Min(ColorSide, image.Height);
         return new ImageTemplate(image.Width, image.Height, ToGray(image), cw, ch, ColorThumb(image, 0, 0, image.Width, image.Height, cw, ch),
             Math.Clamp(capturedScale, 1, MaxCapturedScale));
+    }
+
+    /// <summary>
+    /// The picture of a box picked on screen. A box bigger than <see cref="MaxSide"/> is shrunk to fit, the same way the
+    /// matcher shrinks the screen, and remembers its exact size so it's looked for at the size it really is on screen.
+    /// </summary>
+    public static ImageTemplate FromBox(ScreenImage box)
+    {
+        if (box.Width <= MaxSide && box.Height <= MaxSide) return FromImage(box);
+        var by = Math.Max((double)box.Width / MaxSide, (double)box.Height / MaxSide);
+        if (by > MaxCapturedScale)
+            throw new ArgumentException($"Pick a smaller area (at most {MaxSide * MaxCapturedScale:0} px a side).");
+        var small = TemplateMatcher.Shrunk(box, by);
+        var t = FromImage(small, (double)box.Width / small.Width);
+        return new ImageTemplate(t.Width, t.Height, t.Gray, t.ColorWidth, t.ColorHeight, t.Rgb, t.CapturedScale, box.Width, box.Height);
     }
 
     /// <summary>Area-averaged RGB of part of an image, shrunk to <paramref name="cw"/>×<paramref name="ch"/>.</summary>
@@ -121,12 +147,20 @@ public sealed class ImageTemplate
                 z.WriteByte((byte)ColorWidth);
                 z.WriteByte((byte)ColorHeight);
                 z.Write(Rgb);
-                // Shrunk pictures add how much (in hundredths) at the end; older apps stop reading before it.
-                if (CapturedScale > 1.005)
+                // Shrunk pictures add how much (in hundredths) at the end, then (0.10.12+) the exact box size. Older
+                // apps stop reading after what they know.
+                if (CapturedScale > 1.005 || BoxWidth > 0)
                 {
                     var pct = (int)Math.Round(CapturedScale * 100);
                     z.WriteByte((byte)(pct >> 8));
                     z.WriteByte((byte)pct);
+                    if (BoxWidth > 0)
+                    {
+                        z.WriteByte((byte)(BoxWidth >> 8));
+                        z.WriteByte((byte)BoxWidth);
+                        z.WriteByte((byte)(BoxHeight >> 8));
+                        z.WriteByte((byte)BoxHeight);
+                    }
                 }
             }
         }
@@ -161,9 +195,22 @@ public sealed class ImageTemplate
             var rgb = new byte[size[0] * size[1] * 3];
             z.ReadExactly(rgb);
             Span<byte> scale = stackalloc byte[2];
-            var captured = z.ReadAtLeast(scale, 2, throwOnEndOfStream: false) == 2
-                ? Math.Clamp(((scale[0] << 8) | scale[1]) / 100.0, 1, MaxCapturedScale) : 1;
-            template = new ImageTemplate(w, h, gray, size[0], size[1], rgb, captured);
+            if (z.ReadAtLeast(scale, 2, throwOnEndOfStream: false) < 2)
+            {
+                template = new ImageTemplate(w, h, gray, size[0], size[1], rgb);
+                return true;
+            }
+            var captured = Math.Clamp(((scale[0] << 8) | scale[1]) / 100.0, 1, MaxCapturedScale);
+            Span<byte> box = stackalloc byte[4];
+            int bw = 0, bh = 0;
+            if (z.ReadAtLeast(box, 4, throwOnEndOfStream: false) == 4)
+            {
+                (bw, bh) = ((box[0] << 8) | box[1], (box[2] << 8) | box[3]);
+                // Only a box the picture could have been shrunk from counts.
+                if (bw < w || bh < h || bw > w * MaxCapturedScale + 1 || bh > h * MaxCapturedScale + 1) (bw, bh) = (0, 0);
+                else captured = Math.Clamp((double)bw / w, 1, MaxCapturedScale);
+            }
+            template = new ImageTemplate(w, h, gray, size[0], size[1], rgb, captured, bw, bh);
             return true;
         }
         catch (Exception ex) when (ex is FormatException or InvalidDataException or EndOfStreamException)
@@ -238,21 +285,229 @@ public static class TemplateMatcher
     /// much dimmer or brighter than captured a copy may be (lighting in games); null evens the brightness out instead.
     public static Match? Find(ScreenImage screen, ImageTemplate template, double minScale, double maxScale, bool matchColor = false, int? brightnessPct = Brightness.DefaultPct)
     {
-        // A picture shrunk when it was saved: shrink the screen the same way, look, and give the spot back in screen
-        // pixels. Its Scale is then the size on screen compared with the saved picture, as for any other picture.
+        double? range = brightnessPct is { } pct ? Math.Clamp(pct, Brightness.MinPct, Brightness.MaxPct) / 100.0 : null;
+        // A picture shrunk when it was saved: shrink the screen the same way, look, then line the find up on the real
+        // screen. Its Scale is then the size on screen compared with the saved picture, as for any other picture.
         var shrink = template.CapturedScale;
         if (shrink > 1.005)
         {
             var small = Shrunk(screen, shrink);
-            if (FindAsSaved(small, template, minScale, maxScale, matchColor, brightnessPct) is not { } m) return null;
-            return m with
-            {
-                X = screen.Left + (int)Math.Round((m.X + 0.5) * screen.Width / small.Width),
-                Y = screen.Top + (int)Math.Round((m.Y + 0.5) * screen.Height / small.Height),
-                Scale = m.Scale * screen.Width / small.Width,
-            };
+            // Colors on the shrunk screen are only roughly right (its pixels don't line up with the picture's), so
+            // they only choose which find to line up; the lined-up box is checked properly.
+            return Best(small, template, minScale, maxScale, matchColor, range, LooseLevels) is { } coarse
+                ? LineUp(screen, small, template, coarse, matchColor && template.HasColor, range)
+                : null;
         }
-        return FindAsSaved(screen, template, minScale, maxScale, matchColor, brightnessPct);
+        return Best(screen, template, minScale, maxScale, matchColor, range, NoiseLevels) is { } r ? ToMatch(screen, r.Box, r.ColorOk) : null;
+    }
+
+    private static Match ToMatch(ScreenImage screen, Found b, bool colorOk) =>
+        new(screen.Left + b.X + b.W / 2, screen.Top + b.Y + b.H / 2, Math.Max(0, b.Score), b.Scale, colorOk);
+
+    /// <summary>
+    /// A shrunk picture's pixels each cover a few screen pixels, starting wherever its box started when it was
+    /// picked. The shrunk screen's pixels start at the screen's corner instead, so they line up with the picture's only
+    /// by chance, and text or fine detail then scores far lower than it should (0.86 for the same text on the same
+    /// screen). This shrinks the screen again around the find, starting at each nearby pixel (and, without the box's
+    /// exact size, at a pixel more or less wide and high), and keeps the best: the same thing then scores ~1.
+    /// </summary>
+    private static Match LineUp(ScreenImage screen, ScreenImage small, ImageTemplate t, (Found Box, bool ColorOk) coarse, bool checkColor, double? range)
+    {
+        var b = coarse.Box;
+        double sx = (double)screen.Width / small.Width, sy = (double)screen.Height / small.Height;
+        // The size it was picked at (exact when the picture knows its box), and the size the shrunk look found.
+        var saved = t.BoxWidth > 0 ? (W: t.BoxWidth, H: t.BoxHeight)
+            : (W: (int)Math.Round(t.Width * t.CapturedScale), H: (int)Math.Round(t.Height * t.CapturedScale));
+        var seen = Math.Abs(b.Scale - 1) < 1e-9 ? saved : (W: (int)Math.Round(b.W * sx), H: (int)Math.Round(b.H * sy));
+        // A size close to the saved one is most likely the saved one (the shrunk look can't tell a few pixels apart).
+        var sizes = seen == saved || Math.Abs(b.Scale - 1) > 0.1 ? new[] { seen } : new[] { seen, saved };
+        var cx0 = (b.X + b.W / 2.0) * sx;
+        var cy0 = (b.Y + b.H / 2.0) * sy;
+        var reach = (int)Math.Ceiling(Math.Max(sx, sy)) + 1;
+        var step = Math.Max(1, (int)(Math.Max(sx, sy) / 2));
+        // Without the exact box (pictures saved before 0.10.12), its short side is only known to about half a shrunk
+        // pixel, and its long side to a pixel.
+        var grow = t.BoxWidth > 0 ? 1 : 1 + (int)Math.Ceiling(t.CapturedScale / 2);
+        var margin = reach + step + grow + 2;
+        var span = (W: Math.Max(seen.W, saved.W), H: Math.Max(seen.H, saved.H));
+        var near = new Region(screen, (int)(cx0 - span.W / 2.0) - margin, (int)(cy0 - span.H / 2.0) - margin, span.W + 2 * margin + grow, span.H + 2 * margin + grow);
+        var needle = new Needle(t.Gray, t.Width, t.Height);
+
+        var best = (X: 0, Y: 0, W: 0, H: 0, Score: double.MinValue);
+        void Try(int x, int y, int w, int h)
+        {
+            if (x < near.Left || y < near.Top || x + w > near.Right || y + h > near.Bottom || w < t.Width || h < t.Height) return;
+            var score = near.Score(x, y, w, h, needle);
+            if (score > best.Score) best = (x, y, w, h, score);
+        }
+        foreach (var (bw, bh) in sizes)
+        {
+            // Every start a shrunk pixel or so around the find; far-shrunk pictures first every few pixels, then each.
+            var x0 = (int)Math.Round(cx0 - bw / 2.0);
+            var y0 = (int)Math.Round(cy0 - bh / 2.0);
+            var before = best;
+            best = (0, 0, 0, 0, double.MinValue);
+            for (var dy = -reach; dy <= reach; dy += step)
+            for (var dx = -reach; dx <= reach; dx += step)
+                Try(x0 + dx, y0 + dy, bw, bh);
+            if (step > 1 && best.W > 0)
+            {
+                var (cx, cy) = (best.X, best.Y);
+                for (var dy = -step; dy <= step; dy++)
+                for (var dx = -step; dx <= step; dx++)
+                    Try(cx + dx, cy + dy, bw, bh);
+            }
+            if (before.Score > best.Score) best = before;
+        }
+        if (best.W == 0) return Coarse();
+        if (t.BoxWidth == 0 || (best.W, best.H) != saved)
+        {
+            // Not the exact box: try it a little wider, then higher, then a pixel either way of both.
+            var (cx, cy, cw, ch) = (best.X, best.Y, best.W, best.H);
+            for (var dw = -grow; dw <= grow; dw++)
+            for (var dx = -1; dx <= 1; dx++)
+                Try(cx + dx, cy, cw + dw, ch);
+            (cx, cy, cw, ch) = (best.X, best.Y, best.W, best.H);
+            for (var dh = -grow; dh <= grow; dh++)
+            for (var dy = -1; dy <= 1; dy++)
+                Try(cx, cy + dy, cw, ch + dh);
+            (cx, cy, cw, ch) = (best.X, best.Y, best.W, best.H);
+            for (var dh = -1; dh <= 1; dh++)
+            for (var dw = -1; dw <= 1; dw++)
+            for (var dy = -1; dy <= 1; dy++)
+            for (var dx = -1; dx <= 1; dx++)
+                Try(cx + dx, cy + dy, cw + dw, ch + dh);
+        }
+        if (best.Score < b.Score) return Coarse();
+
+        // Colors are checked on the lined-up box, shrunk exactly the way the picture was: the shrunk look's box can
+        // be a pixel off, and on a small or dark picture that alone looks a few percent dimmer.
+        var colorOk = !checkColor || ColorFits(screen, t, (best.X, best.Y, best.W, best.H), range);
+        return new Match(screen.Left + best.X + best.W / 2, screen.Top + best.Y + best.H / 2, Math.Max(0, best.Score), (double)best.W / t.Width, colorOk);
+
+        // The find as the shrunk look saw it, in screen pixels.
+        Match Coarse() => new(
+            screen.Left + (int)Math.Round((b.X + b.W / 2 + 0.5) * sx),
+            screen.Top + (int)Math.Round((b.Y + b.H / 2 + 0.5) * sy),
+            Math.Max(0, b.Score), b.Scale * sx, coarse.ColorOk);
+    }
+
+    /// <summary>Whether the box's colors match a shrunk picture's, compared at the picture's own pixel size.</summary>
+    private static bool ColorFits(ScreenImage screen, ImageTemplate t, (int X, int Y, int W, int H) box, double? range)
+    {
+        // Room around the box for the color check to try it a little bigger (see BestFit).
+        var room = (int)Math.Ceiling(Math.Max(t.Width, t.Height) * 0.22) + 1;
+        var (image, left, top) = ShrunkAround(screen, box, t.Width, t.Height, room);
+        return ColorDistance(image, t, (left, top, t.Width, t.Height), range) <= ColorLimit;
+    }
+
+    /// <summary>
+    /// The box shrunk to <paramref name="tw"/>×<paramref name="th"/> the way <see cref="Shrunk"/> does, with up to
+    /// <paramref name="room"/> more shrunk pixels around it (as far as the screen goes). Also says where the box is in it.
+    /// </summary>
+    private static (ScreenImage Image, int Left, int Top) ShrunkAround(ScreenImage screen, (int X, int Y, int W, int H) box, int tw, int th, int room)
+    {
+        static int Edge(int start, int i, int size, int parts) => start + (int)Math.Floor((double)i * size / parts);
+        int i0 = -room, i1 = tw + room, j0 = -room, j1 = th + room;
+        while (i0 < 0 && Edge(box.X, i0, box.W, tw) < 0) i0++;
+        while (i1 > tw && Edge(box.X, i1, box.W, tw) > screen.Width) i1--;
+        while (j0 < 0 && Edge(box.Y, j0, box.H, th) < 0) j0++;
+        while (j1 > th && Edge(box.Y, j1, box.H, th) > screen.Height) j1--;
+        int w = i1 - i0, h = j1 - j0;
+        var src = screen.Bgra;
+        var px = new byte[w * h * 4];
+        for (var j = j0; j < j1; j++)
+        {
+            int y0 = Edge(box.Y, j, box.H, th), y1 = Math.Max(y0 + 1, Edge(box.Y, j + 1, box.H, th));
+            for (var i = i0; i < i1; i++)
+            {
+                int x0 = Edge(box.X, i, box.W, tw), x1 = Math.Max(x0 + 1, Edge(box.X, i + 1, box.W, tw));
+                long b = 0, g = 0, r = 0, n = 0;
+                for (var y = y0; y < y1 && y < screen.Height; y++)
+                for (var x = x0; x < x1 && x < screen.Width; x++)
+                {
+                    var k = (y * screen.Width + x) * 4;
+                    b += src[k]; g += src[k + 1]; r += src[k + 2]; n++;
+                }
+                if (n == 0) n = 1;
+                var o = ((j - j0) * w + i - i0) * 4;
+                px[o] = (byte)(b / n); px[o + 1] = (byte)(g / n); px[o + 2] = (byte)(r / n); px[o + 3] = 255;
+            }
+        }
+        return (new ScreenImage(0, 0, w, h, px), -i0, -j0);
+    }
+
+    /// <summary>
+    /// Part of the screen in gray with running sums, to shrink any box in it the way <see cref="Shrunk"/> does (each
+    /// pixel the average of the ones it covers) and compare it with a picture. Positions count from the image's corner.
+    /// </summary>
+    private sealed class Region
+    {
+        private readonly long[] _sum;
+        private readonly int _stride;
+
+        public Region(ScreenImage screen, int left, int top, int width, int height)
+        {
+            Left = Math.Max(0, left);
+            Top = Math.Max(0, top);
+            Right = Math.Min(screen.Width, left + width);
+            Bottom = Math.Min(screen.Height, top + height);
+            var w = Math.Max(0, Right - Left);
+            var h = Math.Max(0, Bottom - Top);
+            _stride = w + 1;
+            _sum = new long[_stride * (h + 1)];
+            var px = screen.Bgra;
+            for (var y = 0; y < h; y++)
+            {
+                long row = 0;
+                var i = ((Top + y) * screen.Width + Left) * 4;
+                for (var x = 0; x < w; x++, i += 4)
+                {
+                    row += (px[i] * 29 + px[i + 1] * 150 + px[i + 2] * 77) >> 8;
+                    _sum[(y + 1) * _stride + x + 1] = _sum[y * _stride + x + 1] + row;
+                }
+            }
+        }
+
+        public int Left { get; }
+        public int Top { get; }
+        public int Right { get; }
+        public int Bottom { get; }
+
+        /// <summary>How alike the box at <paramref name="x"/>, <paramref name="y"/>, shrunk to the picture's size, is to it.</summary>
+        public double Score(int x, int y, int w, int h, Needle t)
+        {
+            // Where each picture column and row starts in the box, as Shrunk splits it.
+            Span<int> cols = stackalloc int[t.Width + 1];
+            Span<int> rows = stackalloc int[t.Height + 1];
+            Edges(cols, w, t.Width, x - Left);
+            Edges(rows, h, t.Height, y - Top);
+            double sum = 0, sumSq = 0, cross = 0;
+            var px = t.Pixels;
+            for (var ty = 0; ty < t.Height; ty++)
+            {
+                int r0 = rows[ty] * _stride, r1 = rows[ty + 1] * _stride, tall = rows[ty + 1] - rows[ty];
+                for (var tx = 0; tx < t.Width; tx++)
+                {
+                    int c0 = cols[tx], c1 = cols[tx + 1];
+                    var v = (double)(_sum[r1 + c1] - _sum[r0 + c1] - _sum[r1 + c0] + _sum[r0 + c0]) / ((c1 - c0) * tall);
+                    sum += v;
+                    sumSq += v * v;
+                    cross += v * px[ty * t.Width + tx];
+                }
+            }
+            return Correlation(t.Count, sum, sumSq, cross, t);
+        }
+
+        private static void Edges(Span<int> edges, int size, int parts, int offset)
+        {
+            for (var i = 0; i < parts; i++)
+            {
+                var start = i * size / parts;
+                edges[i] = offset + start;
+                edges[i + 1] = offset + Math.Max(start + 1, (i + 1) * size / parts);
+            }
+        }
     }
 
     /// <summary>The screen shrunk by <paramref name="by"/>, each pixel the average of the ones it covers. Its corner is 0, 0. Apps shrink big picked pictures with this too, so they match the shrunk screen.</summary>
@@ -281,7 +536,8 @@ public static class TemplateMatcher
         return new ScreenImage(0, 0, w, h, px);
     }
 
-    private static Match? FindAsSaved(ScreenImage screen, ImageTemplate template, double minScale, double maxScale, bool matchColor, int? brightnessPct)
+    /// <summary>The best spot at the picture's own pixel size (the screen as given), and whether its colors match.</summary>
+    private static (Found Box, bool ColorOk)? Best(ScreenImage screen, ImageTemplate template, double minScale, double maxScale, bool matchColor, double? range, double levels)
     {
         var hay = new Haystack(ImageTemplate.ToGray(screen), screen.Width, screen.Height);
         var scales = Scales(template, minScale, maxScale, out var step);
@@ -295,12 +551,11 @@ public static class TemplateMatcher
         if (all.Count == 0) return null;
         var b = all[0];
         var checkColor = matchColor && template.HasColor;
-        double? range = brightnessPct is { } pct ? Math.Clamp(pct, Brightness.MinPct, Brightness.MaxPct) / 100.0 : null;
         var colorOk = true;
         if (checkColor)
         {
             // The best-shaped spot with the right colors; a same-shaped thing in another color is skipped.
-            var pick = all.FirstOrDefault(f => ColorDistance(screen, template, f, range) <= ColorLimit);
+            var pick = all.FirstOrDefault(f => ColorDistance(screen, template, f, range, levels) <= ColorLimit);
             if (pick.W > 0) b = pick;
             else colorOk = false;
         }
@@ -313,10 +568,10 @@ public static class TemplateMatcher
                 var s = b.Scale + d;
                 if (s < minScale - 1e-9 || s > maxScale + 1e-9) continue;
                 if (Polish(hay, template, b, s) is { } p && p.Score > b.Score
-                    && (!checkColor || !colorOk || ColorDistance(screen, template, p, range) <= ColorLimit)) b = p;
+                    && (!checkColor || !colorOk || ColorDistance(screen, template, p, range, levels) <= ColorLimit)) b = p;
             }
         }
-        return new Match(screen.Left + b.X + b.W / 2, screen.Top + b.Y + b.H / 2, Math.Max(0, b.Score), b.Scale, colorOk);
+        return (b, colorOk);
     }
 
     /// <summary>
@@ -325,7 +580,7 @@ public static class TemplateMatcher
     /// the picture's, so a dimmer or brighter copy matches too. Otherwise a spot more than <paramref name="range"/>
     /// (a share, 0.1 = 10%) dimmer or brighter than the picture doesn't match at all.
     /// </summary>
-    internal static double ColorDistance(ScreenImage screen, ImageTemplate t, (int X, int Y, int W, int H) at, double? range)
+    internal static double ColorDistance(ScreenImage screen, ImageTemplate t, (int X, int Y, int W, int H) at, double? range, double levels = NoiseLevels)
     {
         if (t.Rgb is null) return 0;
         if (range is not { } r)
@@ -337,7 +592,7 @@ public static class TemplateMatcher
         // inside the picture only sees its middle, which is brighter. Measure where the colors line up best.
         var (bestMine, bestSeen) = BestFit(screen, t, at);
         var allowed = r + BrightnessNoise;
-        if (BrightnessOff(bestMine, bestSeen, allowed)) return 255;
+        if (BrightnessOff(bestMine, bestSeen, allowed, levels)) return 255;
         return Distance(bestMine, bestSeen, 1 / (1 + allowed), 1 / Math.Max(0.01, 1 - allowed));
     }
 
@@ -389,7 +644,7 @@ public static class TemplateMatcher
     /// picture. Per channel, because a bright channel that is already at full (255) can't get brighter, while the
     /// others still show it. Channels that are nearly black in the picture are skipped (no brightness to compare).
     /// </summary>
-    private static bool BrightnessOff(byte[] want, byte[] seen, double range)
+    private static bool BrightnessOff(byte[] want, byte[] seen, double range, double levels)
     {
         for (var c = 0; c < 3; c++)
         {
@@ -398,12 +653,23 @@ public static class TemplateMatcher
             var cells = want.Length / 3;
             if (w / cells < 12) continue;
             var ratio = s / w;
-            if (ratio < 1 - range || ratio > 1 + range) return true;
+            // On a dark picture a few levels either way is already a few percent (see LooseLevels).
+            var allowed = Math.Max(range, levels * cells / w);
+            if (ratio < 1 - allowed || ratio > 1 + allowed) return true;
         }
         return false;
     }
 
-    private static double ColorDistance(ScreenImage screen, ImageTemplate t, Found f, double? range) => ColorDistance(screen, t, (f.X, f.Y, f.W, f.H), range);
+    /// <summary>Brightness levels (of 255) a color may be off by however dark it is, for the real check: none.</summary>
+    private const double NoiseLevels = 0;
+    /// <summary>
+    /// Same, for the rough first look on a shrunk screen, whose pixels don't line up with the picture's: a pixel's
+    /// shift of light text on a dark picture looked over 6% dimmer there. The lined-up box is then checked exactly.
+    /// </summary>
+    private const double LooseLevels = 5;
+
+    private static double ColorDistance(ScreenImage screen, ImageTemplate t, Found f, double? range, double levels) =>
+        ColorDistance(screen, t, (f.X, f.Y, f.W, f.H), range, levels);
 
     private static byte[] ResizeRgb(byte[] rgb, int w, int h, int nw, int nh)
     {
@@ -443,7 +709,7 @@ public static class TemplateMatcher
         var h = (int)Math.Round(template.Height * scale);
         if (TooSmall(template, w, h) || w > hay.Width || h > hay.Height) return found;
         var full = Resize(template.Gray, template.Width, template.Height, w, h);
-        var factor = Math.Clamp(Math.Min(w, h) / CoarseTarget, 1, MaxFactor);
+        var factor = Math.Clamp((int)Math.Round(Math.Min(w, h) / (double)CoarseTarget, MidpointRounding.AwayFromZero), 1, MaxFactor);
 
         var coarse = hay.Level(factor);
         var tCoarse = new Needle(Shrink(full, w, h, factor, out var cw, out var ch), cw, ch);
@@ -544,6 +810,12 @@ public static class TemplateMatcher
             for (var x = 0; x < t.Width; x++) acc += px[row + x] * tp[trow + x];
             sumHT += acc;
         }
+        return Correlation(n, sumH, sumHH, sumHT, t);
+    }
+
+    /// <summary>The score from a screen area's sum, sum of squares and sum of products with the picture.</summary>
+    private static double Correlation(double n, double sumH, double sumHH, double sumHT, Needle t)
+    {
         var varH = sumHH - sumH * sumH / n;
         if (t.Variance < 1e-6 || varH < 1e-6)
         {
