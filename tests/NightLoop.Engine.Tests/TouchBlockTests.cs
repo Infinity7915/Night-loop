@@ -105,6 +105,26 @@ public class TouchBlockTests
     }
 
     [Fact]
+    public async Task If_the_app_is_not_open_is_skipped_while_it_is_open()
+    {
+        // Cryo's start: open the game only when it isn't in front, then carry on.
+        var doc = new MacroBuilder()
+            .If(new JsonObject { ["kind"] = "not", ["condition"] = new JsonObject { ["kind"] = "appInFront", ["package"] = "com.example.game" } })
+            .Add(BlockTypes.AppOpen, new() { ["package"] = "com.example.game" })
+            .Add(BlockTypes.WaitForApp, new() { ["package"] = "com.example.game" })
+            .End()
+            .Add(BlockTypes.Tap, new() { ["x"] = 1, ["y"] = 2 })
+            .Build();
+        var open = new FakeTouch { ForegroundApp = "com.example.game" };
+        Assert.Equal(RunState.Stopped, (await RunAsync(doc, open)).State);
+        Assert.Equal(["tap 1,2 50"], open.Log);
+
+        var closed = new FakeTouch { ForegroundApp = "com.android.launcher" };
+        Assert.Equal(RunState.Stopped, (await RunAsync(doc, closed)).State);
+        Assert.Equal(["open com.example.game", "tap 1,2 50"], closed.Log);
+    }
+
+    [Fact]
     public async Task Missing_apps_and_slow_apps_fault()
     {
         var missing = await RunAsync(new MacroBuilder().Add(BlockTypes.AppOpen, new() { ["package"] = "com.not.here" }).Build(), new FakeTouch());
@@ -133,7 +153,8 @@ public class TouchBlockTests
             })
             .Build();
         var hold = RunAsync(doc, touch);
-        await Task.Delay(100);
+        // Let it hold for a few checks first, however long the run takes to get going (a busy test machine was slow).
+        for (var i = 0; i < 500 && touch.HoldChecks < 3; i++) await Task.Delay(10);
         touch.ForegroundApp = "com.example.game"; // the check turns true: let go
         var run = await hold;
         Assert.Equal(RunState.Stopped, run.State);

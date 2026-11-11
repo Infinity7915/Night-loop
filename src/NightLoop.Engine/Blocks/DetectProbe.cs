@@ -57,7 +57,7 @@ public static class DetectProbe
         if (what.ImageData is not { Length: > 0 } data || !ImageTemplate.TryDecode(data, out var t) || t is null)
             return new(false, "Capture the picture first.");
         var m = TemplateMatcher.Find(shot, t, what.SizeTolerancePct, what.MatchColor, what.BrightnessPct);
-        if (m is not { } found || found.Score * 100 < what.ConfidencePct || !found.ColorOk)
+        if (m is not { } found || !Vision.AlikeEnough(found.Score, what.ConfidencePct) || !found.ColorOk)
             return new(false, "The picture isn't on screen right now. Show it on screen, then pick the spot again.");
         var w = Math.Max(1, (int)Math.Round(t.Width * found.Scale));
         var h = Math.Max(1, (int)Math.Round(t.Height * found.Scale));
@@ -85,7 +85,7 @@ public static class DetectProbe
     private static ProbeResult Picture(RunContext ctx, LookFor what)
     {
         if (Vision.BestImageMatch(ctx, what) is not { } m) return new ProbeResult(false, "The picture is bigger than the area to look in.");
-        var score = (int)Math.Floor(m.Score * 100);
+        var score = Vision.Percent(m.Score);
         var at = Vision.PointIn(m, what);
         var shown = m.Scale / Vision.CapturedScale(what.ImageData); // compared with how it was picked
         var size = Math.Abs(shown - 1) < 0.005 ? "" : $" at {Math.Round(shown * 100)}% of its size";
