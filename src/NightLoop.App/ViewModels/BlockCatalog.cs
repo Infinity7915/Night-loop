@@ -626,7 +626,8 @@ internal static class F
     private static string AutoSize(int? stored) => stored is null or 25 ? "" : stored.Value.ToString(CultureInfo.InvariantCulture);
 
     private const string MatchColorHint =
-        "On: the colors have to match too, so a same-shaped thing in another color is never clicked. Off: only the shape counts.";
+        "On: the colors have to match too, so a same-shaped thing in another color, or a grayed-out copy, is never clicked. " +
+        "Off: only the shape counts.";
 
     /// <summary>Picture blocks: the colors have to match as well as the shape. On unless turned off.</summary>
     public static FieldDef MatchColor() =>

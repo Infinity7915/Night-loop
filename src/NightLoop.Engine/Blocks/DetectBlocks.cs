@@ -144,7 +144,7 @@ internal static class DetectBlocks
     }
 
     /// <summary>What Swipe and scan / Walk to look for: a picture (default) or text.</summary>
-    private static LookFor Look(Block b) => b.GetString("target", "image") == "text"
+    internal static LookFor Look(Block b) => b.GetString("target", "image") == "text"
         ? DetectBlocksLook.Text(b) with { Value = b.GetString("value", "") , Contains = b.GetString("match", "contains") == "contains" }
         : DetectBlocksLook.Picture(b);
 

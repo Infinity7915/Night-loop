@@ -583,9 +583,12 @@ public static class TemplateMatcher
     internal static double ColorDistance(ScreenImage screen, ImageTemplate t, (int X, int Y, int W, int H) at, double? range, double levels = NoiseLevels)
     {
         if (t.Rgb is null) return 0;
+        // The rough first look on a shrunk screen (levels above none) only has to skip a copy that is clearly gray.
+        var rough = levels > NoiseLevels;
         if (range is not { } r)
         {
             var (mine, seen) = Thumbs(screen, t, at);
+            if (Faded(mine, seen, null, rough)) return 255;
             return Distance(mine, seen, 0.6, 1.6);
         }
         // A dimmer copy is often found a little too small (the dim edge blends into the background), and a box
@@ -593,7 +596,105 @@ public static class TemplateMatcher
         var (bestMine, bestSeen) = BestFit(screen, t, at);
         var allowed = r + BrightnessNoise;
         if (BrightnessOff(bestMine, bestSeen, allowed, levels)) return 255;
+        if (Faded(bestMine, bestSeen, allowed, rough)) return 255;
         return Distance(bestMine, bestSeen, 1 / (1 + allowed), 1 / Math.Max(0.01, 1 - allowed));
+    }
+
+    /// <summary>
+    /// With a brightness range, the screen must show at least this share of the picture's color, less the range (a
+    /// wider range allows for lighting, and lighting washes colors out a little too). Real matches keep 94% or more;
+    /// a grayed-out card keeps about a fifth.
+    /// </summary>
+    private const double ExactKeep = 0.7;
+    /// <summary>With Average colors (and at the widest ranges): the least share of the picture's color the screen must show.</summary>
+    private const double AverageKeep = 0.45;
+    /// <summary>
+    /// Color that is missing only counts from this much, in levels (of 255) averaged over the picture: below it a
+    /// picture has too little color to say it is gone (white text, a gray icon), and a small colored part that changed
+    /// (a highlight in one corner) is not the whole picture fading.
+    /// </summary>
+    private const double FadeLevels = 8;
+    /// <summary>
+    /// The rough first look on a shrunk screen, whose pixels don't line up with the picture's, only skips a spot that
+    /// has lost far more: there the share to keep is multiplied by this. The lined-up box is then checked in full.
+    /// </summary>
+    private const double RoughKeep = 0.6;
+
+    /// <summary>How much color is missing between a picture and a spot on screen. See <see cref="Faded"/>.</summary>
+    /// <param name="LostShare">The share (0–1) of the picture's color the screen doesn't show.</param>
+    /// <param name="LostLevels">The same in levels (of 255), averaged over the picture.</param>
+    /// <param name="GainedShare">The share of the screen's color the picture doesn't have.</param>
+    /// <param name="GainedLevels">The same in levels, averaged over the picture.</param>
+    internal readonly record struct Fade(double LostShare, double LostLevels, double GainedShare, double GainedLevels);
+
+    /// <summary>
+    /// Whether the color has drained out of the picture on screen: a grayed-out button or card, with the same shape and
+    /// the same light and dark, but most of its color gone (or the other way round: the picture is the gray one).
+    /// Brightness can't tell those apart. A gray copy of a many-colored picture is as bright as the picture in every
+    /// channel, and on a pale picture the difference is far below <see cref="ColorLimit"/>.
+    /// <para>
+    /// "Color" is how far a cell is from gray: its red, green and blue, less their average. With a brightness range
+    /// (<paramref name="allowed"/>), the screen must show most of the picture's color in the same hue, once each
+    /// channel is evened out as far as the range allows (so a slight tint all over is still only a tint). With Average
+    /// colors (null), brightness is evened out freely and only how strong the color is counts, not its hue, and only
+    /// color the picture has: light in games tints things, and that still matches.
+    /// </para>
+    /// </summary>
+    private static bool Faded(byte[] want, byte[] seen, double? allowed, bool rough = false)
+    {
+        var f = FadeOf(want, seen, allowed);
+        var keep = allowed is { } a ? Math.Max(AverageKeep, ExactKeep - a) : AverageKeep;
+        if (rough) keep *= RoughKeep;
+        if (f.LostLevels >= FadeLevels && f.LostShare > 1 - keep) return true;
+        return allowed is not null && f.GainedLevels >= FadeLevels && f.GainedShare > 1 - keep;
+    }
+
+    internal static Fade FadeOf(byte[] want, byte[] seen, double? allowed)
+    {
+        // What to multiply the screen by so it is as bright as the picture: per channel within the range, or as a
+        // whole (Average colors).
+        Span<double> gain = stackalloc double[3];
+        if (allowed is { } range)
+        {
+            for (var c = 0; c < 3; c++)
+            {
+                double w = 0, s = 0;
+                for (var i = c; i < want.Length; i += 3) { w += want[i]; s += seen[i]; }
+                gain[c] = s < 1 ? 1 : Math.Clamp(w / s, 1 / (1 + range), 1 / Math.Max(0.01, 1 - range));
+            }
+        }
+        else
+        {
+            double w = 0, s = 0;
+            for (var i = 0; i < want.Length; i++) { w += want[i]; s += seen[i]; }
+            gain[0] = gain[1] = gain[2] = s < 1 ? 1 : Math.Clamp(w / s, 0.25, 4);
+        }
+
+        double mine = 0, lost = 0, theirs = 0, gained = 0;
+        for (var i = 0; i < want.Length; i += 3)
+        {
+            double r1 = want[i], g1 = want[i + 1], b1 = want[i + 2];
+            double r2 = Math.Min(255, seen[i] * gain[0]), g2 = Math.Min(255, seen[i + 1] * gain[1]), b2 = Math.Min(255, seen[i + 2] * gain[2]);
+            double m1 = (r1 + g1 + b1) / 3, m2 = (r2 + g2 + b2) / 3;
+            r1 -= m1; g1 -= m1; b1 -= m1;
+            r2 -= m2; g2 -= m2; b2 -= m2;
+            double n1 = Math.Sqrt(r1 * r1 + g1 * g1 + b1 * b1), n2 = Math.Sqrt(r2 * r2 + g2 * g2 + b2 * b2);
+            double keptMine, keptTheirs;
+            if (allowed is null) keptMine = keptTheirs = Math.Min(n1, n2);
+            else
+            {
+                // How much of one's color the other shows in the same hue (none when it points the other way).
+                var along = r1 * r2 + g1 * g2 + b1 * b2;
+                keptMine = n1 > 1e-9 ? Math.Clamp(along / n1, 0, n1) : 0;
+                keptTheirs = n2 > 1e-9 ? Math.Clamp(along / n2, 0, n2) : 0;
+            }
+            mine += n1;
+            lost += n1 - keptMine;
+            theirs += n2;
+            gained += n2 - keptTheirs;
+        }
+        var cells = Math.Max(1, want.Length / 3);
+        return new Fade(mine > 1e-9 ? lost / mine : 0, lost / cells, theirs > 1e-9 ? gained / theirs : 0, gained / cells);
     }
 
     /// <summary>Added to every brightness range: screens never show a picture exactly as captured.</summary>
