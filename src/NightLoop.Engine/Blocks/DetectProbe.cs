@@ -21,7 +21,8 @@ public static class DetectProbe
 {
     /// <summary>Blocks the editor offers the test for.</summary>
     public static bool CanTest(Block block) => block.Type is BlockTypes.WaitForText or BlockTypes.WaitForTextGone or BlockTypes.WaitForImage or BlockTypes.WaitForImageGone
-        or BlockTypes.DetectPixelColor or BlockTypes.DetectPixelColorGone or BlockTypes.FindClick or BlockTypes.ScanTurn or BlockTypes.If or BlockTypes.RepeatUntil;
+        or BlockTypes.DetectPixelColor or BlockTypes.DetectPixelColorGone or BlockTypes.FindClick or BlockTypes.ScanTurn or BlockTypes.If or BlockTypes.RepeatUntil
+        or BlockTypes.SwipeScan or BlockTypes.WalkTo;
 
     public static async Task<ProbeResult> LookOnceAsync(Block block, RunEnvironment environment, string? targetExe, CancellationToken ct = default)
     {
@@ -37,6 +38,7 @@ public static class DetectProbe
                 BlockTypes.WaitForText or BlockTypes.WaitForTextGone => await FindAsync(ctx, DetectBlocksLook.Text(block)),
                 BlockTypes.WaitForImage or BlockTypes.WaitForImageGone => await FindAsync(ctx, DetectBlocksLook.Picture(block)),
                 BlockTypes.FindClick or BlockTypes.ScanTurn => await FindAsync(ctx, DetectBlocksLook.Target(block)),
+                BlockTypes.SwipeScan or BlockTypes.WalkTo => await FindAsync(ctx, DetectBlocks.Look(block)),
                 _ => new ProbeResult(false, "This block doesn't look at the screen."),
             };
         }
@@ -90,7 +92,7 @@ public static class DetectProbe
         var shown = m.Scale / Vision.CapturedScale(what.ImageData); // compared with how it was picked
         var size = Math.Abs(shown - 1) < 0.005 ? "" : $" at {Math.Round(shown * 100)}% of its size";
         if (!m.ColorOk && score >= what.ConfidencePct)
-            return new ProbeResult(false, $"Found the shape{size} ({score}% alike), but not in the picture's colors. Match colors is on, so it won't click a different-colored one.", at);
+            return new ProbeResult(false, $"Found the shape{size} ({score}% alike), but not in the picture's colors: it looks like a different-colored or grayed-out copy. Match colors is on, so that doesn't count as found.", at);
         if (score >= what.ConfidencePct)
             return new ProbeResult(true, $"Found the picture at {at.X}, {at.Y}{size} ({score}% alike).", at);
         var hint = what.SizeTolerancePct is not null
