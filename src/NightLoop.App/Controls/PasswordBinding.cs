@@ -12,12 +12,15 @@ public static class PasswordBinding
 {
     public static readonly DependencyProperty ValueProperty = DependencyProperty.RegisterAttached(
         "Value", typeof(string), typeof(PasswordBinding),
-        new FrameworkPropertyMetadata("", FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnValueChanged));
+        // Default null, not "": the box listens for typing only once this value changes, and the dialog's bound value
+        // starts as "". With "" as the default nothing changed, the box never listened, and whatever was typed never
+        // reached the dialog ("Enter your current password." with the password in the box).
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnValueChanged));
 
     private static readonly DependencyProperty HookedProperty =
         DependencyProperty.RegisterAttached("Hooked", typeof(bool), typeof(PasswordBinding));
 
-    public static string GetValue(DependencyObject d) => (string)d.GetValue(ValueProperty);
+    public static string GetValue(DependencyObject d) => (string?)d.GetValue(ValueProperty) ?? "";
     public static void SetValue(DependencyObject d, string value) => d.SetValue(ValueProperty, value);
 
     private static void OnValueChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
