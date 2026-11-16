@@ -1,0 +1,2 @@
+tray icon: ok, notification sent=True
+text reading: ok, read "Collect 25 coins"
